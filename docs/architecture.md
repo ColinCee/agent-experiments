@@ -50,6 +50,10 @@ A continued session copies its parent's entries under its own id; each entry cou
 - **Check.** Under the rules the sessions really had (`--in-force`), the replay must miss within 1.5 times the real rate or within 5 points of it; otherwise the verdict is `replay can't test this`. On the user's first replay, 198 moments, the real agents missed 30% and the replay 10%.
 - **Verdict.** Moments where both replies had a chance, compared by session (Method): `works` at one-sided p < 0.05 with fewer misses under the new rules, `no useful effect` when the 90% range rules out a 30% drop, else `can't tell`. One row per output folder goes in `replays`.
 
+## Rule and skill size
+
+[`size.py`](../src/agent_experiments/size.py) shows whether agents only append to rules and skills. From the agents repo's `git log --numstat -M` and each file's text at each commit, it fills `sizes`: one row per file a commit changed, with its words after the commit and the lines added and deleted. A file renamed away or deleted drops to 0 words. `daily --agents-repo` refreshes it for `home/*.md`, the every-turn rules, and `skills/*/SKILL.md`. The every-turn files held 559 words in the repo's first commit on 14 October 2026 and 1,917 on 12 November; 22% of their changes in that time deleted no line.
+
 ## Method
 
 [`stats.py`](../src/agent_experiments/stats.py) uses SciPy for both tests.
@@ -63,4 +67,4 @@ A continued session copies its parent's entries under its own id; each entry cou
 
 ## Overview page
 
-[`page.py`](../src/agent_experiments/page.py) writes one HTML file with plotly.js inlined once, so it works offline. On top, four numbers: trials running, verdicts in the last 7 days, sessions with a group on the day reported, settled rules no longer helping. Then a row per trial: its day, tasks per group, status, tasks needed, and the drop with its 90% range against a "no change" line. Folded below: each trial's daily miss rates and looks taken, and the tracked measures, last 7 days against the 21 before, flagged ones first; and the replays. A trial that fails is left off, and `daily` prints why and exits 1 after writing the page.
+[`page.py`](../src/agent_experiments/page.py) writes one HTML file with plotly.js inlined once, so it works offline. On top, four numbers: trials running, verdicts in the last 7 days, sessions with a group on the day reported, settled rules no longer helping. Then a row per trial: its day, tasks per group, status, tasks needed, and the drop with its 90% range against a "no change" line. Folded below: each trial's daily miss rates and looks taken, and the tracked measures, last 7 days against the 21 before, flagged ones first; the replays; and rule and skill size: each pattern's words over time, the largest files now, and per month the share of changes that deleted no line (new files included) and the share of changed lines that were added. A trial that fails is left off, and `daily` prints why and exits 1 after writing the page.

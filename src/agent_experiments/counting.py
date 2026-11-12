@@ -15,6 +15,9 @@ CREATE TABLE IF NOT EXISTS replays (
   folder VARCHAR PRIMARY KEY, measure VARCHAR, "day" VARCHAR, in_force VARCHAR, moments INTEGER, paired INTEGER,
   sessions INTEGER, rate_old DOUBLE, rate_new DOUBLE, "drop" DOUBLE, low DOUBLE, high DOUBLE, p DOUBLE,
   real_rate DOUBLE, replay_rate DOUBLE, verdict VARCHAR);
+CREATE TABLE IF NOT EXISTS sizes (
+  n INTEGER, "commit" VARCHAR, "day" VARCHAR, pattern VARCHAR, file VARCHAR, words INTEGER, added INTEGER,
+  deleted INTEGER);
 """
 
 

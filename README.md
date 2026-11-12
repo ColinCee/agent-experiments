@@ -12,7 +12,7 @@ It reads Claude Code session transcripts and a measures file you write in SQL, w
 uv run agent-experiments daily --agents-repo <path to the agents repo>
 ```
 
-It writes `~/.claude/keep-going/experiments.duckdb` and `~/.claude/keep-going/overview.html`; `uv run agent-experiments daily --help` lists the paths it takes.
+It writes `~/.claude/keep-going/experiments.duckdb` and `~/.claude/keep-going/overview.html`, with how the agents repo's rules and skills grow; `uv run agent-experiments daily --help` lists the paths it takes.
 
 To test a rule's new wording on past moments in hours (needs Node with npm, and a signed-in Claude Code):
 

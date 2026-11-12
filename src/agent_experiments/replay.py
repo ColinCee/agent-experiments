@@ -204,9 +204,13 @@ def _ask(out: Path, rules: str, prompts: list[str], model: str) -> list[str | No
     replies: list[str | None] = [None] * len(prompts)
     errors = []
     for row in json.loads(results.read_text(encoding="utf-8"))["results"]["results"]:
-        output = (row.get("response") or {}).get("output")
-        if row.get("error") or not isinstance(output, str):
-            errors.append(str(row.get("error") or row.get("response")))
+        response = row.get("response") or {}
+        output = response.get("output")
+        meta = response.get("metadata") or {}
+        # Claude Code can end "successfully" with an API error, such as a usage limit, as its result text.
+        failure = row.get("error") or meta.get("apiErrorStatus") or meta.get("assistantErrors")
+        if failure or not isinstance(output, str):
+            errors.append(f"{failure} {output}")
         else:
             replies[row["testIdx"]] = output
     if any(re.search(r"limit|quota", e, re.IGNORECASE) for e in errors):

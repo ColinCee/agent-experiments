@@ -164,8 +164,10 @@ def _replays(rows: list[dict]) -> str:
             "<th>New rules</th><th>Drop (90% range)</th><th>Real against replay</th><th>Verdict</th></tr>"
         )
         for r in rows:
+            folder = Path(r["folder"]).name
+            run = "" if folder == r["measure"] else f" ({e(folder)})"  # a second replay of a measure, in its own folder
             parts.append(
-                f"<tr><td>{e(r['name'])}</td><td>{_short(r['day'])}</td><td>{r['paired']} of {r['moments']}</td>"
+                f"<tr><td>{e(r['name'])}{run}</td><td>{_short(r['day'])}</td><td>{r['paired']} of {r['moments']}</td>"
                 f"<td>{_pct(r['rate_old'])}</td><td>{_pct(r['rate_new'])}</td>"
                 f"<td>{_pct(r['drop'])} ({_pct(r['low'])} to {_pct(r['high'])})</td>"
                 f"<td>{_pct(r['real_rate'])} against {_pct(r['replay_rate'])}, {e(r['in_force'])} rules</td>"
@@ -176,6 +178,48 @@ def _replays(rows: list[dict]) -> str:
             "real agents and the replay missed, under the rules those sessions had.</p>"
         )
     return "".join(parts) + "</details>"
+
+
+def _sizes(s: dict, figure: _Figures) -> str:
+    e = html.escape
+    parts = ["<h2>Rule and skill size</h2><details><summary>"]
+    if not s["words"]:
+        return parts[0] + "Not measured: run with --agents-repo.</summary></details>"
+    now: dict[str, int] = {}
+    for _, pattern, words in s["words"]:
+        now[pattern] = words
+    parts.append(", ".join(f"{e(p)}: {w:,} words" for p, w in now.items()) + "</summary>")
+    fig = go.Figure()
+    for i, pattern in enumerate(now):
+        points = [(d, w) for d, p, w in s["words"] if p == pattern]
+        fig.add_trace(
+            go.Scatter(
+                x=[d for d, _ in points],
+                y=[w for _, w in points],
+                name=pattern,
+                mode="lines",
+                line={"color": (OFF, ON, MUTED)[i % 3], "width": 2, "shape": "hv"},
+                hovertemplate="%{x}: %{y:,} words<extra>" + e(pattern) + "</extra>",
+            )
+        )
+    fig.update_layout(legend={"orientation": "h", "y": 1.15, "x": 0}, hovermode="x unified")
+    fig.update_yaxes(rangemode="tozero", title={"text": "Words", "font": {"size": 11}})
+    parts.append(figure(fig, 240))
+    parts.append("<div class='wide'><table><tr><th>Largest files now</th><th>Words</th></tr>")
+    parts += [f"<tr><td>{e(f)}</td><td>{w:,}</td></tr>" for f, w in s["largest"]]
+    parts.append(
+        "</table></div><div class='wide'><table><tr><th>Month</th><th>Changes</th>"
+        "<th>Only added lines</th><th>Lines added, of all changed</th></tr>"
+    )
+    parts += [
+        f"<tr><td>{m}</td><td>{n}</td><td>{_pct(only)}</td><td>{_pct(share)}</td></tr>"
+        for m, n, only, share in s["months"]
+    ]
+    parts.append(
+        "</table></div><p class='note'>A change is one file in one commit. Only added lines: no line deleted, new "
+        "files included. Lines added, of all changed: added / (added + deleted).</p></details>"
+    )
+    return "".join(parts)
 
 
 def render(report: dict) -> str:
@@ -278,6 +322,7 @@ def render(report: dict) -> str:
         parts.append("</table></div><p class='note'>Each cell: share of chances missed, of how many chances.</p>")
     parts.append("</details>")
     parts.append(_replays(report["replays"]))
+    parts.append(_sizes(report["sizes"], figure))
     body = "\n".join(parts)
     return (
         "<!doctype html><html lang='en'><head><meta charset='utf-8'>"

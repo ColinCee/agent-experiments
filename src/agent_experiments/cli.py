@@ -1,5 +1,5 @@
 """agent-experiments: `daily` counts, takes the looks due and writes the overview page; `replay` tests a rule's wording
-on past moments (docs/architecture.md)."""
+on past moments; `size` reads rule and skill sizes from git (docs/architecture.md)."""
 
 import argparse
 import sys
@@ -9,7 +9,7 @@ from pathlib import Path
 
 import numpy as np
 
-from agent_experiments import looks, page, replay
+from agent_experiments import looks, page, replay, size
 from agent_experiments.counting import count
 from agent_experiments.looks import LIMITS, TRIAL_DAYS, shift
 from agent_experiments.stats import tasks_needed
@@ -23,7 +23,9 @@ def main(argv: list[str] | None = None) -> int:
     sub = parser.add_subparsers(dest="command", required=True)
     daily = sub.add_parser("daily", help="count, take the looks due, and write the overview page")
     daily.add_argument("--day", help="the day to report, YYYY-MM-DD (default: yesterday, UTC)")
-    daily.add_argument("--agents-repo", type=Path, default=Path.cwd(), help="the repo whose home/trials holds trials")
+    daily.add_argument(
+        "--agents-repo", type=Path, help="the repo whose home/trials holds trials, and whose rules are sized"
+    )
     daily.add_argument("--trials", type=Path, help="folder of trial files (default: home/trials in --agents-repo)")
     daily.add_argument("--measures", type=Path, default=DATA / "measures" / "measures.sql")
     daily.add_argument("--transcripts", default=str(PROJECTS / "*" / "*.jsonl"))
@@ -42,8 +44,16 @@ def main(argv: list[str] | None = None) -> int:
     rp.add_argument("--out", type=Path, help="folder for picks and replies (default: replays/<measure> beside --db)")
     rp.add_argument("--measures", type=Path, default=DATA / "measures" / "measures.sql")
     rp.add_argument("--db", type=Path, default=DATA / "experiments.duckdb")
+    sz = sub.add_parser("size", help="words of rule and skill files after each commit, and lines added and deleted")
+    sz.add_argument("--repo", type=Path, required=True)
+    sz.add_argument("--paths", nargs="+", default=size.PATHS, help="git globs of the files to size")
+    sz.add_argument("--db", type=Path, default=DATA / "experiments.duckdb")
     args = parser.parse_args(argv)
 
+    if args.command == "size":
+        n = size.measure(args.repo, tuple(args.paths), args.db)
+        print(f"{n} changes to {', '.join(args.paths)} in {args.repo}; the overview page shows them after `daily`.")
+        return 0
     if args.command == "replay":
         if not args.rescore and not (args.old and args.new):
             parser.error("replay needs --old and --new, unless --rescore")
@@ -54,8 +64,10 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     day = args.day or (datetime.now(UTC).date() - timedelta(days=1)).isoformat()
     errors: list[str] = []
-    trials = looks.read_trials(args.trials or args.agents_repo / "home" / "trials", errors)
+    trials = looks.read_trials(args.trials or (args.agents_repo or Path.cwd()) / "home" / "trials", errors)
     count(args.transcripts, args.measures, args.db)
+    if args.agents_repo:
+        size.measure(args.agents_repo, size.PATHS, args.db)
     report = build(args.db, trials, day, errors)
     page.write(args.page, report)
     for lk in report["new_looks"]:
@@ -113,10 +125,12 @@ def build(db: Path, trials: list[looks.Trial], day: str, errors: list[str]) -> d
         """SELECT count(*) FROM looks WHERE verdict <> 'no verdict yet' AND "day" > ? AND "day" <= ?""",
         [shift(day, -7), day],
     ).fetchone()
-    replays = [
-        dict(zip([d[0] for d in con.description], r, strict=True)) | {"name": names.get(r[1], r[1])}
-        for r in con.execute('SELECT * FROM replays ORDER BY "day" DESC, measure').fetchall()
-    ]
+    found = con.execute('SELECT * FROM replays ORDER BY "day" DESC, measure')
+    columns = [d[0] for d in found.description]
+    replays = [dict(zip(columns, r, strict=True)) for r in found.fetchall()]
+    for r in replays:
+        r["name"] = names.get(r["measure"], r["measure"])
+    sizes = size.report(con)
     con.close()
     return {
         "day": day,
@@ -131,6 +145,7 @@ def build(db: Path, trials: list[looks.Trial], day: str, errors: list[str]) -> d
         "settled": settled,
         "measures": measures,
         "replays": replays,
+        "sizes": sizes,
         "new_looks": [r["new"] for r in rows if r["new"]],
     }
 
