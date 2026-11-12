@@ -223,6 +223,29 @@ def measure_tasks(con, measure: str, first: str, last: str) -> np.ndarray:
     return np.array(rows, dtype=float).reshape(-1, 2)
 
 
+def by_day(con, measure: str, first: str, last: str) -> dict[str, tuple[int, int]]:
+    """Each day's (chances, misses) for a measure, in the same tasks as measure_tasks."""
+    rows = con.execute(
+        """SELECT c."day", count(*), sum(c.miss::INT) FROM chances c JOIN tasks t USING (session)
+           WHERE c.measure = ? AND c."day" BETWEEN ? AND ? GROUP BY c."day\"""",
+        [measure, first, last],
+    ).fetchall()
+    return {d: (c, m) for d, c, m in rows}
+
+
+def rolling(
+    counts: dict[str, tuple[int, int]], first: str, last: str, width: int = 3
+) -> list[tuple[str, float | None]]:
+    """Each day's share of chances missed over it and the `width - 1` days before; None with no chances."""
+    out = []
+    for i in range((date.fromisoformat(last) - date.fromisoformat(first)).days + 1):
+        day = shift(first, i)
+        window = [counts.get(shift(day, -k), (0, 0)) for k in range(width)]
+        chances = sum(c for c, _ in window)
+        out.append((day, sum(m for _, m in window) / chances if chances else None))
+    return out
+
+
 def flag(con, measure: str, day: str, rng: np.random.Generator) -> dict | None:
     """Whether `day`'s miss rate lies outside the middle 98% of what the same number of tasks from the 28 days before
     gave; None with too little history to say."""

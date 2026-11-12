@@ -8,7 +8,7 @@ Everything dashed in the picture is the user's own data and stays under `~/.clau
 
 ## Hook
 
-A trial is a file in the agents repo's `home/trials/` (format: that repo's `docs/keep-going.md`); an optional `name:` line is what the page calls it (else the name of a measure it shares its file name with), and a file with no `started:` date is reported and skipped. Its hook, at each session and subagent start, puts the rule's `On` or `Off` wording in the session's context and writes one line that lands in the transcript as a `hook_additional_context` attachment:
+A trial is a file in the agents repo's `home/trials/` (format: that repo's `docs/keep-going.md`; a file with no `started:` date is reported and skipped). Its hook, at each session and subagent start, puts the rule's `On` or `Off` wording in the session's context and writes one line that lands in the transcript as a `hook_additional_context` attachment:
 
 ```
 Rule trials: <trial>=on|off ... holdout=yes|no task=<8 hex> rules=<7 hex>
@@ -26,7 +26,7 @@ The group comes from a hash of the trial's name and the task, so a task keeps it
 | `stamps` | stamp the hook gave a session, with its time |
 | `chances` | moment a rule could be broken (`measure, session, day, ts, uuid, miss`), as the measures file defines them |
 
-A continued session copies its parent's entries under its own id; each entry counts once, for the session that started first, which is the continuation's root. A measures file is SQL that creates a temp table `chances` from the temp tables `texts`, `calls` and `typed`; `sessions.sql` names their columns. It may also create `measure_names(measure, name)`, and the page then shows those names in place of measure ids. A full rebuild takes about 8 s on 2 GB of transcripts.
+A continued session copies its parent's entries; each counts once, for the root session. A measures file is SQL that creates a temp table `chances` from the temp tables `texts`, `calls` and `typed`; `sessions.sql` names their columns. It may also create `measure_names(measure, name)`, names the page shows in place of measure ids, and `changes(measure, day, what)`, the days a rule for a measure changed. A full rebuild takes about 8 s on 2 GB of transcripts.
 
 `looks` and `replays` are never rebuilt: a look is written once, and a replay's row changes only when that replay is rerun.
 
@@ -34,7 +34,7 @@ A continued session copies its parent's entries under its own id; each entry cou
 
 [`looks.py`](../src/agent_experiments/looks.py) turns chances into tasks per group, then into looks.
 
-- **Unit.** A task is the stamp's `task=` token, else the root session. A session counts for a trial only when every stamp it and its root got agrees on its group, and only its chances after the first stamp that named the trial, so a trial added mid-task does not claim earlier replies. Sessions nobody typed in (scheduled runs, scripted calls) are left out; sessions with no stamp are left out and counted on the page.
+- **Unit.** A task is the stamp's `task=` token, else the root session. A session counts for a trial only when every stamp it and its root got agrees on its group, and only its chances after the first stamp that named the trial, so a trial added mid-task does not claim earlier replies. Sessions nobody typed in, or with no stamp, are left out; the page counts the unstamped.
 - **When.** A trial is looked at when its smaller group reaches 10, 20 and 40 tasks, and a last time 7 days after `started`, whatever its size. A look is due only past every look already taken under that trial name and `started` date, so a restarted trial starts again; none follows `works` or the last look.
 - **Verdict.** An early look says `works` or `no verdict yet`. The last says `works`, `no useful effect` (the 90% range of the drop rules out a 30% drop) or `can't tell`. Fewer than 5 tasks in a group is always `can't tell`.
 - **Settled rules.** Holdout tasks against the rest over the last 28 days, on the model with the most replies in the last 7, so a model that no longer needs a rule shows. It is no longer helping when its range rules out a 30% drop.
@@ -42,17 +42,18 @@ A continued session copies its parent's entries under its own id; each entry cou
 
 ## Replays
 
-[`replay.py`](../src/agent_experiments/replay.py) tests a rule's wording in hours: a model writes the agent's next message at past moments under the old rules file and under the new, and the misses are compared.
+[`replay.py`](../src/agent_experiments/replay.py) tests a rule's wording in hours: a model writes the agent's next message at past moments under the old and the new rules, and their misses are compared.
 
-- **Moments.** A measure's stored chances in sessions someone typed in. Sessions are taken in random order, each one's first chance and then others, at most 3 per session. The conversation before a moment becomes text: what the user typed, what the agent wrote, each tool call and how its result began, the last 24,000 characters.
-- **Replies.** promptfoo's Claude Agent SDK provider, on the user's Claude subscription: the rules file inside a short frame is the whole system prompt, with no tools, settings, MCP servers or saved session, and one turn. Claude Code still adds the user's email and the folder, platform and date. npx fetches the pinned promptfoo, Agent SDK and Node, so a machine needs Node with npm and a signed-in Claude Code. Picks and replies are saved in the output folder as they come, so a rerun continues, `--rescore` makes no model calls, and running out of quota stops the run with what it wrote kept.
+- **Moments.** A measure's stored chances in sessions someone typed in. Sessions are taken in random order, each one's first chance and then others, at most 3 per session. The conversation before it becomes text (typed messages, replies, tool calls and how each result began), its last 24,000 characters.
+- **Replies.** The Claude Agent SDK for Python, locked in `uv.lock` with the Claude Code it bundles, on the signed-in subscription, six at once: the framed rules file is the whole system prompt, with no tools, settings, MCP servers or saved session, and one turn. Claude Code still adds the user's email, folder, platform and date.
+- **Runs.** A run's folder is named for the measure and a hash of the framed rules, model and pick settings, which its `manifest.json` records, so changed inputs never reuse replies. Replies are saved as they come: a rerun continues, running out of quota keeps what was written, and `--rescore FOLDER` makes no model calls.
 - **Scoring.** Each reply goes through the measures file as the one text of a session of its own, with nothing called or typed, so one definition of a measure counts both real sessions and replays. Only measures on reply text can be replayed.
-- **Check.** Under the rules the sessions really had (`--in-force`), the replay must miss within 1.5 times the real rate or within 5 points of it; otherwise the verdict is `replay can't test this`. On the user's first replay, 198 moments, the real agents missed 30% and the replay 10%.
-- **Verdict.** Moments where both replies had a chance, compared by session (Method): `works` at one-sided p < 0.05 with fewer misses under the new rules, `no useful effect` when the 90% range rules out a 30% drop, else `can't tell`. One row per output folder goes in `replays`.
+- **Check.** Under the rules the sessions really had (`--in-force`), the replay must miss within 1.5 times the real rate or within 5 points of it; otherwise the verdict is `replay can't test this`. On the first real replay the agents missed 30% and the replay 10%.
+- **Verdict.** Moments where both replies had a chance, compared by session (Method): under 30 is `can't tell`; else `works` at one-sided p < 0.05 with fewer misses under the new rules, `no useful effect` when the 90% range rules out a 30% drop, else `can't tell`. One row per run folder goes in `replays`.
 
 ## Rule and skill size
 
-[`size.py`](../src/agent_experiments/size.py) shows whether agents only append to rules and skills. From the agents repo's `git log --numstat -M` and each file's text at each commit, it fills `sizes`: one row per file a commit changed, with its words after the commit and the lines added and deleted. A file renamed away or deleted drops to 0 words. `daily --agents-repo` refreshes it for `home/*.md`, the every-turn rules, and `skills/*/SKILL.md`. The every-turn files held 559 words in the repo's first commit on 14 October 2026 and 1,917 on 12 November; 22% of their changes in that time deleted no line.
+[`size.py`](../src/agent_experiments/size.py) shows whether agents only append to rules and skills. From the agents repo's `git log --numstat -M` over each pattern's folder (so a file moved into a pattern is not new) and each file's text at each commit, it fills `sizes`: one row per file a commit changed, with its words after the commit and the lines added and deleted. A file renamed away or deleted drops to 0 words. `daily --agents-repo` refreshes it for `home/*.md`, the every-turn rules, and `skills/*/SKILL.md`. The every-turn files grew from 559 words in the first `home/` commit (14 October 2026) to 1,917 on 12 November; in those 30 days 22% of their changes deleted no line, and 14% of the skills'.
 
 ## Method
 
@@ -62,9 +63,14 @@ A continued session copies its parent's entries under its own id; each entry cou
 - **p.** `scipy.stats.permutation_test` over task indices, one-sided: the rule's group misses less. Real looks use 99,999 shuffles, since the first limit needs steps of p well below 0.0003.
 - **Range.** `scipy.stats.bootstrap`, percentile, 90%: the drop `1 - on/off`, resampling tasks within each group. A resample with no misses without the rule has no drop and is left out.
 - **Replays.** The same moments answered under the old and the new wording: shuffles swap the two answers within a session, and the bootstrap draws whole sessions.
-- **Limits.** One-sided O'Brien-Fleming-style limits for the three looks: p < 0.0003, 0.0071 and 0.0225. An independent check on these sessions found p < 0.02 at each look passed a do-nothing rule about 6% of the time, and these limits 3.6%; on made-up tasks they passed 3.0% in 1,000 runs. `tests/test_stats.py` fails if that rises past 7% in 300.
-- **Power.** For each running trial the page shows the tasks per group at which one look at 0.0225 finds a true halving 80% of the time, simulated from that measure's own tasks over the last 28 days (tasks drawn with replacement, the rule's group's misses thinned by half), next to how many tasks a week brings. Sizes tried are 10 to 320, doubling. On the user's sessions up to 11 November 2026, it said 20 for the commonest miss, 40 for two measures, 80 for two and 160 or 320 for four (one more had too little history), while a week brings 5 to 19 tasks per group. So a week often cannot decide, and a trial that can't tell gets a commoner measure or a bolder change, not a longer run.
+- **Limits.** One-sided O'Brien-Fleming-style limits for the three looks: p < 0.0003, 0.0071 and 0.0225. On these sessions they passed a do-nothing rule 3.6% of the time (p < 0.02 at each look: 6%); on made-up tasks, 3.0% in 1,000 runs. `tests/test_stats.py` fails if that rises past 7% in 300.
+- **Power.** For each running trial the page shows the tasks per group (10 to 320, doubling) at which one look at 0.0225 finds a true halving 80% of the time, simulated from that measure's tasks over the last 28 days with the rule's group's misses thinned by half. On the user's sessions up to 11 November 2026 it said 20 for the commonest miss, 40 or 80 for four measures and 160 or 320 for four, while a week brings 5 to 19 tasks per group. So a week often cannot decide, and a trial that can't tell gets a commoner measure or a bolder change, not a longer run.
 
 ## Overview page
 
-[`page.py`](../src/agent_experiments/page.py) writes one HTML file with plotly.js inlined once, so it works offline. On top, four numbers: trials running, verdicts in the last 7 days, sessions with a group on the day reported, settled rules no longer helping. Then a row per trial: its day, tasks per group, status, tasks needed, and the drop with its 90% range against a "no change" line. Folded below: each trial's daily miss rates and looks taken, and the tracked measures, last 7 days against the 21 before, flagged ones first; the replays; and rule and skill size: each pattern's words over time, the largest files now, and per month the share of changes that deleted no line (new files included) and the share of changed lines that were added. A trial that fails is left off, and `daily` prints why and exits 1 after writing the page.
+[`page.py`](../src/agent_experiments/page.py) writes one HTML file of about 20 KB with no script, so any viewer shows it: charts are SVG written directly, coloured by the page's light and dark styles. On top, four counts: trials running, recent verdicts, sessions with a group, settled rules no longer helping. Then a card per trial: its day, tasks per group, status, tasks needed, the drop with its 90% range, and folded, its miss rates with and without the rule since the start, looks marked. Folded below:
+
+- **Tracked measures.** Each one's share of chances missed over 3 days for 6 weeks, a line on each day a rule for it changed (`changes`, and each trial's start), and its misses before and after the latest change. Before and after is not a test: whatever else changed that day moves it too, which a trial's random halves rule out.
+- **Replays**, and **rule and skill size**: words over time, largest files, and per month the share of changes deleting no line and of changed lines added.
+
+A trial that fails is left off, and `daily` prints why and exits 1 after writing the page.

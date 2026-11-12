@@ -3,34 +3,29 @@
 How and why: docs/architecture.md#replays. Picks and replies stay in the user's own output folder.
 """
 
+import asyncio
+import hashlib
 import json
 import os
 import random
 import re
-import shutil
-import subprocess
 from dataclasses import astuple, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
 import duckdb
 import numpy as np
+from claude_agent_sdk import AssistantMessage, ClaudeAgentOptions, ResultMessage, query
 
 from agent_experiments.counting import SCHEMA
 from agent_experiments.stats import USEFUL_DROP, Effect, compare_paired
 
-# Pinned so a replay runs the same next month. promptfoo 0.125.1 needs Node 22.22 or later, so npx fetches a Node with
-# it rather than asking for one on the machine; the provider loads the Agent SDK from beside promptfoo.
-PROMPTFOO = (
-    *("-p", "node@24.22.3", "-p", "promptfoo@0.125.1", "-p", "@anthropic-ai/claude-agent-sdk@0.3.322"),
-    "promptfoo",
-)
 CONTEXT_CHARS = 24_000  # the tail of the conversation a reply is written from: enough for the last few turns
 PER_SESSION = 3  # so one long session cannot fill the sample
 GATE = 1.5  # replayed and real miss rates must agree within this factor for the replay to stand for the real agent
-BATCH = 20  # moments per promptfoo run: it writes its results only at the end, so a crash loses at most these
 PARALLEL = 6  # replies at once, below where the subscription starts to refuse requests
 WORKS_P = 0.05  # one look, so no early-look limits
+MIN_PAIRED = 30  # fewer paired moments than this give no verdict: a handful can swing either way by chance
 
 FRAME = """You are a coding agent in the middle of a session with the user. These are the user's rules for you, loaded \
 every turn:
@@ -147,77 +142,68 @@ def context(lines: list[str], uuid: str) -> str:
     return f"[earlier conversation cut]\n\n{text[-CONTEXT_CHARS:]}" if len(text) > CONTEXT_CHARS else text
 
 
-def _env(out: Path) -> dict[str, str]:
-    # Without the calling agent's session variables the nested Claude Code runs as from a plain terminal; without its
-    # non-essential traffic it makes one model call per reply, not a second to title the session.
-    env = {k: v for k, v in os.environ.items() if not re.match(r"CLAUDE_CODE_|ANTHROPIC_|CLAUDECODE$", k)}
-    return env | {
-        "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
-        "PROMPTFOO_DISABLE_TELEMETRY": "1",
-        "PROMPTFOO_DISABLE_UPDATE": "1",
-        "PROMPTFOO_CONFIG_DIR": str(out / ".promptfoo"),
-    }
-
-
-def _ask(out: Path, rules: str, prompts: list[str], model: str) -> list[str | None]:
-    """One promptfoo run: a reply to each prompt under `rules`, None where it failed. Raises OutOfQuota when the
-    model refused for quota, after the run, so the replies it did write are still returned through the exception."""
-    config = {
-        "description": "replay",
-        "prompts": ["{{conversation}}"],
-        "providers": [
-            {
-                "id": "anthropic:claude-agent-sdk",
-                "config": {
-                    "apiKeyRequired": False,
-                    "model": model,
-                    "custom_system_prompt": FRAME.format(rules=rules),
-                    "tools": [],
-                    "setting_sources": [],
-                    "strict_mcp_config": True,
-                    "persist_session": False,
-                    "max_turns": 1,
-                },
-            }
-        ],
-        # promptfoo replaces {{name}} inside a var with that var, so the prompt's own name is broken up.
-        "tests": [{"vars": {"conversation": re.sub(r"\{\{(\s*conversation\s*\}\})", "{​{\\1", p)}} for p in prompts],
-    }
-    (out / "promptfoo.json").write_text(json.dumps(config), encoding="utf-8")
-    results = out / "results.json"
-    results.unlink(missing_ok=True)
-    npx = shutil.which("npx") or "npx"
-    # Relative paths and cwd: npx on Windows is a .cmd file, which splits paths with spaces.
-    args = [npx, "--yes", *PROMPTFOO, "eval", "-c", "promptfoo.json", "-o", "results.json", "--no-cache", "--no-write"]
-    run = subprocess.run(
-        [*args, "-j", str(PARALLEL)],
-        cwd=out,
-        env=_env(out),
-        capture_output=True,
-        text=True,
-        encoding="utf-8",
-        errors="replace",
-        timeout=1800,  # a batch takes a few minutes, the first a few more while npx fetches promptfoo
+def options(system: Path, model: str, cwd: Path) -> ClaudeAgentOptions:
+    """The clean context a reply is written in: the framed rules file as the whole system prompt, no tools, settings,
+    MCP servers or saved session, and one turn. The system prompt goes by file, since a command line is limited."""
+    return ClaudeAgentOptions(
+        system_prompt={"type": "file", "path": str(system)},
+        tools=[],
+        setting_sources=[],
+        mcp_servers={},
+        strict_mcp_config=True,
+        max_turns=1,
+        model=model,
+        cwd=cwd,
+        extra_args={"no-session-persistence": None},
     )
-    if not results.exists():
-        raise RuntimeError(f"promptfoo wrote no results (exit {run.returncode}): {(run.stdout + run.stderr)[-500:]}")
-    replies: list[str | None] = [None] * len(prompts)
-    errors = []
-    for row in json.loads(results.read_text(encoding="utf-8"))["results"]["results"]:
-        response = row.get("response") or {}
-        output = response.get("output")
-        meta = response.get("metadata") or {}
+
+
+async def ask(prompt: str, opts: ClaudeAgentOptions) -> str:
+    """One reply. Raises OutOfQuota when the model refused for quota, RuntimeError on any other failure."""
+    reply, error = None, None
+    async for message in query(prompt=prompt, options=opts):
         # Claude Code can end "successfully" with an API error, such as a usage limit, as its result text.
-        failure = row.get("error") or meta.get("apiErrorStatus") or meta.get("assistantErrors")
-        if failure or not isinstance(output, str):
-            errors.append(f"{failure} {output}")
-        else:
-            replies[row["testIdx"]] = output
-    if any(re.search(r"limit|quota", e, re.IGNORECASE) for e in errors):
-        raise OutOfQuota(replies)
-    for e in errors[:3]:
-        print(f"A reply failed: {e[:200]}")
-    return replies
+        if isinstance(message, AssistantMessage) and message.error:
+            error = message.error
+        elif isinstance(message, ResultMessage):
+            reply = message.result
+            error = error or (message.subtype if message.is_error else None)
+    # Only a failed reply is read for quota words: a good reply may well mention a limit.
+    if error and re.search(r"limit|quota|billing", f"{error} {reply}", re.IGNORECASE):
+        raise OutOfQuota(f"{error} {reply}")
+    if error or reply is None:
+        raise RuntimeError(f"no reply: {error}")
+    return reply
+
+
+async def write_replies(path: Path, todo: list[tuple[dict, str, str]], answer) -> int:
+    """Writes a reply for each (moment, arm, prompt), PARALLEL at once, appending each to `path` as it comes, with
+    `answer(prompt, arm)`. Returns how many failed; OutOfQuota stops the rest, keeping what was written."""
+    gate = asyncio.Semaphore(PARALLEL)
+    failed = 0
+    with path.open("a", encoding="utf-8") as f:
+
+        async def one(m: dict, arm: str, prompt: str) -> None:
+            nonlocal failed
+            async with gate:
+                try:
+                    reply = await answer(prompt, arm)
+                except OutOfQuota:
+                    raise
+                except Exception as e:
+                    failed += 1
+                    print(f"A reply failed: {str(e)[:200]}")
+                    return
+            f.write(json.dumps({"uuid": m["uuid"], "arm": arm, "reply": reply}) + "\n")
+            f.flush()
+
+        try:
+            async with asyncio.TaskGroup() as tasks:
+                for m, arm, prompt in todo:
+                    tasks.create_task(one(m, arm, prompt))
+        except* OutOfQuota as e:
+            raise e.exceptions[0] from None
+    return failed
 
 
 def moments(db: Path, projects: Path, measure: str, first: str, last: str) -> list[dict]:
@@ -230,37 +216,17 @@ def moments(db: Path, projects: Path, measure: str, first: str, last: str) -> li
     ]
 
 
-def write_replies(out: Path, picks: list[dict], rules: dict[str, str], model: str) -> int:
-    """Asks for each reply not yet in replies.jsonl, appending each as it comes. Returns how many failed."""
-    path = out / "replies.jsonl"
-    have = {(r["uuid"], r["arm"]) for r in _read_replies(path)}
-    failed = 0
-    for arm in ("old", "new"):
-        todo = [m for m in picks if (m["uuid"], arm) not in have]
-        print(f"{arm} rules: {len(todo)} replies to write")
-        for start in range(0, len(todo), BATCH):
-            batch = todo[start : start + BATCH]
-            prompts = [_prompt(m) for m in batch]
-            try:
-                replies = _ask(out, rules[arm], prompts, model)
-            except OutOfQuota as e:
-                _append(path, batch, arm, e.args[0])
-                raise
-            failed += _append(path, batch, arm, replies)
-    return failed
-
-
-def _prompt(moment: dict) -> str:
-    lines = Path(moment["file"]).read_text(encoding="utf-8", errors="replace").splitlines()
-    return f"{context(lines, moment['uuid'])}\n\n(Write the agent's next message.)"
-
-
-def _append(path: Path, batch: list[dict], arm: str, replies: list[str | None]) -> int:
-    with path.open("a", encoding="utf-8") as f:
-        for m, reply in zip(batch, replies, strict=True):
-            if reply is not None:
-                f.write(json.dumps({"uuid": m["uuid"], "arm": arm, "reply": reply}) + "\n")
-    return sum(r is None for r in replies)
+def prompts(picks: list[dict]) -> dict[str, str]:
+    """Each moment's prompt, reading each transcript once."""
+    by_file: dict[str, list[dict]] = {}
+    for m in picks:
+        by_file.setdefault(m["file"], []).append(m)
+    out = {}
+    for file, ms in by_file.items():
+        lines = Path(file).read_text(encoding="utf-8", errors="replace").splitlines()
+        for m in ms:
+            out[m["uuid"]] = f"{context(lines, m['uuid'])}\n\n(Write the agent's next message.)"
+    return out
 
 
 def _read_replies(path: Path) -> list[dict]:
@@ -307,7 +273,9 @@ def judge(
     replayed = sum(scored[(m["uuid"], in_force)] for m in had) / len(had) if had else np.nan
     # Rates a few points apart agree even when their ratio is large, as when both are near zero.
     stands = bool(abs(replayed - real) <= 0.05 or (real > 0 and 1 / GATE <= replayed / real <= GATE))
-    if not stands:
+    if len(both) < MIN_PAIRED:
+        verdict = "can't tell"
+    elif not stands:
         verdict = "replay can't test this"
     elif effect.p < WORKS_P and effect.drop > 0:
         verdict = "works"
@@ -338,31 +306,68 @@ def store(db: Path, replay: Replay) -> None:
     con.close()
 
 
+def _sha(text: str) -> str:
+    return hashlib.sha256(text.encode()).hexdigest()
+
+
 def run(args, projects: Path) -> int:
-    """`agent-experiments replay`: picks moments once, writes the replies not yet written, scores and stores."""
-    out = (args.out or args.db.parent / "replays" / args.measure).resolve()
-    out.mkdir(parents=True, exist_ok=True)
-    picks_file = out / "picks.json"
-    if picks_file.exists():
-        picks = json.loads(picks_file.read_text(encoding="utf-8"))
+    """`agent-experiments replay`: in a folder named for the measure and a hash of everything that shapes the replies,
+    picks moments once, writes the replies not yet written, scores and stores. `--rescore FOLDER` rescores a folder
+    from its manifest, with no model calls."""
+    if args.rescore:
+        out = args.rescore.resolve()
+        manifest = json.loads((out / "manifest.json").read_text(encoding="utf-8"))
+        picks = json.loads((out / "picks.json").read_text(encoding="utf-8"))
+        code = 0
     else:
-        found = moments(args.db, projects, args.measure, args.from_, args.to)
-        picks = pick(found, args.n, random.Random(1))
+        systems = {
+            arm: FRAME.format(rules=path.read_text(encoding="utf-8"))
+            for arm, path in (("old", args.old), ("new", args.new))
+        }
+        inputs = {"measure": args.measure, "model": args.model, "n": args.n, "from": args.from_, "to": args.to}
+        inputs |= {arm: _sha(text) for arm, text in systems.items()}
+        out = (args.db.parent / "replays" / f"{args.measure}-{_sha(json.dumps(inputs, sort_keys=True))[:8]}").resolve()
+        manifest = inputs | {"in_force": args.in_force}
+        picks_file = out / "picks.json"
+        if picks_file.exists():
+            picks = json.loads(picks_file.read_text(encoding="utf-8"))
+        else:
+            picks = pick(moments(args.db, projects, args.measure, args.from_, args.to), args.n, random.Random(1))
+        have = {(r["uuid"], r["arm"]) for r in _read_replies(out / "replies.jsonl")}
+        todo = [(m, arm) for arm in ("old", "new") for m in picks if (m["uuid"], arm) not in have]
+        print(f"{len(todo)} replies to write with {args.model}, for {len(picks)} moments, in {out}")
+        if args.dry_run:
+            return 0
+        out.mkdir(parents=True, exist_ok=True)
+        (out / "manifest.json").write_text(json.dumps(manifest, indent=1), encoding="utf-8")
         picks_file.write_text(json.dumps(picks), encoding="utf-8")
-    code = 0
-    if not args.rescore:
-        rules = {arm: path.read_text(encoding="utf-8") for arm, path in (("old", args.old), ("new", args.new))}
+        for arm, text in systems.items():
+            (out / f"system-{arm}.txt").write_text(text, encoding="utf-8")
+        needed = {m["uuid"] for m, _ in todo}
+        found = prompts([m for m in picks if m["uuid"] in needed])
+        opts = {arm: options(out / f"system-{arm}.txt", args.model, out) for arm in systems}
+        # Without the calling agent's session variables the nested Claude Code runs as from a plain terminal, on the
+        # subscription; without its non-essential traffic it makes one model call per reply, not a second for a title.
+        for k in [k for k in os.environ if re.match(r"CLAUDE_CODE_|ANTHROPIC_|CLAUDECODE$", k)]:
+            del os.environ[k]
+        os.environ["CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"] = "1"
         try:
-            failed = write_replies(out, picks, rules, args.model)
+            failed = asyncio.run(
+                write_replies(
+                    out / "replies.jsonl",
+                    [(m, arm, found[m["uuid"]]) for m, arm in todo],
+                    lambda prompt, arm: ask(prompt, opts[arm]),
+                )
+            )
         except OutOfQuota:
             print("Out of model quota: the replies written so far are kept; rerun later to continue.")
             return 1
+        code = 1 if failed else 0
         if failed:
             print(f"{failed} replies failed; rerun to write them.")
-            code = 1
     replies = _read_replies(out / "replies.jsonl")
-    scored = score(args.measures, args.measure, picks, replies)
-    r = judge(str(out), args.measure, picks, scored, args.in_force, np.random.default_rng(1))
+    scored = score(args.measures, manifest["measure"], picks, replies)
+    r = judge(str(out), manifest["measure"], picks, scored, manifest["in_force"], np.random.default_rng(1))
     store(args.db, r)
 
     def pct(x: float) -> str:

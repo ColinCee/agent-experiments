@@ -19,20 +19,12 @@ def _git(repo: Path, *args: str, stdin: bytes | None = None) -> bytes:
 
 
 def changes(repo: Path, globs: tuple[str, ...]) -> list[tuple[str, str, str, str, int, int]]:
-    """Rows of (commit, day, glob, file, added, deleted), each commit after its parents. A file renamed away gets a row of its own with
-    nothing added or deleted, so its old name stops counting from then."""
-    log = _git(
-        repo,
-        "log",
-        "--reverse",
-        "--topo-order",
-        "-z",
-        "--numstat",
-        "-M",
-        "--format=%x01%H %cs",
-        "--",
-        *(f":(glob){g}" for g in globs),
-    )
+    """Rows of (commit, day, glob, file, added, deleted), each commit after its parents. A file renamed away gets a row
+    of its own with nothing added or deleted, so its old name stops counting from then."""
+    # Logged over each glob's folder, not the glob: git sees a rename only when both names are in what it logs, and a
+    # file moved into a glob would otherwise count as all new lines.
+    folders = {g.split("*")[0].rpartition("/")[0] or "." for g in globs}
+    log = _git(repo, "log", "--reverse", "--topo-order", "-z", "--numstat", "-M", "--format=%x01%H %cs", "--", *folders)
     rows = []
     for record in log.decode("utf-8", "replace").split("\x01")[1:]:
         header, _, rest = record.partition("\x00")

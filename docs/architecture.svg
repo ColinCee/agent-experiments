@@ -33,7 +33,7 @@
 
   <rect class="private" x="556" y="34" width="150" height="56" rx="8"/>
   <text class="t" x="631" y="58" text-anchor="middle">Measures file</text>
-  <text class="s" x="631" y="76" text-anchor="middle">private SQL: chances</text>
+  <text class="s" x="631" y="76" text-anchor="middle">private SQL: chances, changes</text>
 
   <text class="layer" x="130" y="194">This package</text>
   <rect class="main" x="286" y="162" width="160" height="56" rx="8"/>
@@ -50,7 +50,7 @@
 
   <rect class="private" x="286" y="290" width="160" height="56" rx="8"/>
   <text class="t" x="366" y="314" text-anchor="middle">Overview page</text>
-  <text class="s" x="366" y="332" text-anchor="middle">page.py: one HTML file</text>
+  <text class="s" x="366" y="332" text-anchor="middle">page.py: HTML and SVG</text>
 
   <rect class="main" x="120" y="230" width="150" height="56" rx="8"/>
   <text class="t" x="195" y="254" text-anchor="middle">Replay and size</text>
