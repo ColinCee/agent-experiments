@@ -100,11 +100,35 @@ def test_a_look_is_written_once(tmp_path):
         add_session(con, f"s{i}", [("2026-01-02T09:00:00Z", f"t={group} task=b{i:07d}")], [(ts, group == "off")] * 4)
     rng = np.random.default_rng(1)
 
-    first = looks.take_looks(con, [TRIAL], "2026-01-03", rng)
-    again = looks.take_looks(con, [TRIAL], "2026-01-04", rng)
-    week = looks.take_looks(con, [TRIAL], "2026-01-08", rng)
+    first = looks.look_at(con, TRIAL, "x", "2026-01-03", rng)[3]
+    again = looks.look_at(con, TRIAL, "x", "2026-01-04", rng)[3]
+    week = looks.look_at(con, TRIAL, "x", "2026-01-08", rng)[3]
+    restarted = looks.look_at(con, Trial("t", "testing", ("x",), "2026-01-02"), "x", "2026-01-03", rng)[3]
 
-    assert [(lk.look, lk.tasks_off, lk.tasks_on, lk.verdict) for lk in first] == [(1, 12, 12, "works")]
-    assert again == []
-    assert week == []  # nothing follows works
-    assert con.execute("SELECT count(*) FROM looks").fetchone() == (1,)
+    assert first and (first.look, first.tasks_off, first.tasks_on, first.verdict) == (1, 12, 12, "works")
+    assert again is None
+    assert week is None  # nothing follows works
+    assert restarted and restarted.look == 1  # a trial restarted under the same name starts its looks again
+    assert con.execute("SELECT count(*) FROM looks").fetchone() == (2,)
+
+
+def test_the_last_look_at_one_task_a_group_cannot_tell(tmp_path):
+    con = looks.open_store(store(tmp_path))
+    for group in ("off", "on"):
+        add_session(con, group, [("2026-01-02T09:00:00Z", f"t={group} task={group}")], [("2026-01-02T10:00:00Z", True)])
+
+    _, _, effect, look = looks.look_at(con, TRIAL, "x", "2026-01-08", np.random.default_rng(1))
+
+    assert effect is None
+    assert look and (look.look, look.verdict) == (3, "can't tell")
+
+
+def test_a_trial_file_without_a_date_is_reported_and_the_rest_are_read(tmp_path):
+    (tmp_path / "quoted.md").write_text('---\nname: A plain name\nmeasures: x\nstarted: "2026-01-01"\n---\n')
+    (tmp_path / "undated.md").write_text("---\nmeasures: x\n---\n")
+    errors: list[str] = []
+
+    trials = looks.read_trials(tmp_path, errors)
+
+    assert trials == [Trial("quoted", "testing", ("x",), "2026-01-01", "A plain name")]
+    assert len(errors) == 1 and "undated.md" in errors[0]

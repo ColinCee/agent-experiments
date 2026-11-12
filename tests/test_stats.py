@@ -22,7 +22,7 @@ def passes(rng: np.random.Generator, rate_off: float, rate_on: float) -> bool:
     )
 
 
-def test_three_looks_pass_a_rule_that_does_nothing_about_one_trial_in_twenty_at_most():
+def test_three_looks_rarely_pass_a_rule_that_does_nothing():
     rng = np.random.default_rng(7)
     runs = 300
     assert sum(passes(rng, 0.4, 0.4) for _ in range(runs)) / runs < 0.07

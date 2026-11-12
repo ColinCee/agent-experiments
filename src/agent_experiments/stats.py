@@ -13,6 +13,9 @@ from scipy import stats
 USEFUL_DROP = 0.3  # a drop smaller than this is not worth a rule's place in the every-turn file
 RESAMPLES = 99_999  # the first look's limit is p < 0.0003, which needs steps of p well below it
 BOOTSTRAPS = 9_999
+# Resamples held in memory at once: all 99,999 for 60 against 500 tasks took 2 GB, a thousand take about 20 MB and
+# run no slower.
+BATCH = 1_000
 POWER_SIZES = (10, 20, 40, 80, 160, 320)
 POWER_RUNS = 200
 
@@ -78,6 +81,7 @@ def _effect(off, on, rng: np.random.Generator, resamples: int, paired: bool, ran
         permutation_type="samples" if paired else "independent",
         vectorized=True,
         n_resamples=resamples,
+        batch=BATCH,
         alternative="greater",
         rng=rng,
     ).pvalue
@@ -93,6 +97,7 @@ def _effect(off, on, rng: np.random.Generator, resamples: int, paired: bool, ran
                 paired=paired,
                 vectorized=True,
                 n_resamples=BOOTSTRAPS,
+                batch=BATCH,
                 confidence_level=0.9,
                 method="percentile",
                 rng=rng,

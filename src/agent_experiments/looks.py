@@ -5,7 +5,7 @@ How and why: docs/architecture.md#looks. Reads and writes the experiments file t
 
 import math
 import re
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, astuple, dataclass
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -62,11 +62,13 @@ class Trial:
     status: str  # testing or settled
     measures: tuple[str, ...]
     started: str
+    title: str = ""  # the page's name for it; the file name is what stamps use
 
 
 @dataclass(frozen=True)
 class Look:
     trial: str
+    started: str  # with the name, so a trial restarted under it gets fresh looks
     measure: str
     look: int
     day: str
@@ -81,19 +83,25 @@ class Look:
     verdict: str
 
 
-def read_trials(folder: Path) -> list[Trial]:
-    """Trial files as docs/keep-going.md in the agents repo describes them: front matter with status, measures, started."""
+def read_trials(folder: Path, errors: list[str]) -> list[Trial]:
+    """Trial files as docs/keep-going.md in the agents repo describes them: front matter with status, measures, started
+    and an optional name. A file with no valid `started` is left out and added to `errors`."""
     trials = []
     for path in sorted(folder.glob("*.md")) if folder.is_dir() else []:
         text = path.read_text(encoding="utf-8")
 
         def field(name: str, text: str = text) -> str:
             found = re.search(rf"^{name}:\s*(.+?)\s*$", text, re.MULTILINE)
-            return found.group(1) if found else ""
+            return found.group(1).strip("'\"") if found else ""
 
+        try:
+            started = date.fromisoformat(field("started")).isoformat()
+        except ValueError:
+            errors.append(f"{path}: needs a line `started: YYYY-MM-DD`, found {field('started')!r}; left out.")
+            continue
         measures = tuple(m.strip() for m in field("measures").split(",") if m.strip())
         status = "settled" if field("status") == "settled" else "testing"
-        trials.append(Trial(path.stem, status, measures, field("started")))
+        trials.append(Trial(path.stem, status, measures, started, field("name")))
     return trials
 
 
@@ -148,39 +156,26 @@ def due_look(trial: Trial, sizes: tuple[int, int], taken: list[tuple[int, str]],
     return look if look > max((n for n, _ in taken), default=0) else 0
 
 
-def take_looks(con, trials: list[Trial], day: str, rng: np.random.Generator) -> list[Look]:
-    """Takes and stores every look due as of `day`."""
-    new = []
-    for trial in (t for t in trials if t.status == "testing"):
-        for measure in trial.measures:
-            groups = units(con, trial.name, measure, trial.started, day)
-            off, on = groups["off"], groups["on"]
-            taken = con.execute(
-                "SELECT look, verdict FROM looks WHERE trial = ? AND measure = ?", [trial.name, measure]
-            ).fetchall()
-            look = due_look(trial, (len(off), len(on)), taken, day)
-            if not look:
-                continue
-            nan = math.nan
-            effect = compare(off, on, rng) if len(off) and len(on) else Effect(nan, nan, nan, nan, nan, nan)
-            found = Look(
-                trial.name,
-                measure,
-                look,
-                day,
-                len(off),
-                len(on),
-                effect.off,
-                effect.on,
-                effect.drop,
-                effect.low,
-                effect.high,
-                effect.p,
-                verdict(effect, look, min(len(off), len(on))),
-            )
-            con.execute("INSERT INTO looks VALUES (" + ", ".join("?" * 13) + ")", list(asdict(found).values()))
-            new.append(found)
-    return new
+def look_at(con, trial: Trial, measure: str, day: str, rng: np.random.Generator):
+    """A testing trial's groups and effect as of `day`, and the look due then, stored; the effect is None until each
+    group has two tasks, the fewest SciPy's tests take, and the look None when none is due."""
+    groups = units(con, trial.name, measure, trial.started, day)
+    off, on = groups["off"], groups["on"]
+    effect = compare(off, on, rng) if min(len(off), len(on)) > 1 else None
+    taken = con.execute(
+        "SELECT look, verdict FROM looks WHERE trial = ? AND started = ? AND measure = ?",
+        [trial.name, trial.started, measure],
+    ).fetchall()
+    look = due_look(trial, (len(off), len(on)), taken, day)
+    if not look:
+        return off, on, effect, None
+    e = effect or Effect(*[math.nan] * 6)
+    smaller = min(len(off), len(on))
+    found = Look(
+        trial.name, trial.started, measure, look, day, len(off), len(on), *astuple(e), verdict(e, look, smaller)
+    )
+    con.execute("INSERT INTO looks VALUES (" + ", ".join("?" * 14) + ")", list(asdict(found).values()))
+    return off, on, effect, found
 
 
 def model_in_use(con, day: str) -> str | None:
@@ -200,7 +195,7 @@ def settled(con, trials: list[Trial], day: str, rng: np.random.Generator) -> lis
     for trial in (t for t in trials if t.status == "settled"):
         for measure in trial.measures:
             g = units(con, trial.name, measure, shift(day, 1 - USUAL_DAYS), day, model)
-            effect = compare(g["off"], g["on"], rng) if len(g["off"]) and len(g["on"]) else None
+            effect = compare(g["off"], g["on"], rng) if min(len(g["off"]), len(g["on"])) > 1 else None
             off_course = (
                 effect is not None and min(len(g["off"]), len(g["on"])) >= MIN_GROUP and effect.high < USEFUL_DROP
             )

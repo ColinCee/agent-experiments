@@ -55,6 +55,10 @@ def _pct(x: float | None) -> str:
     return "n/a" if x is None or not math.isfinite(x) else f"{round(100 * x)}%"
 
 
+def plural(n: int, word: str) -> str:
+    return word if n == 1 else word + "s"
+
+
 def _short(day: str) -> str:
     d = date.fromisoformat(day)
     return f"{d.day} {d:%b}"
@@ -129,7 +133,7 @@ def _trend_chart(trend: dict[str, list[tuple[str, float]]], figure: _Figures) ->
 
 
 def _measures_chart(rows: list[dict], figure: _Figures) -> str:
-    names = [r["measure"] for r in rows][::-1]
+    names = [r["name"] for r in rows][::-1]
     fig = go.Figure()
     for key, colour, name in (("before", MUTED, "21 days before"), ("recent", OFF, "Last 7 days")):
         fig.add_trace(
@@ -159,10 +163,10 @@ def render(report: dict) -> str:
     parts = [
         f"<h1>Rule trials</h1><p class='sub'>As of {_short(report['day'])}, from session transcripts.</p>",
         '<section class="health">',
-        _tile(str(h["running"]), "trials running"),
-        _tile(str(h["verdicts"]), "verdicts in the last 7 days"),
-        _tile(f"{h['stamped']} of {h['sessions']}", "sessions with a group yesterday"),
-        _tile(str(h["off_course"]), "settled rules off course"),
+        _tile(str(h["running"]), f"{plural(h['running'], 'trial')} running"),
+        _tile(str(h["verdicts"]), f"{plural(h['verdicts'], 'verdict')} in the last 7 days"),
+        _tile(f"{h['stamped']} of {h['sessions']}", f"sessions with a group on {_short(report['day'])}"),
+        _tile(str(h["off_course"]), f"settled {plural(h['off_course'], 'rule')} no longer helping"),
         "</section><h2>Trials</h2>",
     ]
     if not report["trials"]:
@@ -180,12 +184,12 @@ def render(report: dict) -> str:
             if t["needed"]
             else "over 320 tasks per group to see a halving, or too little history to say"
         )
-        measure = "" if t["measure"] == t["trial"] else f"<span>measure {e(t['measure'])}</span>"
+        measure = "" if t["measure"] == t["trial"] else f"<span>measure: {e(t['name'])}</span>"
         status_class = "status works" if t["status"] == "works" else "status"
         parts.append(
-            f"<article class='trial'><h3>{e(t['trial'])}</h3>"
+            f"<article class='trial'><h3>{e(t['title'])}</h3>"
             f"<div class='facts'>{measure}<span>{when}</span>"
-            f"<span>{t['tasks_off']} tasks without, {t['tasks_on']} with</span>"
+            f"<span>{t['tasks_off']} {plural(t['tasks_off'], 'task')} without, {t['tasks_on']} with</span>"
             f"<span class='{status_class}'>{e(t['status'])}</span></div>"
             f"<p class='note'>Tasks needed: {needed}; a week brings about {t['per_week']} per group.</p>"
         )
@@ -220,8 +224,8 @@ def render(report: dict) -> str:
         ef = s["effect"]
         said = f"a drop of {_pct(ef.drop)}, 90% range {_pct(ef.low)} to {_pct(ef.high)}" if ef else "no comparison yet"
         parts.append(
-            f"<p class='note'>Settled {e(s['trial'])} ({e(s['measure'])}) on {e(s['model'] or 'no model')}: {said}; "
-            f"{s['tasks_off']} holdout tasks, {s['tasks_on']} with the rule.</p>"
+            f"<p class='note'>Settled {e(s['title'])} ({e(s['name'])}) on {e(s['model'] or 'no model')}: {said}; "
+            f"{s['tasks_off']} holdout {plural(s['tasks_off'], 'task')}, {s['tasks_on']} with the rule.</p>"
         )
     rows = report["measures"]
     flagged = sum(r["flagged"] for r in rows)
@@ -233,7 +237,7 @@ def render(report: dict) -> str:
         parts.append(_measures_chart(rows, figure))
         parts.append(
             "<div class='wide'><table><tr><th>Measure</th><th>Missed, last 7 days</th><th>21 days before</th>"
-            "<th>Latest day</th></tr>"
+            f"<th>{_short(report['day'])}</th></tr>"
         )
         for r in rows:
             f = r["flag"]
@@ -245,7 +249,7 @@ def render(report: dict) -> str:
                 else f"{_pct(f['rate'])}, usual"
             )
             parts.append(
-                f"<tr><td>{e(r['measure'])}</td><td>{_pct(r['recent'])} of {r['recent_n']}</td>"
+                f"<tr><td>{e(r['name'])}</td><td>{_pct(r['recent'])} of {r['recent_n']}</td>"
                 f"<td>{_pct(r['before'])} of {r['before_n']}</td><td>{day}</td></tr>"
             )
         parts.append("</table></div><p class='note'>Each cell: share of chances missed, of how many chances.</p>")

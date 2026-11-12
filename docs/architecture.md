@@ -8,7 +8,7 @@ Everything dashed in the picture is the user's own data and stays under `~/.clau
 
 ## Hook
 
-A trial is a file in the agents repo's `home/trials/` (format: that repo's `docs/keep-going.md`). Its hook, at each session and subagent start, puts the rule's `On` or `Off` wording in the session's context and writes one line that lands in the transcript as a `hook_additional_context` attachment:
+A trial is a file in the agents repo's `home/trials/` (format: that repo's `docs/keep-going.md`); an optional `name:` line is what the page calls it (else the name of a measure it shares its file name with), and a file with no `started:` date is reported and skipped. Its hook, at each session and subagent start, puts the rule's `On` or `Off` wording in the session's context and writes one line that lands in the transcript as a `hook_additional_context` attachment:
 
 ```
 Rule trials: <trial>=on|off ... holdout=yes|no task=<8 hex> rules=<7 hex>
@@ -26,7 +26,7 @@ The group comes from a hash of the trial's name and the task, so a task keeps it
 | `stamps` | stamp the hook gave a session, with its time |
 | `chances` | moment a rule could be broken (`measure, session, day, ts, uuid, miss`), as the measures file defines them |
 
-A continued session copies its parent's entries under its own id; each entry counts once, for the session that started first, which is the continuation's root. A measures file is SQL that creates a temp table `chances` from the temp tables `texts`, `calls` and `typed`; `sessions.sql` names their columns. A full rebuild takes about 8 s on 2 GB of transcripts.
+A continued session copies its parent's entries under its own id; each entry counts once, for the session that started first, which is the continuation's root. A measures file is SQL that creates a temp table `chances` from the temp tables `texts`, `calls` and `typed`; `sessions.sql` names their columns. It may also create `measure_names(measure, name)`, and the page then shows those names in place of measure ids. A full rebuild takes about 8 s on 2 GB of transcripts.
 
 `looks` is the fourth table, and the only one never rebuilt: a look is written once.
 
@@ -35,9 +35,9 @@ A continued session copies its parent's entries under its own id; each entry cou
 [`looks.py`](../src/agent_experiments/looks.py) turns chances into tasks per group, then into looks.
 
 - **Unit.** A task is the stamp's `task=` token, else the root session. A session counts for a trial only when every stamp it and its root got agrees on its group, and only its chances after the first stamp that named the trial, so a trial added mid-task does not claim earlier replies. Sessions nobody typed in (scheduled runs, scripted calls) are left out; sessions with no stamp are left out and counted on the page.
-- **When.** A trial is looked at when its smaller group reaches 10, 20 and 40 tasks, and a last time 7 days after `started`, whatever its size. A look is due only past every look already taken; none follows `works` or the last look.
+- **When.** A trial is looked at when its smaller group reaches 10, 20 and 40 tasks, and a last time 7 days after `started`, whatever its size. A look is due only past every look already taken under that trial name and `started` date, so a restarted trial starts again; none follows `works` or the last look.
 - **Verdict.** An early look says `works` or `no verdict yet`. The last says `works`, `no useful effect` (the 90% range of the drop rules out a 30% drop) or `can't tell`. Fewer than 5 tasks in a group is always `can't tell`.
-- **Settled rules.** Holdout tasks against the rest over the last 28 days, on the model with the most replies in the last 7, so a model that no longer needs a rule shows. It is off course when its range rules out a 30% drop.
+- **Settled rules.** Holdout tasks against the rest over the last 28 days, on the model with the most replies in the last 7, so a model that no longer needs a rule shows. It is no longer helping when its range rules out a 30% drop.
 - **Usual range.** For each measure, the latest day's miss rate against the middle 98% of rates from the same number of tasks drawn from the 28 days before.
 
 ## Method
@@ -53,4 +53,4 @@ A continued session copies its parent's entries under its own id; each entry cou
 
 ## Overview page
 
-[`page.py`](../src/agent_experiments/page.py) writes one HTML file with plotly.js inlined once, so it works offline. On top, four numbers: trials running, verdicts in the last 7 days, sessions with a group yesterday, settled rules off course. Then a row per trial: its day, tasks per group, status, tasks needed, and the drop with its 90% range against a "no change" line. Folded below: each trial's daily miss rates and looks taken, and the tracked measures, last 7 days against the 21 before, flagged ones first.
+[`page.py`](../src/agent_experiments/page.py) writes one HTML file with plotly.js inlined once, so it works offline. On top, four numbers: trials running, verdicts in the last 7 days, sessions with a group on the day reported, settled rules no longer helping. Then a row per trial: its day, tasks per group, status, tasks needed, and the drop with its 90% range against a "no change" line. Folded below: each trial's daily miss rates and looks taken, and the tracked measures, last 7 days against the 21 before, flagged ones first. A trial that fails is left off, and `daily` prints why and exits 1 after writing the page.
