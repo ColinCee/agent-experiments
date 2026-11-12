@@ -1,4 +1,5 @@
-"""agent-experiments daily: counts, takes the looks due, and writes the overview page (docs/architecture.md)."""
+"""agent-experiments: `daily` counts, takes the looks due and writes the overview page; `replay` tests a rule's wording
+on past moments (docs/architecture.md)."""
 
 import argparse
 import sys
@@ -8,12 +9,13 @@ from pathlib import Path
 
 import numpy as np
 
-from agent_experiments import looks, page
+from agent_experiments import looks, page, replay
 from agent_experiments.counting import count
 from agent_experiments.looks import LIMITS, TRIAL_DAYS, shift
 from agent_experiments.stats import tasks_needed
 
 DATA = Path.home() / ".claude" / "keep-going"
+PROJECTS = Path.home() / ".claude" / "projects"
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -24,10 +26,28 @@ def main(argv: list[str] | None = None) -> int:
     daily.add_argument("--agents-repo", type=Path, default=Path.cwd(), help="the repo whose home/trials holds trials")
     daily.add_argument("--trials", type=Path, help="folder of trial files (default: home/trials in --agents-repo)")
     daily.add_argument("--measures", type=Path, default=DATA / "measures" / "measures.sql")
-    daily.add_argument("--transcripts", default=str(Path.home() / ".claude" / "projects" / "*" / "*.jsonl"))
+    daily.add_argument("--transcripts", default=str(PROJECTS / "*" / "*.jsonl"))
     daily.add_argument("--db", type=Path, default=DATA / "experiments.duckdb")
     daily.add_argument("--page", type=Path, default=DATA / "overview.html")
+    rp = sub.add_parser("replay", help="answer past moments again under old and new rules, and compare their misses")
+    rp.add_argument("--measure", required=True, help="a measure on reply text: its chances are the moments replayed")
+    rp.add_argument("--old", type=Path, help="the old rules file")
+    rp.add_argument("--new", type=Path, help="the new rules file")
+    rp.add_argument("--in-force", required=True, choices=("old", "new"), help="which rules the sessions really had")
+    rp.add_argument("--from", dest="from_", default="0000-00-00", help="first day of moments, YYYY-MM-DD")
+    rp.add_argument("--to", default="9999-99-99", help="last day of moments, YYYY-MM-DD")
+    rp.add_argument("--n", type=int, default=200, help="moments to replay, at most 3 a session")
+    rp.add_argument("--model", default="opus", help="the model that writes the replies")
+    rp.add_argument("--rescore", action="store_true", help="score the replies already written, with no model calls")
+    rp.add_argument("--out", type=Path, help="folder for picks and replies (default: replays/<measure> beside --db)")
+    rp.add_argument("--measures", type=Path, default=DATA / "measures" / "measures.sql")
+    rp.add_argument("--db", type=Path, default=DATA / "experiments.duckdb")
     args = parser.parse_args(argv)
+
+    if args.command == "replay":
+        if not args.rescore and not (args.old and args.new):
+            parser.error("replay needs --old and --new, unless --rescore")
+        return replay.run(args, PROJECTS)
 
     if not args.measures.is_file():
         print(f"No measures file at {args.measures}: it makes the chances table; pass --measures.", file=sys.stderr)
@@ -93,6 +113,10 @@ def build(db: Path, trials: list[looks.Trial], day: str, errors: list[str]) -> d
         """SELECT count(*) FROM looks WHERE verdict <> 'no verdict yet' AND "day" > ? AND "day" <= ?""",
         [shift(day, -7), day],
     ).fetchone()
+    replays = [
+        dict(zip([d[0] for d in con.description], r, strict=True)) | {"name": names.get(r[1], r[1])}
+        for r in con.execute('SELECT * FROM replays ORDER BY "day" DESC, measure').fetchall()
+    ]
     con.close()
     return {
         "day": day,
@@ -106,6 +130,7 @@ def build(db: Path, trials: list[looks.Trial], day: str, errors: list[str]) -> d
         "trials": rows,
         "settled": settled,
         "measures": measures,
+        "replays": replays,
         "new_looks": [r["new"] for r in rows if r["new"]],
     }
 

@@ -28,7 +28,7 @@ The group comes from a hash of the trial's name and the task, so a task keeps it
 
 A continued session copies its parent's entries under its own id; each entry counts once, for the session that started first, which is the continuation's root. A measures file is SQL that creates a temp table `chances` from the temp tables `texts`, `calls` and `typed`; `sessions.sql` names their columns. It may also create `measure_names(measure, name)`, and the page then shows those names in place of measure ids. A full rebuild takes about 8 s on 2 GB of transcripts.
 
-`looks` is the fourth table, and the only one never rebuilt: a look is written once.
+`looks` and `replays` are never rebuilt: a look is written once, and a replay's row changes only when that replay is rerun.
 
 ## Looks
 
@@ -39,6 +39,16 @@ A continued session copies its parent's entries under its own id; each entry cou
 - **Verdict.** An early look says `works` or `no verdict yet`. The last says `works`, `no useful effect` (the 90% range of the drop rules out a 30% drop) or `can't tell`. Fewer than 5 tasks in a group is always `can't tell`.
 - **Settled rules.** Holdout tasks against the rest over the last 28 days, on the model with the most replies in the last 7, so a model that no longer needs a rule shows. It is no longer helping when its range rules out a 30% drop.
 - **Usual range.** For each measure, the latest day's miss rate against the middle 98% of rates from the same number of tasks drawn from the 28 days before.
+
+## Replays
+
+[`replay.py`](../src/agent_experiments/replay.py) tests a rule's wording in hours: a model writes the agent's next message at past moments under the old rules file and under the new, and the misses are compared.
+
+- **Moments.** A measure's stored chances in sessions someone typed in. Sessions are taken in random order, each one's first chance and then others, at most 3 per session. The conversation before a moment becomes text: what the user typed, what the agent wrote, each tool call and how its result began, the last 24,000 characters.
+- **Replies.** promptfoo's Claude Agent SDK provider, on the user's Claude subscription: the rules file inside a short frame is the whole system prompt, with no tools, settings, MCP servers or saved session, and one turn. Claude Code still adds the user's email and the folder, platform and date. npx fetches the pinned promptfoo, Agent SDK and Node, so a machine needs Node with npm and a signed-in Claude Code. Picks and replies are saved in the output folder as they come, so a rerun continues, `--rescore` makes no model calls, and running out of quota stops the run with what it wrote kept.
+- **Scoring.** Each reply goes through the measures file as the one text of a session of its own, with nothing called or typed, so one definition of a measure counts both real sessions and replays. Only measures on reply text can be replayed.
+- **Check.** Under the rules the sessions really had (`--in-force`), the replay must miss within 1.5 times the real rate or within 5 points of it; otherwise the verdict is `replay can't test this`. On the user's first replay, 198 moments, the real agents missed 30% and the replay 10%.
+- **Verdict.** Moments where both replies had a chance, compared by session (Method): `works` at one-sided p < 0.05 with fewer misses under the new rules, `no useful effect` when the 90% range rules out a 30% drop, else `can't tell`. One row per output folder goes in `replays`.
 
 ## Method
 
@@ -53,4 +63,4 @@ A continued session copies its parent's entries under its own id; each entry cou
 
 ## Overview page
 
-[`page.py`](../src/agent_experiments/page.py) writes one HTML file with plotly.js inlined once, so it works offline. On top, four numbers: trials running, verdicts in the last 7 days, sessions with a group on the day reported, settled rules no longer helping. Then a row per trial: its day, tasks per group, status, tasks needed, and the drop with its 90% range against a "no change" line. Folded below: each trial's daily miss rates and looks taken, and the tracked measures, last 7 days against the 21 before, flagged ones first. A trial that fails is left off, and `daily` prints why and exits 1 after writing the page.
+[`page.py`](../src/agent_experiments/page.py) writes one HTML file with plotly.js inlined once, so it works offline. On top, four numbers: trials running, verdicts in the last 7 days, sessions with a group on the day reported, settled rules no longer helping. Then a row per trial: its day, tasks per group, status, tasks needed, and the drop with its 90% range against a "no change" line. Folded below: each trial's daily miss rates and looks taken, and the tracked measures, last 7 days against the 21 before, flagged ones first; and the replays. A trial that fails is left off, and `daily` prints why and exits 1 after writing the page.

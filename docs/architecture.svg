@@ -35,14 +35,14 @@
   <text class="t" x="631" y="58" text-anchor="middle">Measures file</text>
   <text class="s" x="631" y="76" text-anchor="middle">private SQL: chances</text>
 
-  <text class="layer" x="130" y="194">This package, run daily</text>
+  <text class="layer" x="130" y="194">This package</text>
   <rect class="main" x="286" y="162" width="160" height="56" rx="8"/>
   <text class="t" x="366" y="186" text-anchor="middle">Counting</text>
   <text class="s" x="366" y="204" text-anchor="middle">counting.py, sessions.sql</text>
 
   <rect class="private" x="516" y="162" width="190" height="56" rx="8"/>
   <text class="t" x="611" y="186" text-anchor="middle">experiments.duckdb</text>
-  <text class="s" x="611" y="204" text-anchor="middle">sessions, stamps, chances, looks</text>
+  <text class="s" x="611" y="204" text-anchor="middle">counts, looks, replays</text>
 
   <rect class="main" x="516" y="290" width="190" height="56" rx="8"/>
   <text class="t" x="611" y="314" text-anchor="middle">Looks and verdicts</text>
@@ -51,6 +51,10 @@
   <rect class="private" x="286" y="290" width="160" height="56" rx="8"/>
   <text class="t" x="366" y="314" text-anchor="middle">Overview page</text>
   <text class="s" x="366" y="332" text-anchor="middle">page.py: one HTML file</text>
+
+  <rect class="main" x="120" y="230" width="150" height="56" rx="8"/>
+  <text class="t" x="195" y="254" text-anchor="middle">Replay</text>
+  <text class="s" x="195" y="272" text-anchor="middle">replay.py, promptfoo</text>
 
   <rect class="private" x="16" y="392" width="12" height="12" rx="2"/>
   <text class="s" x="34" y="402">dashed: private, never in this repo</text>
@@ -67,4 +71,6 @@
   <path class="arrow" d="M581 218 V286"/>
   <path class="arrow" d="M641 290 V222"/>
   <path class="arrow" d="M516 318 H450"/>
+  <!-- A replay picks moments from the file and stores its result there. -->
+  <path class="arrow" d="M270 258 H546 V222"/>
 </svg>

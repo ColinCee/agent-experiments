@@ -14,6 +14,12 @@ uv run agent-experiments daily --agents-repo <path to the agents repo>
 
 It writes `~/.claude/keep-going/experiments.duckdb` and `~/.claude/keep-going/overview.html`; `uv run agent-experiments daily --help` lists the paths it takes.
 
+To test a rule's new wording on past moments in hours (needs Node with npm, and a signed-in Claude Code):
+
+```
+uv run agent-experiments replay --measure <id> --old <rules file> --new <rules file> --in-force old|new
+```
+
 ## Docs
 
 - [Architecture](docs/architecture.md): the parts, the method, and why a week is often too short.

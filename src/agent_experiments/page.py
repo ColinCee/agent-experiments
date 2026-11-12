@@ -155,6 +155,29 @@ def _tile(value: str, label: str) -> str:
     return f'<div class="tile"><b>{html.escape(value)}</b><span>{html.escape(label)}</span></div>'
 
 
+def _replays(rows: list[dict]) -> str:
+    e = html.escape
+    parts = [f"<h2>Replays</h2><details><summary>{len(rows)} {plural(len(rows), 'replay')}</summary>"]
+    if rows:
+        parts.append(
+            "<div class='wide'><table><tr><th>Measure</th><th>Day</th><th>Moments</th><th>Missed, old rules</th>"
+            "<th>New rules</th><th>Drop (90% range)</th><th>Real against replay</th><th>Verdict</th></tr>"
+        )
+        for r in rows:
+            parts.append(
+                f"<tr><td>{e(r['name'])}</td><td>{_short(r['day'])}</td><td>{r['paired']} of {r['moments']}</td>"
+                f"<td>{_pct(r['rate_old'])}</td><td>{_pct(r['rate_new'])}</td>"
+                f"<td>{_pct(r['drop'])} ({_pct(r['low'])} to {_pct(r['high'])})</td>"
+                f"<td>{_pct(r['real_rate'])} against {_pct(r['replay_rate'])}, {e(r['in_force'])} rules</td>"
+                f"<td>{e(r['verdict'])}</td></tr>"
+            )
+        parts.append(
+            "</table></div><p class='note'>Moments: compared, of those replayed. Real against replay: how often the "
+            "real agents and the replay missed, under the rules those sessions had.</p>"
+        )
+    return "".join(parts) + "</details>"
+
+
 def render(report: dict) -> str:
     """The page for one day's report, as cli.py builds it."""
     figure = _Figures()
@@ -254,6 +277,7 @@ def render(report: dict) -> str:
             )
         parts.append("</table></div><p class='note'>Each cell: share of chances missed, of how many chances.</p>")
     parts.append("</details>")
+    parts.append(_replays(report["replays"]))
     body = "\n".join(parts)
     return (
         "<!doctype html><html lang='en'><head><meta charset='utf-8'>"

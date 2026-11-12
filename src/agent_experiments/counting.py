@@ -5,11 +5,16 @@ from pathlib import Path
 
 import duckdb
 
+# The tables counting never rebuilds, run against whichever database is in use.
 SCHEMA = """
-CREATE TABLE IF NOT EXISTS store.looks (
+CREATE TABLE IF NOT EXISTS looks (
   trial VARCHAR, started VARCHAR, measure VARCHAR, look INTEGER, "day" VARCHAR, tasks_off INTEGER, tasks_on INTEGER,
   rate_off DOUBLE, rate_on DOUBLE, "drop" DOUBLE, low DOUBLE, high DOUBLE, p DOUBLE, verdict VARCHAR,
   PRIMARY KEY (trial, started, measure, look));
+CREATE TABLE IF NOT EXISTS replays (
+  folder VARCHAR PRIMARY KEY, measure VARCHAR, "day" VARCHAR, in_force VARCHAR, moments INTEGER, paired INTEGER,
+  sessions INTEGER, rate_old DOUBLE, rate_new DOUBLE, "drop" DOUBLE, low DOUBLE, high DOUBLE, p DOUBLE,
+  real_rate DOUBLE, replay_rate DOUBLE, verdict VARCHAR);
 """
 
 
@@ -23,7 +28,9 @@ def count(transcripts: str, measures: Path, db: Path) -> None:
     db.parent.mkdir(parents=True, exist_ok=True)
     # The temp tables share the stored tables' names, so the file is attached under its own name.
     con.execute(f"ATTACH '{str(db).replace("'", "''")}' AS store")
+    con.execute("USE store")
     con.execute(SCHEMA)
+    con.execute("USE memory")
     con.execute("BEGIN")
     con.execute("""
         CREATE OR REPLACE TABLE store.sessions AS
