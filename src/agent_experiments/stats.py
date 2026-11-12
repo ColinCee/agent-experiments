@@ -1,7 +1,7 @@
 """How sure a rule's effect is, from chances and misses counted per task (docs/architecture.md#method).
 
 Misses clump within a task, so tasks are shuffled and resampled whole, never single chances. SciPy does both; the
-statistics get arrays of task indices and look the counts up, so one call handles every resample at once.
+statistics get arrays of task indices and look the counts up, so one call handles a whole batch of resamples.
 """
 
 import warnings
