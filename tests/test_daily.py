@@ -38,3 +38,4 @@ def test_daily_writes_the_page_with_one_task_a_group_and_a_broken_trial_file(tmp
     assert "Bad words" in text
     assert "1 task without, 1 with" in text
     assert "can&#x27;t tell" in text  # the last look, at one task a group
+    assert "<script" not in text
