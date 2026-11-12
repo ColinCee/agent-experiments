@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 410" font-family="system-ui, -apple-system, Segoe UI, sans-serif" font-size="13">
+  <style>
+    .box { fill: #fcfcfb; stroke: #898781; stroke-width: 1.2; }
+    .private { fill: #fcfcfb; stroke: #898781; stroke-width: 1.2; stroke-dasharray: 5 4; }
+    .main { fill: #e8f1fc; stroke: #2a78d6; stroke-width: 1.5; }
+    .t { fill: #0b0b0b; } .s { fill: #52514e; font-size: 11px; } .layer { fill: #898781; font-size: 11px; }
+    .arrow { stroke: #52514e; stroke-width: 1.4; fill: none; marker-end: url(#head); }
+    #head path { fill: #52514e; }
+    @media (prefers-color-scheme: dark) {
+      .box, .private { fill: #1a1a19; } .main { fill: #14263d; stroke: #3987e5; }
+      .t { fill: #f0efec; } .s { fill: #c3c2b7; }
+      .arrow { stroke: #c3c2b7; } #head path { fill: #c3c2b7; }
+    }
+  </style>
+  <defs>
+    <marker id="head" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+      <path d="M0 0 L10 5 L0 10 z"/>
+    </marker>
+  </defs>
+
+  <text class="layer" x="16" y="24">Agents repo and Claude Code</text>
+  <rect class="box" x="16" y="34" width="150" height="56" rx="8"/>
+  <text class="t" x="91" y="58" text-anchor="middle">Trial files</text>
+  <text class="s" x="91" y="76" text-anchor="middle">home/trials/*.md</text>
+
+  <rect class="box" x="196" y="34" width="150" height="56" rx="8"/>
+  <text class="t" x="271" y="58" text-anchor="middle">Trial hook</text>
+  <text class="s" x="271" y="76" text-anchor="middle">gives each task a group</text>
+
+  <rect class="private" x="376" y="34" width="150" height="56" rx="8"/>
+  <text class="t" x="451" y="58" text-anchor="middle">Transcripts</text>
+  <text class="s" x="451" y="76" text-anchor="middle">one .jsonl per session</text>
+
+  <rect class="private" x="556" y="34" width="150" height="56" rx="8"/>
+  <text class="t" x="631" y="58" text-anchor="middle">Measures file</text>
+  <text class="s" x="631" y="76" text-anchor="middle">private SQL: chances</text>
+
+  <text class="layer" x="130" y="194">This package, run daily</text>
+  <rect class="main" x="286" y="162" width="160" height="56" rx="8"/>
+  <text class="t" x="366" y="186" text-anchor="middle">Counting</text>
+  <text class="s" x="366" y="204" text-anchor="middle">counting.py, sessions.sql</text>
+
+  <rect class="private" x="516" y="162" width="190" height="56" rx="8"/>
+  <text class="t" x="611" y="186" text-anchor="middle">experiments.duckdb</text>
+  <text class="s" x="611" y="204" text-anchor="middle">sessions, stamps, chances, looks</text>
+
+  <rect class="main" x="516" y="290" width="190" height="56" rx="8"/>
+  <text class="t" x="611" y="314" text-anchor="middle">Looks and verdicts</text>
+  <text class="s" x="611" y="332" text-anchor="middle">looks.py, stats.py</text>
+
+  <rect class="private" x="286" y="290" width="160" height="56" rx="8"/>
+  <text class="t" x="366" y="314" text-anchor="middle">Overview page</text>
+  <text class="s" x="366" y="332" text-anchor="middle">page.py: one HTML file</text>
+
+  <rect class="private" x="16" y="392" width="12" height="12" rx="2"/>
+  <text class="s" x="34" y="402">dashed: private, never in this repo</text>
+
+  <!-- Trial files feed the hook and the looks; the hook stamps transcripts. -->
+  <path class="arrow" d="M166 62 H192"/>
+  <path class="arrow" d="M346 62 H372"/>
+  <path class="arrow" d="M91 90 V372 H611 V350"/>
+  <!-- Transcripts and measures into counting, counting into the file. -->
+  <path class="arrow" d="M451 90 V124 H380 V158"/>
+  <path class="arrow" d="M631 90 V140 H400 V158"/>
+  <path class="arrow" d="M446 190 H512"/>
+  <!-- The file to looks and back (looks are appended), looks to the page. -->
+  <path class="arrow" d="M581 218 V286"/>
+  <path class="arrow" d="M641 290 V222"/>
+  <path class="arrow" d="M516 318 H450"/>
+</svg>
