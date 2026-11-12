@@ -45,13 +45,14 @@ def test_sizes_follow_appends_renames_and_deletes_and_skip_files_outside_the_glo
     assert report(con)["largest"] == []
 
 
-def test_a_file_moved_into_a_glob_counts_no_lines_added(tmp_path: Path):
+def test_a_file_moved_into_a_glob_from_anywhere_counts_no_lines_added(tmp_path: Path):
     repo = tmp_path / "repo"
-    (repo / "skills" / ".drafts" / "a").mkdir(parents=True)
+    (repo / "drafts" / "a").mkdir(parents=True)
+    (repo / "skills").mkdir()
     subprocess.run(["git", "init", "-q", str(repo)], check=True)
-    (repo / "skills" / ".drafts" / "a" / "SKILL.md").write_text("one\ntwo\nthree\n")
+    (repo / "drafts" / "a" / "SKILL.md").write_text("one\ntwo\nthree\n")
     _commit(repo, "draft")
-    (repo / "skills" / ".drafts" / "a").rename(repo / "skills" / "a")
+    (repo / "drafts" / "a").rename(repo / "skills" / "a")
     _commit(repo, "move")
     db = tmp_path / "x.duckdb"
 

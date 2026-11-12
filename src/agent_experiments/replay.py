@@ -9,6 +9,9 @@ import json
 import os
 import random
 import re
+import subprocess
+import sys
+import tempfile
 from dataclasses import astuple, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -21,12 +24,24 @@ from agent_experiments.counting import SCHEMA
 from agent_experiments.stats import USEFUL_DROP, Effect, compare_paired
 
 CONTEXT_CHARS = 24_000  # the tail of the conversation a reply is written from: enough for the last few turns
+CALL_CHARS, RESULT_CHARS = 600, 300  # how much of each tool call, and of the start of each result, the context shows
+ASK = "(Write the agent's next message.)"
 PER_SESSION = 3  # so one long session cannot fill the sample
 GATE = 1.5  # replayed and real miss rates must agree within this factor for the replay to stand for the real agent
 REPLY_SECONDS = 600  # one reply takes well under a minute; past this it is hung, and is counted as failed
 PARALLEL = 6  # replies at once, below where the subscription starts to refuse requests
 WORKS_P = 0.05  # one look, so no early-look limits
 MIN_PAIRED = 30  # fewer paired moments than this give no verdict: a handful can swing either way by chance
+QUOTA_ERRORS = ("rate_limit", "billing_error")
+QUOTA_WORDS = re.compile(r"usage limit|rate limit|quota|billing|credit balance", re.IGNORECASE)
+QUOTA_EXIT = 3
+# What the child that writes replies keeps of the caller's environment: enough to run, and to sign in as the user
+# (Claude Code reads its credentials from CLAUDE_CONFIG_DIR, else the home folder's .claude, or takes the token).
+# The rest, such as a calling agent's session variables or an API key, would change how it runs or who pays.
+ENV_KEEP = (
+    *("PATH", "SystemRoot", "USERPROFILE", "HOME", "APPDATA", "LOCALAPPDATA", "TEMP", "TMP"),
+    *("CLAUDE_CONFIG_DIR", "CLAUDE_CODE_OAUTH_TOKEN"),
+)
 
 FRAME = """You are a coding agent in the middle of a session with the user. These are the user's rules for you, loaded \
 every turn:
@@ -135,10 +150,10 @@ def context(lines: list[str], uuid: str) -> str:
             elif b.get("type") == "tool_use":
                 i = b.get("input") or {}
                 what = i.get("command") or i.get("file_path") or i.get("skill") or json.dumps(i)
-                out.append(f"Agent: [{b.get('name')}: {_cut(str(what), 600)}]")
+                out.append(f"Agent: [{b.get('name')}: {_cut(str(what), CALL_CHARS)}]")
             elif b.get("type") == "tool_result":
                 c = b.get("content")
-                out.append(f"  (result) {_cut(_clean(c if isinstance(c, str) else json.dumps(c or '')), 300)}")
+                out.append(f"  (result) {_cut(_clean(c if isinstance(c, str) else json.dumps(c or '')), RESULT_CHARS)}")
     text = "\n\n".join(out)
     return f"[earlier conversation cut]\n\n{text[-CONTEXT_CHARS:]}" if len(text) > CONTEXT_CHARS else text
 
@@ -159,22 +174,36 @@ def options(system: Path, model: str, cwd: Path) -> ClaudeAgentOptions:
     )
 
 
-async def ask(prompt: str, opts: ClaudeAgentOptions) -> str:
-    """One reply. Raises OutOfQuota when the model refused for quota, RuntimeError on any other failure."""
-    reply, error = None, None
-    async with asyncio.timeout(REPLY_SECONDS):
-        async for message in query(prompt=prompt, options=opts):
-            # Claude Code can end "successfully" with an API error, such as a usage limit, as its result text.
-            if isinstance(message, AssistantMessage) and message.error:
-                error = message.error
-            elif isinstance(message, ResultMessage):
-                reply = message.result
-                error = error or (message.subtype if message.is_error else None)
+def _outside_home() -> Path:
+    """Where each reply's empty working folder goes. Claude Code reads CLAUDE.md files in the folders above where it
+    runs, the user's own rules sit in the home folder, and on Windows the temp folder is inside it too."""
+    home = Path.home().resolve()
+    temp = Path(tempfile.gettempdir()).resolve()
+    for base in (temp, Path(temp.anchor)):
+        if not base.is_relative_to(home):
+            return base
+    raise RuntimeError(f"no folder outside {home} for replies to run in")
+
+
+async def ask(prompt: str, system: Path, model: str) -> str:
+    """One reply, written in a fresh empty folder outside the home folder. Raises OutOfQuota when the model refused
+    for quota, RuntimeError on any other failure."""
+    reply, error, failed = None, None, False
+    with tempfile.TemporaryDirectory(
+        prefix="agent-experiments-", dir=_outside_home(), ignore_cleanup_errors=True
+    ) as cwd:
+        async with asyncio.timeout(REPLY_SECONDS):
+            async for message in query(prompt=prompt, options=options(system, model, Path(cwd))):
+                # Claude Code can end with subtype "success" and an API error, such as a usage limit, as its result.
+                if isinstance(message, AssistantMessage) and message.error:
+                    error = message.error
+                elif isinstance(message, ResultMessage):
+                    reply, failed = message.result, message.is_error
     # Only a failed reply is read for quota words: a good reply may well mention a limit.
-    if error and re.search(r"limit|quota|billing", f"{error} {reply}", re.IGNORECASE):
-        raise OutOfQuota(f"{error} {reply}")
-    if error or reply is None:
-        raise RuntimeError(f"no reply: {error}")
+    if error in QUOTA_ERRORS or (failed and QUOTA_WORDS.search(reply or "")):
+        raise OutOfQuota(reply or str(error))
+    if error or failed or reply is None:
+        raise RuntimeError(f"no reply ({error}): {reply}")
     return reply
 
 
@@ -183,7 +212,11 @@ async def write_replies(path: Path, todo: list[tuple[dict, str, str]], answer) -
     `answer(prompt, arm)`. Returns how many failed; OutOfQuota stops the rest, keeping what was written."""
     gate = asyncio.Semaphore(PARALLEL)
     failed = 0
-    with path.open("a", encoding="utf-8") as f:
+    with path.open("a+b") as f:
+        if size := f.seek(0, os.SEEK_END):
+            f.seek(size - 1)
+            if f.read(1) != b"\n":
+                f.write(b"\n")  # ends a line cut off by a kill, so the next reply is not lost with it
 
         async def one(m: dict, arm: str, prompt: str) -> None:
             nonlocal failed
@@ -196,7 +229,7 @@ async def write_replies(path: Path, todo: list[tuple[dict, str, str]], answer) -
                     failed += 1
                     print(f"A reply failed: {str(e)[:200]}")
                     return
-            f.write(json.dumps({"uuid": m["uuid"], "arm": arm, "reply": reply}) + "\n")
+            f.write((json.dumps({"uuid": m["uuid"], "arm": arm, "reply": reply}) + "\n").encode())
             f.flush()
 
         try:
@@ -227,14 +260,21 @@ def prompts(picks: list[dict]) -> dict[str, str]:
     for file, ms in by_file.items():
         lines = Path(file).read_text(encoding="utf-8", errors="replace").splitlines()
         for m in ms:
-            out[m["uuid"]] = f"{context(lines, m['uuid'])}\n\n(Write the agent's next message.)"
+            out[m["uuid"]] = f"{context(lines, m['uuid'])}\n\n{ASK}"
     return out
 
 
 def _read_replies(path: Path) -> list[dict]:
+    """The replies saved so far, less a line cut off by a kill: that reply is written again."""
     if not path.exists():
         return []
-    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    out = []
+    for line in path.read_text(encoding="utf-8", errors="replace").splitlines():
+        try:
+            out.append(json.loads(line))
+        except ValueError:
+            continue
+    return out
 
 
 def score(measures: Path, measure: str, picks: list[dict], replies: list[dict]) -> dict[tuple[str, str], bool]:
@@ -312,6 +352,41 @@ def _sha(text: str) -> str:
     return hashlib.sha256(text.encode()).hexdigest()
 
 
+def _todo(out: Path, picks: list[dict]) -> list[tuple[dict, str]]:
+    have = {(r["uuid"], r["arm"]) for r in _read_replies(out / "replies.jsonl")}
+    return [(m, arm) for arm in ("old", "new") for m in picks if (m["uuid"], arm) not in have]
+
+
+def write(out: Path) -> int:
+    """Writes the replies a run folder still lacks. Returns 0, 1 when some failed, or QUOTA_EXIT."""
+    model = json.loads((out / "manifest.json").read_text(encoding="utf-8"))["model"]
+    picks = json.loads((out / "picks.json").read_text(encoding="utf-8"))
+    todo = _todo(out, picks)
+    needed = {m["uuid"] for m, _ in todo}
+    found = prompts([m for m in picks if m["uuid"] in needed])
+    try:
+        failed = asyncio.run(
+            write_replies(
+                out / "replies.jsonl",
+                [(m, arm, found[m["uuid"]]) for m, arm in todo],
+                lambda prompt, arm: ask(prompt, out / f"system-{arm}.txt", model),
+            )
+        )
+    except OutOfQuota as e:
+        print(f"Out of model quota ({str(e)[:200]}): the replies written so far are kept; rerun later to continue.")
+        return QUOTA_EXIT
+    if failed:
+        print(f"{failed} replies failed; rerun to write them.")
+    return 1 if failed else 0
+
+
+def _write_in_child(out: Path) -> int:
+    """`write` in a child process given only ENV_KEEP, since the SDK hands Claude Code its caller's whole environment.
+    Without non-essential traffic Claude Code makes one model call per reply, not a second for a title."""
+    env = {k: os.environ[k] for k in ENV_KEEP if k in os.environ} | {"CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1"}
+    return subprocess.run([sys.executable, "-m", "agent_experiments.replay", str(out)], env=env, check=False).returncode
+
+
 def run(args, projects: Path) -> int:
     """`agent-experiments replay`: in a folder named for the measure and a hash of everything that shapes the replies,
     picks moments once, writes the replies not yet written, scores and stores. `--rescore FOLDER` rescores a folder
@@ -327,7 +402,9 @@ def run(args, projects: Path) -> int:
             for arm, path in (("old", args.old), ("new", args.new))
         }
         inputs = {"measure": args.measure, "model": args.model, "n": args.n, "from": args.from_, "to": args.to}
+        # The frame is in each arm's text; the rest of each prompt is shaped by these.
         inputs |= {arm: _sha(text) for arm, text in systems.items()}
+        inputs |= {"prompt": [CONTEXT_CHARS, CALL_CHARS, RESULT_CHARS, ASK]}
         out = (args.db.parent / "replays" / f"{args.measure}-{_sha(json.dumps(inputs, sort_keys=True))[:8]}").resolve()
         manifest = inputs | {"in_force": args.in_force}
         picks_file = out / "picks.json"
@@ -335,9 +412,7 @@ def run(args, projects: Path) -> int:
             picks = json.loads(picks_file.read_text(encoding="utf-8"))
         else:
             picks = pick(moments(args.db, projects, args.measure, args.from_, args.to), args.n, random.Random(1))
-        have = {(r["uuid"], r["arm"]) for r in _read_replies(out / "replies.jsonl")}
-        todo = [(m, arm) for arm in ("old", "new") for m in picks if (m["uuid"], arm) not in have]
-        print(f"{len(todo)} replies to write with {args.model}, for {len(picks)} moments, in {out}")
+        print(f"{len(_todo(out, picks))} replies to write with {args.model}, for {len(picks)} moments, in {out}")
         if args.dry_run:
             return 0
         out.mkdir(parents=True, exist_ok=True)
@@ -345,28 +420,9 @@ def run(args, projects: Path) -> int:
         picks_file.write_text(json.dumps(picks), encoding="utf-8")
         for arm, text in systems.items():
             (out / f"system-{arm}.txt").write_text(text, encoding="utf-8")
-        needed = {m["uuid"] for m, _ in todo}
-        found = prompts([m for m in picks if m["uuid"] in needed])
-        opts = {arm: options(out / f"system-{arm}.txt", args.model, out) for arm in systems}
-        # Without the calling agent's session variables the nested Claude Code runs as from a plain terminal, on the
-        # subscription; without its non-essential traffic it makes one model call per reply, not a second for a title.
-        for k in [k for k in os.environ if re.match(r"CLAUDE_CODE_|ANTHROPIC_|CLAUDECODE$", k)]:
-            del os.environ[k]
-        os.environ["CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"] = "1"
-        try:
-            failed = asyncio.run(
-                write_replies(
-                    out / "replies.jsonl",
-                    [(m, arm, found[m["uuid"]]) for m, arm in todo],
-                    lambda prompt, arm: ask(prompt, opts[arm]),
-                )
-            )
-        except OutOfQuota as e:
-            print(f"Out of model quota ({str(e)[:200]}): the replies written so far are kept; rerun later to continue.")
+        code = _write_in_child(out)
+        if code == QUOTA_EXIT:
             return 1
-        code = 1 if failed else 0
-        if failed:
-            print(f"{failed} replies failed; rerun to write them.")
     replies = _read_replies(out / "replies.jsonl")
     scored = score(args.measures, manifest["measure"], picks, replies)
     r = judge(str(out), manifest["measure"], picks, scored, manifest["in_force"], np.random.default_rng(1))
@@ -385,3 +441,7 @@ def run(args, projects: Path) -> int:
         f"Check: under the {r.in_force} rules the real agents missed {pct(r.real_rate)}, the replay {pct(r.replay_rate)}"
     )
     return code
+
+
+if __name__ == "__main__":
+    sys.exit(write(Path(sys.argv[1])))

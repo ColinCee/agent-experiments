@@ -21,10 +21,9 @@ def _git(repo: Path, *args: str, stdin: bytes | None = None) -> bytes:
 def changes(repo: Path, globs: tuple[str, ...]) -> list[tuple[str, str, str, str, int, int]]:
     """Rows of (commit, day, glob, file, added, deleted), each commit after its parents. A file renamed away gets a row
     of its own with nothing added or deleted, so its old name stops counting from then."""
-    # Logged over each glob's folder, not the glob: git sees a rename only when both names are in what it logs, and a
-    # file moved into a glob would otherwise count as all new lines.
-    folders = {g.split("*")[0].rpartition("/")[0] or "." for g in globs}
-    log = _git(repo, "log", "--reverse", "--topo-order", "-z", "--numstat", "-M", "--format=%x01%H %cs", "--", *folders)
+    # The whole repo, filtered after: git sees a rename only when both names are in what it logs, and a file moved into
+    # a glob from anywhere would otherwise count as all new lines.
+    log = _git(repo, "log", "--reverse", "--topo-order", "-z", "--numstat", "-M", "--format=%x01%H %cs")
     rows = []
     for record in log.decode("utf-8", "replace").split("\x01")[1:]:
         header, _, rest = record.partition("\x00")
@@ -84,8 +83,8 @@ def measure(repo: Path, globs: tuple[str, ...], db: Path) -> int:
 
 
 def report(con) -> dict:
-    """What the overview page shows: each pattern's words by day, the largest files now, and per month how often a
-    change only added lines and the share of changed lines that were added."""
+    """What the overview page shows: each pattern's words by day, the largest files now, and per month and pattern
+    how often a change only added lines and the share of changed lines that were added."""
     words_by_day = con.execute("""
         WITH days AS (SELECT DISTINCT "day" FROM sizes),
         latest AS (
@@ -96,7 +95,7 @@ def report(con) -> dict:
         SELECT file, arg_max(words, n) AS words FROM sizes GROUP BY file HAVING words > 0
         ORDER BY words DESC LIMIT 8""").fetchall()
     months = con.execute("""
-        SELECT left("day", 7) AS month, count(*) AS changes, avg((deleted = 0)::INT) AS only_added,
+        SELECT left("day", 7) AS month, pattern, count(*) AS changes, avg((deleted = 0)::INT) AS only_added,
                sum(added) / sum(added + deleted) AS added_share
-        FROM sizes WHERE added + deleted > 0 GROUP BY month ORDER BY month""").fetchall()
+        FROM sizes WHERE added + deleted > 0 GROUP BY ALL ORDER BY month, pattern""").fetchall()
     return {"words": words_by_day, "largest": largest, "months": months}

@@ -1,17 +1,21 @@
 import asyncio
 import json
 import random
+import subprocess
 from pathlib import Path
 
 import numpy as np
 import pytest
-from claude_agent_sdk import ResultMessage
+from claude_agent_sdk import AssistantMessage, ResultMessage
+from claude_agent_sdk.types import AssistantMessageError
 from test_counting import reply, typed, write
 
 from agent_experiments import cli, replay
 from agent_experiments.cli import main
 from agent_experiments.counting import count
 from agent_experiments.replay import context, judge, pick, score
+
+WRITE_IN_CHILD = replay._write_in_child
 
 # A chance is a reply of at least 5 characters, a miss one that says "bad"; calls and typed must exist, even empty.
 MEASURES = """CREATE TEMP TABLE chances AS
@@ -94,6 +98,7 @@ def test_a_reply_too_short_to_be_a_chance_is_left_out_of_the_pairs(tmp_path: Pat
 @pytest.fixture(autouse=True)
 def _projects(tmp_path: Path, monkeypatch):
     monkeypatch.setattr(cli, "PROJECTS", tmp_path / "projects")
+    monkeypatch.setattr(replay, "_write_in_child", replay.write)  # in this process, so the fakes below answer
 
 
 def _store(tmp_path: Path) -> list[str]:
@@ -119,8 +124,8 @@ def _store(tmp_path: Path) -> list[str]:
 def test_a_run_writes_each_reply_once_and_other_inputs_go_to_their_own_folder(tmp_path: Path, monkeypatch, capsys):
     calls = []
 
-    async def fake(prompt, opts):
-        calls.append((opts.model, Path(opts.system_prompt["path"]).name, prompt))
+    async def fake(prompt, system, model):
+        calls.append((model, system.name, prompt))
         return "a good reply"
 
     monkeypatch.setattr(replay, "ask", fake)
@@ -139,8 +144,8 @@ def test_a_run_writes_each_reply_once_and_other_inputs_go_to_their_own_folder(tm
 
 
 def test_running_out_of_quota_stops_the_run_and_keeps_the_replies_written(tmp_path: Path, monkeypatch):
-    async def fake(prompt, opts):
-        if Path(opts.system_prompt["path"]).name == "system-new.txt":
+    async def fake(prompt, system, model):
+        if system.name == "system-new.txt":
             raise replay.OutOfQuota("usage limit")
         return "a bad reply"
 
@@ -158,16 +163,72 @@ def test_a_measure_must_be_a_plain_name(measure):
         main(["replay", "--measure", measure, "--rescore", "f"])
 
 
-def test_a_reply_that_mentions_a_limit_is_a_reply_and_a_usage_limit_stops_the_run(monkeypatch):
-    def fake(result: str, is_error: bool):
-        async def query(prompt, options):
-            yield ResultMessage("success", 1, 1, is_error, 1, "s", result=result)
+def test_a_kill_mid_line_loses_only_that_reply(tmp_path: Path, monkeypatch):
+    async def fake(prompt, system, model):
+        return "a bad reply"
 
-        return query
+    monkeypatch.setattr(replay, "ask", fake)
+    args = [*_store(tmp_path), "--model", "a"]
+    main(args)
+    (folder,) = (tmp_path / "replays").iterdir()
+    replies = folder / "replies.jsonl"
+    replies.write_text(replies.read_text()[:-20])
 
-    opts = replay.options(Path("s.txt"), "m", Path("."))
-    monkeypatch.setattr(replay, "query", fake("Set a time limit on the loop.", False))
-    assert asyncio.run(replay.ask("p", opts)) == "Set a time limit on the loop."
-    monkeypatch.setattr(replay, "query", fake("You've hit your usage limit", True))
-    with pytest.raises(replay.OutOfQuota):
-        asyncio.run(replay.ask("p", opts))
+    assert main(args) == 0
+    assert main(args) == 0
+    assert len(replay._read_replies(replies)) == 6
+
+
+def _result(result: str, is_error: bool, error: AssistantMessageError | None = None):
+    async def query(prompt, options):
+        if error:
+            yield AssistantMessage([], "m", error=error)
+        yield ResultMessage("success", 1, 1, is_error, 1, "s", result=result)
+
+    return query
+
+
+@pytest.mark.parametrize(
+    ("result", "is_error", "error", "raises"),
+    [
+        ("Set a time limit on the loop.", False, None, None),
+        ("You've hit your usage limit", True, None, replay.OutOfQuota),
+        ("API Error: Rate limit reached", True, "rate_limit", replay.OutOfQuota),
+        ("Credit balance is too low", True, "billing_error", replay.OutOfQuota),
+        ("Prompt is too long: over the context limit", True, "invalid_request", RuntimeError),
+    ],
+)
+def test_only_a_quota_refusal_stops_the_run_and_says_why(monkeypatch, result, is_error, error, raises):
+    monkeypatch.setattr(replay, "query", _result(result, is_error, error))
+    reply = replay.ask("p", Path("s.txt"), "m")
+    if raises is None:
+        assert asyncio.run(reply) == result
+        return
+    with pytest.raises(raises, match=result.split(":")[0]):
+        asyncio.run(reply)
+
+
+def test_a_change_to_how_prompts_are_cut_writes_to_a_new_folder(tmp_path: Path, monkeypatch, capsys):
+    args = [*_store(tmp_path), "--model", "a", "--dry-run"]
+    main(args)
+    monkeypatch.setattr(replay, "CONTEXT_CHARS", 100)
+    main(args)
+
+    first, second = (line.split(" in ")[-1] for line in capsys.readouterr().out.splitlines())
+    assert first != second
+
+
+def test_the_child_gets_only_what_it_needs_to_run_and_sign_in(tmp_path: Path, monkeypatch):
+    seen = {}
+
+    def run(cmd, env, check):
+        seen.update(env)
+        return subprocess.CompletedProcess(cmd, 0)
+
+    monkeypatch.setattr(replay.subprocess, "run", run)
+    for k, v in (("CLAUDE_CODE_OAUTH_TOKEN", "t"), ("CLAUDE_CODE_SESSION_ID", "x"), ("ANTHROPIC_API_KEY", "k")):
+        monkeypatch.setenv(k, v)
+
+    assert WRITE_IN_CHILD(tmp_path) == 0
+    assert "CLAUDE_CODE_OAUTH_TOKEN" in seen and "PATH" in seen
+    assert not {"CLAUDE_CODE_SESSION_ID", "ANTHROPIC_API_KEY"} & set(seen)

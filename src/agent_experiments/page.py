@@ -199,16 +199,17 @@ def _sizes(s: dict) -> str:
     parts.append("<div class='wide'><table><tr><th>Largest files now</th><th>Words</th></tr>")
     parts += [f"<tr><td>{e(f)}</td><td>{w:,}</td></tr>" for f, w in s["largest"]]
     parts.append(
-        "</table></div><div class='wide'><table><tr><th>Month</th><th>Changes</th>"
+        "</table></div><div class='wide'><table><tr><th>Month</th><th>Files</th><th>Changes</th>"
         "<th>Only added lines</th><th>Lines added, of all changed</th></tr>"
     )
     parts += [
-        f"<tr><td>{m}</td><td>{n}</td><td>{_pct(only)}</td><td>{_pct(share)}</td></tr>"
-        for m, n, only, share in s["months"]
+        f"<tr><td>{m}</td><td>{e(p)}</td><td>{n}</td><td>{_pct(only)}</td><td>{_pct(share)}</td></tr>"
+        for m, p, n, only, share in s["months"]
     ]
     parts.append(
-        "</table></div><p class='note'>A change is one file in one commit. Only added lines: no line deleted, new "
-        "files included. Lines added, of all changed: added / (added + deleted).</p></details>"
+        "</table></div><p class='note'>A change is one file in one commit that added or deleted a line; a move "
+        "alone is not one. Only added lines: no line deleted, new files included. Lines added, of all changed: "
+        "added / (added + deleted).</p></details>"
     )
     return "".join(parts)
 
