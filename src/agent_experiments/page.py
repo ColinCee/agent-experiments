@@ -168,11 +168,17 @@ def render(report: dict) -> str:
     if not report["trials"]:
         parts.append("<p class='note'>No trials running.</p>")
     for t in report["trials"]:
-        when = f"day {t['day_n']} of 7" if t["day_n"] >= 1 else f"starts {_short(t['started'])}"
+        when = (
+            f"starts {_short(t['started'])}"
+            if t["day_n"] < 1
+            else f"day {t['day_n']} of 7"
+            if t["day_n"] <= 7
+            else "week over"
+        )
         needed = (
             f"a halving shows at about {t['needed']} tasks per group"
             if t["needed"]
-            else "a halving needs over 320 tasks per group"
+            else "over 320 tasks per group to see a halving, or too little history to say"
         )
         measure = "" if t["measure"] == t["trial"] else f"<span>measure {e(t['measure'])}</span>"
         status_class = "status works" if t["status"] == "works" else "status"

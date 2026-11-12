@@ -31,8 +31,8 @@ WITH kept AS (
   WHERE root IN (SELECT session FROM sessions GROUP BY session HAVING sum(typed) > 0)),
 token AS (
   SELECT k.session, any_value(k.root) AS root, count(st.stamp) AS stamps,
-         count(DISTINCT regexp_extract(st.stamp, '(?:^| )task=(\\w+)', 1)) AS tasks,
-         max(regexp_extract(st.stamp, '(?:^| )task=(\\w+)', 1)) AS task
+         count(DISTINCT nullif(regexp_extract(st.stamp, '(?:^| )task=(\\w+)', 1), '')) AS tasks,
+         max(nullif(regexp_extract(st.stamp, '(?:^| )task=(\\w+)', 1), '')) AS task
   FROM kept k LEFT JOIN stamps st ON st.session IN (k.session, k.root) GROUP BY k.session)
 SELECT session, root, stamps > 0 AS stamped, CASE WHEN tasks = 1 THEN task ELSE root END AS task FROM token;
 """

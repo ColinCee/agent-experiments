@@ -81,11 +81,14 @@ def test_units_leave_out_disagreeing_sessions_untyped_ones_and_chances_before_th
     add_session(con, "mixed", [(stamp_at, "t=on task=aaaa0003"), (late, "t=off task=aaaa0003")], [(late, True)])
     add_session(con, "scripted", [(stamp_at, "t=on task=aaaa0004")], [(late, True)], typed=0)
     add_session(con, "other-trial", [(stamp_at, "tt=on task=aaaa0005")], [(late, True)])
+    # With no task token, each session is its own task.
+    add_session(con, "untokened-1", [(stamp_at, "t=off")], [(late, True)])
+    add_session(con, "untokened-2", [(stamp_at, "t=off")], [(late, True)])
 
     groups = looks.units(con, "t", "x", "2026-01-01", "2026-01-31")
 
     assert groups["on"].tolist() == [[2.0, 1.0]]
-    assert groups["off"].tolist() == [[1.0, 0.0]]
+    assert sorted(groups["off"].tolist()) == [[1.0, 0.0], [1.0, 1.0], [1.0, 1.0]]
 
 
 def test_a_look_is_written_once(tmp_path):
