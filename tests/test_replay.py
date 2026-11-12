@@ -232,3 +232,10 @@ def test_the_child_gets_only_what_it_needs_to_run_and_sign_in(tmp_path: Path, mo
     assert WRITE_IN_CHILD(tmp_path) == 0
     assert "CLAUDE_CODE_OAUTH_TOKEN" in seen and "PATH" in seen
     assert not {"CLAUDE_CODE_SESSION_ID", "ANTHROPIC_API_KEY"} & set(seen)
+
+
+def test_the_child_runs_with_only_its_kept_environment(tmp_path: Path):
+    (tmp_path / "manifest.json").write_text(json.dumps({"model": "m"}))
+    (tmp_path / "picks.json").write_text(json.dumps([]))
+
+    assert WRITE_IN_CHILD(tmp_path) == 0
