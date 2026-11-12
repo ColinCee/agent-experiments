@@ -90,7 +90,7 @@ def _line_chart(
         label = _pct(v) if percent else f"{v:,.0f}"
         out.append(f"<line class='grid' x1='{LEFT}' x2='{W}' y1='{y(v):.1f}' y2='{y(v):.1f}'/>")
         out.append(f"<text x='{LEFT - 4}' y='{y(v) + 4:.1f}' text-anchor='end'>{label}</text>")
-    for day, anchor in ((days[0], "start"), (days[-1], "end")):
+    for day, anchor in dict(((days[0], "start"), (days[-1], "end"))).items():
         out.append(f"<text x='{x(day):.1f}' y='{H - 4}' text-anchor='{anchor}'>{_short(day)}</text>")
     for day, label, hover in marks:
         if days[0] <= day <= days[-1]:
@@ -106,7 +106,8 @@ def _line_chart(
                 runs.append([])
             else:
                 runs[-1].append(f"{x(d):.1f},{y(v):.1f}")
-        out += [f"<polyline class='{cls}' points='{' '.join(r)}'/>" for r in runs if r]
+        # A lone point is drawn as a zero-length line, which its round cap shows as a dot.
+        out += [f"<polyline class='{cls}' points='{' '.join(r * 2 if len(r) == 1 else r)}'/>" for r in runs if r]
     return "".join(out) + "</svg>"
 
 
@@ -117,9 +118,9 @@ def _drop_chart(effect) -> str:
         return 16 + (W - 32) * (max(-1.0, min(1.0, v)) + 1) / 2
 
     out = [f"<svg class='chart' viewBox='0 0 {W} 56' role='img'>"]
-    for v, label, cls in ((0, "no change", "grid"), (0.3, "useful", "mark")):
+    for v, label, cls, anchor in ((0, "no change ", "grid", "end"), (0.3, " useful", "mark", "start")):
         out.append(f"<line class='{cls}' x1='{x(v):.1f}' x2='{x(v):.1f}' y1='12' y2='38'/>")
-        out.append(f"<text x='{x(v):.1f}' y='9' text-anchor='middle'>{label}</text>")
+        out.append(f"<text x='{x(v):.1f}' y='9' text-anchor='{anchor}'>{label}</text>")
     for v in (-1, -0.5, 0.5, 1):
         out.append(f"<text x='{x(v):.1f}' y='52' text-anchor='middle'>{_pct(v)}</text>")
     out.append(f"<line class='range' x1='{x(effect.low):.1f}' x2='{x(effect.high):.1f}' y1='25' y2='25'/>")
@@ -137,8 +138,8 @@ def _measure(r: dict, day: str) -> str:
     parts = [f"<div class='card'><h3>{e(r['name'])}</h3>"]
     if f and f["flagged"]:
         parts.append(
-            f"<p class='note flagged'>Out of its usual range on {_short(day)}: {_pct(f['rate'])}, usual "
-            f"{_pct(f['low'])} to {_pct(f['high'])}</p>"
+            f"<p class='note flagged'>Out of its usual range on {_short(day)}: {100 * f['rate']:.1f}%, usual "
+            f"{100 * f['low']:.1f}% to {100 * f['high']:.1f}%</p>"
         )
     marks = [(d, "", f"{_short(d)}: {w}") for d, w in r["changes"]]
     parts.append(_line_chart([("s1", r["line"])], marks))

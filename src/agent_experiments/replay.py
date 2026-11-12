@@ -23,6 +23,7 @@ from agent_experiments.stats import USEFUL_DROP, Effect, compare_paired
 CONTEXT_CHARS = 24_000  # the tail of the conversation a reply is written from: enough for the last few turns
 PER_SESSION = 3  # so one long session cannot fill the sample
 GATE = 1.5  # replayed and real miss rates must agree within this factor for the replay to stand for the real agent
+REPLY_SECONDS = 600  # one reply takes well under a minute; past this it is hung, and is counted as failed
 PARALLEL = 6  # replies at once, below where the subscription starts to refuse requests
 WORKS_P = 0.05  # one look, so no early-look limits
 MIN_PAIRED = 30  # fewer paired moments than this give no verdict: a handful can swing either way by chance
@@ -161,13 +162,14 @@ def options(system: Path, model: str, cwd: Path) -> ClaudeAgentOptions:
 async def ask(prompt: str, opts: ClaudeAgentOptions) -> str:
     """One reply. Raises OutOfQuota when the model refused for quota, RuntimeError on any other failure."""
     reply, error = None, None
-    async for message in query(prompt=prompt, options=opts):
-        # Claude Code can end "successfully" with an API error, such as a usage limit, as its result text.
-        if isinstance(message, AssistantMessage) and message.error:
-            error = message.error
-        elif isinstance(message, ResultMessage):
-            reply = message.result
-            error = error or (message.subtype if message.is_error else None)
+    async with asyncio.timeout(REPLY_SECONDS):
+        async for message in query(prompt=prompt, options=opts):
+            # Claude Code can end "successfully" with an API error, such as a usage limit, as its result text.
+            if isinstance(message, AssistantMessage) and message.error:
+                error = message.error
+            elif isinstance(message, ResultMessage):
+                reply = message.result
+                error = error or (message.subtype if message.is_error else None)
     # Only a failed reply is read for quota words: a good reply may well mention a limit.
     if error and re.search(r"limit|quota|billing", f"{error} {reply}", re.IGNORECASE):
         raise OutOfQuota(f"{error} {reply}")
@@ -359,8 +361,8 @@ def run(args, projects: Path) -> int:
                     lambda prompt, arm: ask(prompt, opts[arm]),
                 )
             )
-        except OutOfQuota:
-            print("Out of model quota: the replies written so far are kept; rerun later to continue.")
+        except OutOfQuota as e:
+            print(f"Out of model quota ({str(e)[:200]}): the replies written so far are kept; rerun later to continue.")
             return 1
         code = 1 if failed else 0
         if failed:
