@@ -1,0 +1,33 @@
+[project]
+name = "agent-experiments"
+version = "0.1.0"
+description = "Tests whether a change to a coding agent's rules works, from its session transcripts."
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.13"
+dependencies = [
+    "duckdb>=1.5",
+    "numpy>=2.5",
+    "plotly>=7.1",
+    "scipy>=1.18",
+]
+
+[project.scripts]
+agent-experiments = "agent_experiments.cli:main"
+
+[dependency-groups]
+dev = ["pytest>=9", "ruff>=0.17", "ty>=0.0.101"]
+
+[build-system]
+requires = ["uv_build>=0.9,<0.14"]
+build-backend = "uv_build"
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
+ignore = ["E501"]  # the formatter sets line length; long SQL and HTML strings stay whole
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

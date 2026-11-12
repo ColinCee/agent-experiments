@@ -1,0 +1,9 @@
+[extend]
+useDefault = true
+
+# This repository is public and the data it reads is the user's own: no home folder may appear in it.
+[[rules]]
+id = "home-path"
+description = "A path inside a user's home folder"
+regex = '''(?i)(?:[a-z]:[\\/]+users[\\/]+[^\\/\s"'`]+|/home/[a-z][\w.-]*/|/Users/[A-Za-z][\w.-]*/)'''
+keywords = ["users", "home"]
