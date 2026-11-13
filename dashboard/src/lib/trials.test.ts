@@ -1,6 +1,7 @@
 import { describe, expect, test } from "vitest";
 import type { Trial } from "@/data/report";
 import {
+  missingTrialChange,
   neededWords,
   sortTrials,
   taskScale,
@@ -151,4 +152,11 @@ test("a trial's badge says where it is, or its verdict once finished", () => {
 test("the overview's trial line gives its tasks once it has started", () => {
   expect(trialSummary(trial({}), "2026-11-12")).toBe("Day 4 of 7 · 14 with · 9 without");
   expect(trialSummary(trial({ state: "scheduled", started: "2026-11-13" }), "2026-11-12")).toBe("Starts 13 Nov");
+});
+
+test("a trial's missing change says no mistakes without the rule only with tasks enough in both halves", () => {
+  expect(missingTrialChange(trial({ tasks_with: 30, tasks_without: 20 }))).toBe(
+    "No mistakes without the rule, so nothing to compare",
+  );
+  expect(missingTrialChange(trial({ tasks_with: 30, tasks_without: 3 }))).toBe("Too few tasks to tell");
 });

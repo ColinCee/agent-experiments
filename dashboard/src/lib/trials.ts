@@ -1,6 +1,6 @@
 import { differenceInCalendarDays, parseISO } from "date-fns";
 import type { Day, Replay, Trial, Verdict } from "@/data/report";
-import { type BadgeTone, changeTone } from "./change";
+import { type BadgeTone, changeTone, missingChange } from "./change";
 import { dayLabel, number } from "./format";
 
 const days = (from: Day, to: Day) => differenceInCalendarDays(parseISO(to), parseISO(from));
@@ -101,3 +101,7 @@ export function trialSummary(trial: Trial, day: Day): string {
   if (trial.state === "scheduled") return when;
   return `${when} · ${number(trial.tasks_with)} with · ${number(trial.tasks_without)} without`;
 }
+
+/** What a trial's missing change means: too few tasks, or no mistakes without the rule. */
+export const missingTrialChange = (trial: Trial) =>
+  missingChange(Math.min(trial.tasks_with, trial.tasks_without), "without the rule");

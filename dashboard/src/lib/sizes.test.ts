@@ -5,7 +5,6 @@ test("growth is words added since the first point, signed, or no change", () => 
   const points = (first: number, last: number) => ({
     label: "Rules" as const,
     now: last,
-    change: null,
     points: [
       { day: "2026-10-03", words: first },
       { day: "2026-11-12", words: last },

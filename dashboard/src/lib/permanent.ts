@@ -1,31 +1,34 @@
 import type { Day, PermanentCheck } from "@/data/report";
-import type { BadgeTone } from "./change";
+import { type BadgeTone, FEWEST_TASKS, missingChange } from "./change";
 import { dayLabel, plural } from "./format";
 
-/** Fewer tasks than this in the smaller group and the range means little. */
-export const FEWEST_TASKS = 5;
-
-export type PermanentStatus = "working" | "slipping" | "waiting";
+export type PermanentStatus = "working" | "slipping" | "waiting" | "nothing";
 
 export const STATUS_WORDS: Record<PermanentStatus, string> = {
   working: "Still working",
   slipping: "Slipping",
   waiting: "Waiting for tasks",
+  nothing: "Nothing to compare",
 };
 
-export const STATUS_TONE: Record<PermanentStatus, BadgeTone> = { working: "good", slipping: "bad", waiting: "waiting" };
+export const STATUS_TONE: Record<PermanentStatus, BadgeTone> = {
+  working: "good",
+  slipping: "bad",
+  waiting: "waiting",
+  nothing: "unclear",
+};
 
 /** The text that stands in a permanent check's result cell instead of a strip, or null when a strip is drawn. */
 export function permanentNote(check: PermanentCheck): string | null {
   if (check.tasks_without === 0) return "No tasks without the rule yet";
-  if (Math.min(check.tasks_with, check.tasks_without) < FEWEST_TASKS || check.change === null) {
-    return `Too few tasks to tell (needs ${FEWEST_TASKS})`;
-  }
-  return null;
+  const smaller = Math.min(check.tasks_with, check.tasks_without);
+  if (smaller < FEWEST_TASKS) return `Too few tasks to tell (needs ${FEWEST_TASKS})`;
+  return check.change === null ? missingChange(smaller, "without the rule") : null;
 }
 
 export function permanentStatus(check: PermanentCheck): PermanentStatus {
   if (check.slipping) return "slipping";
+  if (check.change === null && Math.min(check.tasks_with, check.tasks_without) >= FEWEST_TASKS) return "nothing";
   return permanentNote(check) === null ? "working" : "waiting";
 }
 
@@ -52,7 +55,7 @@ export function statusCounts(checks: PermanentCheck[]): string {
     const status = permanentStatus(check);
     counts.set(status, (counts.get(status) ?? 0) + 1);
   }
-  return (["working", "slipping", "waiting"] as const)
+  return (["working", "slipping", "waiting", "nothing"] as const)
     .filter((s) => counts.has(s))
     .map((s) => `${counts.get(s)} ${STATUS_WORDS[s].toLowerCase()}`)
     .join(" · ");

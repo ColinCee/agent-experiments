@@ -125,7 +125,7 @@ def test_the_last_look_finishes_a_trial_and_replays_and_sizes_are_reported(tmp_p
     assert (r["name"], r["trusted"], r["real_rate"], r["replay_rate"]) == ("Bad words", False, 0.3, 0.1)
     assert r["change"] == pytest.approx({"value": -0.5, "low": -0.8, "high": -0.2})
     (series,) = report["sizes"]["series"]
-    assert (series["label"], series["now"], series["change"]) == ("Rules", 120, pytest.approx(0.2))
+    assert (series["label"], series["now"], series["points"][0]["words"]) == ("Rules", 120, 100)
     assert report["sizes"]["largest"] == [{"file": "home/a.md", "words": 120}]
 
 

@@ -84,9 +84,8 @@ def measure(repo: Path, globs: tuple[str, ...], db: Path) -> int:
 
 
 def report(con) -> dict:
-    """The report's `sizes`: each pattern's words by day, now and their growth as a fraction of the first day's, the
-    largest files now, and per month and pattern how often a change only added lines and the share of changed lines
-    that were added."""
+    """The report's `sizes`: each pattern's words by day and now, the largest files now, and per month and pattern how
+    often a change only added lines and the share of changed lines that were added."""
     words_by_day = con.execute("""
         WITH days AS (SELECT DISTINCT "day" FROM sizes),
         latest AS (
@@ -104,9 +103,7 @@ def report(con) -> dict:
     for pattern, label in LABELS.items():
         points = [{"day": d, "words": w} for d, p, w in words_by_day if p == pattern]
         if points:
-            first, now = points[0]["words"], points[-1]["words"]
-            change = now / first - 1 if first else None
-            series.append({"label": label, "now": now, "change": change, "points": points})
+            series.append({"label": label, "now": points[-1]["words"], "points": points})
     return {
         "series": series,
         "largest": [{"file": f, "words": w} for f, w in largest],

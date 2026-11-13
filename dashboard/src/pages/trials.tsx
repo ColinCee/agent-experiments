@@ -6,7 +6,16 @@ import { StatusBadge } from "@/components/status-badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Day, Report, Trial } from "@/data/report";
 import { fewTasks, number, percent } from "@/lib/format";
-import { hasResult, neededWords, sortTrials, taskScale, tasksNote, trialBadge, trialWhen } from "@/lib/trials";
+import {
+  hasResult,
+  missingTrialChange,
+  neededWords,
+  sortTrials,
+  taskScale,
+  tasksNote,
+  trialBadge,
+  trialWhen,
+} from "@/lib/trials";
 import { cn } from "@/lib/utils";
 
 function TaskBar({ side, label, tasks, scale }: { side: Side; label: string; tasks: number; scale: number }) {
@@ -84,7 +93,7 @@ function Result({ trial, axis }: { trial: Trial; axis: boolean }) {
       <AlignWithStrip>
         <RatePair without={trial.rate_without} withRule={trial.rate_with} />
       </AlignWithStrip>
-      <ChangeStrip change={trial.change} axis={axis} />
+      <ChangeStrip change={trial.change} axis={axis} missing={missingTrialChange(trial)} />
     </div>
   );
 }

@@ -8,6 +8,7 @@ import type { Day, Mistake, Report } from "@/data/report";
 import { percent } from "@/lib/format";
 import {
   currentWords,
+  missingMistakeChange,
   NO_RECENT_TASKS,
   ruleSince,
   ruleTasks,
@@ -29,7 +30,7 @@ function RuleNumbers({ mistake }: { mistake: Mistake }) {
         <Swatch side="with">
           Since rule <RateValue rate={rate(mistake.after?.rate)} side="with" className="text-lg" />
         </Swatch>
-        <ChangeText change={mistake.change} />
+        <ChangeText change={mistake.change} missing={missingMistakeChange(mistake)} />
       </div>
       <p className="text-sm text-muted-foreground">{ruleTasks(mistake)}</p>
     </div>

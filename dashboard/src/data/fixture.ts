@@ -199,7 +199,7 @@ const sizePoints = (first: number, last: number) =>
   }));
 
 const ruleWords = sizePoints(3200, 4100);
-// Skills start from nothing, so their growth as a fraction is null.
+// Skills start from nothing, as a new file set does.
 const skillWords = sizePoints(0, 12600);
 
 export const fixture: Report = {
@@ -306,6 +306,15 @@ export const fixture: Report = {
       slipping: false,
     },
     {
+      name: "Old branches left open",
+      since: "2026-10-30",
+      model: "model-a",
+      tasks_with: 90,
+      tasks_without: 11,
+      change: null,
+      slipping: false,
+    },
+    {
       name: "Drafts saved in the wrong folder",
       since: "2026-09-20",
       model: "model-a",
@@ -375,10 +384,9 @@ export const fixture: Report = {
       {
         label: "Rules",
         now: ruleWords[19].words,
-        change: round(ruleWords[19].words / ruleWords[0].words - 1),
         points: ruleWords,
       },
-      { label: "Skills", now: skillWords[19].words, change: null, points: skillWords },
+      { label: "Skills", now: skillWords[19].words, points: skillWords },
     ],
     largest: [
       { file: "skills/release-checklist/SKILL.md", words: 2100 },

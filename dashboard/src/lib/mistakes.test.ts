@@ -5,6 +5,7 @@ import {
   currentWords,
   historyRows,
   markerWords,
+  missingMistakeChange,
   ruleSince,
   ruleTasks,
   slug,
@@ -110,4 +111,13 @@ test("changes on the same day share one marker, in order", () => {
     ["2026-11-02", ["A"]],
     ["2026-11-07", ["B", "C"]],
   ]);
+});
+
+test("a mistake's missing change says no mistakes before the rule only when both sides have tasks enough", () => {
+  const side = { rate: 0, low: null, high: null, tasks: 30, from: "2026-10-01" };
+  expect(missingMistakeChange(mistake({ before: side, after: side }))).toBe(
+    "No mistakes before the rule, so nothing to compare",
+  );
+  expect(missingMistakeChange(mistake({ before: side, after: { ...side, tasks: 2 } }))).toBe("Too few tasks to tell");
+  expect(missingMistakeChange(mistake({ before: null, after: side }))).toBe("Too few tasks to tell");
 });

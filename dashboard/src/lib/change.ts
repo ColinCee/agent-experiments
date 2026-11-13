@@ -44,13 +44,27 @@ export function rangeWords(change: Range): string | null {
 
 export type ChangeMode = "plain" | "slipping" | "untrusted";
 
+/** Fewer tasks than this in the smaller group and the range means little. */
+export const FEWEST_TASKS = 5;
+
+const TOO_FEW = "Too few tasks to tell";
+
+/**
+ * What stands for a change the report left out (null). With enough tasks on both sides it is missing because the side
+ * compared against had no mistakes at all, so there is nothing to divide by; otherwise there were too few tasks.
+ */
+export function missingChange(smaller: number, against: "without the rule" | "before the rule"): string {
+  return smaller >= FEWEST_TASKS ? `No mistakes ${against}, so nothing to compare` : TOO_FEW;
+}
+
 /**
  * How a change in the mistake rate and its 90% range read on screen; lower is better. A `slipping` proven rule reads
  * "Little or no change" in red whatever the range; an `untrusted` replay keeps its words but loses its colour.
  */
-export function changeWords(change: Range | null, mode: ChangeMode = "plain"): ChangeWords {
-  if (change?.low == null || change.high == null) {
-    return { tone: "unclear", lead: "Too few tasks to tell", hint: null, hasRange: false };
+export function changeWords(change: Range | null, mode: ChangeMode = "plain", missing = TOO_FEW): ChangeWords {
+  if (change === null) return { tone: "unclear", lead: missing, hint: null, hasRange: false };
+  if (change.low == null || change.high == null) {
+    return { tone: "unclear", lead: TOO_FEW, hint: null, hasRange: false };
   }
   if (mode === "slipping")
     return { tone: "bad", lead: "Little or no change", hint: rangeWords(change), hasRange: true };

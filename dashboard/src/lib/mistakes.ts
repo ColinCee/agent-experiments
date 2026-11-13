@@ -1,5 +1,5 @@
 import type { Day, Mistake, MistakeChange } from "@/data/report";
-import { changeTone, type Tone } from "./change";
+import { changeTone, missingChange, type Tone } from "./change";
 import { dayLabel, percent, plural } from "./format";
 
 export function slug(name: string): string {
@@ -76,3 +76,7 @@ export function changesByDay(changes: MistakeChange[]): { day: Day; changes: Mis
   for (const change of changes) days.set(change.day, [...(days.get(change.day) ?? []), change]);
   return [...days].map(([day, all]) => ({ day, changes: all }));
 }
+
+/** What a mistake's missing before/since change means: too few tasks, or no mistakes before the rule. */
+export const missingMistakeChange = (mistake: Mistake) =>
+  missingChange(Math.min(mistake.before?.tasks ?? 0, mistake.after?.tasks ?? 0), "before the rule");

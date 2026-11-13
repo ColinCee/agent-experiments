@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { changeWords, isClipped, rangeWords, stripPosition } from "./change";
+import { changeWords, isClipped, missingChange, rangeWords, stripPosition } from "./change";
 
 describe("changeWords", () => {
   test("a range wholly below no change reads as fewer mistakes", () => {
@@ -87,4 +87,14 @@ describe("stripPosition", () => {
     expect(isClipped({ value: 0.6, low: 0.2, high: 1 })).toBe(false);
     expect(isClipped(null)).toBe(false);
   });
+});
+
+test("a missing change with enough tasks means no mistakes on the side compared against", () => {
+  expect(missingChange(5, "without the rule")).toBe("No mistakes without the rule, so nothing to compare");
+  expect(missingChange(40, "before the rule")).toBe("No mistakes before the rule, so nothing to compare");
+  expect(missingChange(4, "without the rule")).toBe("Too few tasks to tell");
+  expect(changeWords(null, "plain", missingChange(40, "before the rule")).lead).toBe(
+    "No mistakes before the rule, so nothing to compare",
+  );
+  expect(changeWords({ value: -0.4, low: null, high: null }, "plain", "anything").lead).toBe("Too few tasks to tell");
 });

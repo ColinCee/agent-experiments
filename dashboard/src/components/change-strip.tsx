@@ -69,8 +69,8 @@ function Words({ words, inline = false }: { words: ChangeWords; inline?: boolean
 }
 
 /** The words for a change without its strip, on one line. */
-export function ChangeText({ change }: { change: Range | null }) {
-  return <Words words={changeWords(change)} inline />;
+export function ChangeText({ change, missing }: { change: Range | null; missing?: string }) {
+  return <Words words={changeWords(change, "plain", missing)} inline />;
 }
 
 /** Lays `children` out exactly as a strip is laid out, so a rate track above a strip has the strip's width. */
@@ -103,13 +103,16 @@ export function ChangeStrip({
   axis = false,
   mode = "plain",
   cells = false,
+  missing,
 }: {
   change: Range | null;
   axis?: boolean;
   mode?: ChangeMode;
   cells?: boolean;
+  /** What to say when the report has no change (null); too few tasks unless told otherwise. */
+  missing?: string;
 }) {
-  const words = changeWords(change, mode);
+  const words = changeWords(change, mode, missing);
   return (
     // Words go beside the strip only when that leaves the strip room for its captions; otherwise below it.
     <div className={cn("@container", cells && "md:contents")}>

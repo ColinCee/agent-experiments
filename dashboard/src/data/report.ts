@@ -112,8 +112,7 @@ export interface Replay {
 }
 
 export interface Sizes {
-  /** `change` is now / first point - 1, null when the first point has no words. */
-  series: { label: "Rules" | "Skills"; now: number; change: number | null; points: { day: Day; words: number }[] }[];
+  series: { label: "Rules" | "Skills"; now: number; points: { day: Day; words: number }[] }[];
   largest: { file: string; words: number }[];
   /** Per month (YYYY-MM): edits, the share of them that only added lines, and the share of changed lines added. */
   months: { month: string; label: "Rules" | "Skills"; changes: number; only_added: number; added_share: number }[];

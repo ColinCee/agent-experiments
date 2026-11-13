@@ -1,6 +1,14 @@
 import { expect, test } from "vitest";
 import type { PermanentCheck } from "@/data/report";
-import { permanentNote, permanentStatus, permanentSummary, sharedModel, statusCounts } from "./permanent";
+import {
+  permanentNote,
+  permanentStatus,
+  permanentSummary,
+  STATUS_TONE,
+  STATUS_WORDS,
+  sharedModel,
+  statusCounts,
+} from "./permanent";
 
 const check = (over: Partial<PermanentCheck>): PermanentCheck => ({
   name: "A rule",
@@ -51,4 +59,13 @@ test("status counts leave out statuses no rule has", () => {
     "2 still working · 1 slipping · 1 waiting for tasks",
   );
   expect(statusCounts([check({ tasks_without: 0 })])).toBe("1 waiting for tasks");
+});
+
+test("plenty of tasks but no mistakes without the rule is nothing to compare, not waiting or working", () => {
+  const none = check({ tasks_with: 90, tasks_without: 11, change: null });
+  expect(permanentNote(none)).toBe("No mistakes without the rule, so nothing to compare");
+  expect(permanentStatus(none)).toBe("nothing");
+  expect(STATUS_WORDS.nothing).toBe("Nothing to compare");
+  expect(STATUS_TONE.nothing).toBe("unclear");
+  expect(statusCounts([none, check({})])).toBe("1 still working · 1 nothing to compare");
 });

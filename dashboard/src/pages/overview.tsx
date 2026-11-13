@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Mistake, Report, Trial } from "@/data/report";
 import { type AttentionItem, attentionItems, calmLine } from "@/lib/attention";
 import { fewTasks, percent, plural } from "@/lib/format";
-import { NO_RECENT_TASKS, slug, sortByChange, withoutRule, withRule } from "@/lib/mistakes";
+import { missingMistakeChange, NO_RECENT_TASKS, slug, sortByChange, withoutRule, withRule } from "@/lib/mistakes";
 import { permanentSummary, statusCounts } from "@/lib/permanent";
 import { sortTrials, trialSummary, verdictWords } from "@/lib/trials";
 import { cn } from "@/lib/utils";
@@ -162,7 +162,7 @@ function RulesTable({ mistakes }: { mistakes: Mistake[] }) {
           <div className="pr-2.5">
             <RatePair without={m.before?.rate ?? null} withRule={m.after?.rate ?? null} />
           </div>
-          <ChangeStrip change={m.change} axis={i === 0} cells />
+          <ChangeStrip change={m.change} axis={i === 0} cells missing={missingMistakeChange(m)} />
         </GridRow>
       ))}
     </div>
