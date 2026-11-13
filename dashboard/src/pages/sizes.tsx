@@ -53,8 +53,7 @@ function Months({ months, day }: { months: Sizes["months"]; day: Day }) {
           <TableHead className="whitespace-normal">Month</TableHead>
           <TableHead className="whitespace-normal">Files</TableHead>
           <TableHead className="text-right whitespace-normal">Edits</TableHead>
-          <TableHead className="text-right whitespace-normal">Only added text</TableHead>
-          <TableHead className="text-right whitespace-normal">Of changed lines, added</TableHead>
+          <TableHead className="text-right whitespace-normal">Edits that only added text</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -64,7 +63,6 @@ function Months({ months, day }: { months: Sizes["months"]; day: Day }) {
             <TableCell>{m.label}</TableCell>
             <TableCell className="text-right">{number(m.changes)}</TableCell>
             <TableCell className="text-right">{percent(m.only_added)}</TableCell>
-            <TableCell className="text-right">{percent(m.added_share)}</TableCell>
           </TableRow>
         ))}
       </TableBody>

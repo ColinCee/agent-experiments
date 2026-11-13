@@ -6,9 +6,9 @@ const replay = fixture.replays[0];
 
 test("a replay says when it ran and on how many moments", () => {
   expect(replayedLine({ ...replay, day: "2026-11-12", moments: 57 }, "2026-11-12")).toBe(
-    "Replayed 12 Nov · 57 moments",
+    "Replayed 12 Nov · 57 past moments",
   );
-  expect(replayedLine({ ...replay, moments: 1 }, "2026-11-12")).toContain("· 1 moment");
+  expect(replayedLine({ ...replay, moments: 1 }, "2026-11-12")).toContain("· 1 past moment");
 });
 
 test("trust is explained by the real rate against the replay's", () => {

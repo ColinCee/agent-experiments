@@ -14,7 +14,7 @@ function StripAxis() {
     <div data-axis className="relative h-4 text-xs leading-4 text-muted-foreground">
       <span className="absolute left-0">fewer mistakes</span>
       <span className="absolute left-1/2 -translate-x-1/2">no change</span>
-      <span className="absolute right-0">more</span>
+      <span className="absolute right-0">more mistakes</span>
     </div>
   );
 }

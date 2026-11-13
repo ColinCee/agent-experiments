@@ -5,7 +5,7 @@ import { ChartContainer, ChartTooltip } from "@/components/ui/chart";
 import type { Day, Mistake, MistakeChange } from "@/data/report";
 import { layoutLabels, rateCeiling, rateTicks } from "@/lib/charts";
 import { dayLabel, percent } from "@/lib/format";
-import { historyRows, markerWords } from "@/lib/mistakes";
+import { changesByDay, historyRows, markerWords } from "@/lib/mistakes";
 import { cn } from "@/lib/utils";
 import { ChartTip } from "./chart-tip";
 import { PointMark } from "./marks";
@@ -15,7 +15,8 @@ const ICON = 12;
 const ROW_HEIGHT = 16;
 
 export interface Picked {
-  change: MistakeChange;
+  day: Day;
+  changes: MistakeChange[];
   x: number;
   anchor: "start" | "middle" | "end";
 }
@@ -42,40 +43,41 @@ function Markers({
 }: {
   changes: MistakeChange[];
   day: Day;
-  picked: MistakeChange | null;
+  picked: Day | null;
   onPick: (picked: Picked | null) => void;
 }) {
   const scale = useXAxisScale();
   const plot = usePlotArea();
   if (!scale || !plot) return null;
-  const marks = changes.flatMap((change) => {
-    const x = scale(change.day);
+  const marks = changesByDay(changes).flatMap((group) => {
+    const x = scale(group.day);
     if (x === undefined) return [];
-    const label = dayLabel(change.day, day);
-    const width = textWidth(label) + (change.kind === "trial" ? ICON + 2 : 0);
-    return [{ change, x, label, width }];
+    // A day with a rule change is drawn as a rule change; only a day of trial starts alone gets the trial style.
+    const trial = group.changes.every((c) => c.kind === "trial");
+    const label = dayLabel(group.day, day);
+    const width = textWidth(label) + (trial ? ICON + 2 : 0);
+    return [{ group, trial, x, label, width }];
   });
   const slots = layoutLabels(marks, plot.x, plot.x + plot.width);
   const third = plot.width / 3;
   return (
     <g>
-      {marks.map(({ change, x, label, width }, i) => {
+      {marks.map(({ group, trial, x, label, width }, i) => {
         const { row, anchor } = slots[i];
-        const trial = change.kind === "trial";
-        const active = picked === change;
+        const active = picked === group.day;
         const pick = () =>
-          onPick({ change, x, anchor: x < plot.x + third ? "start" : x > plot.x + 2 * third ? "end" : "middle" });
+          onPick({ ...group, x, anchor: x < plot.x + third ? "start" : x > plot.x + 2 * third ? "end" : "middle" });
         const from = anchor === "start" ? x : anchor === "end" ? x - width : x - width / 2;
         const y = plot.y - 6 - (row ?? 0) * ROW_HEIGHT;
         return (
           // biome-ignore lint/a11y/useSemanticElements: SVG has no button element; the marker is drawn inside the chart.
           <g
-            key={`${change.kind} ${change.day} ${change.what}`}
-            data-marker-day={change.day}
-            data-marker-kind={change.kind}
+            key={group.day}
+            data-marker-day={group.day}
+            data-marker-kind={trial ? "trial" : "rule"}
             role="button"
             tabIndex={0}
-            aria-label={markerWords(change, day)}
+            aria-label={group.changes.map((c) => markerWords(c, day)).join("; ")}
             className="cursor-pointer outline-none"
             onMouseEnter={pick}
             onMouseLeave={() => onPick(null)}
@@ -132,20 +134,22 @@ function MarkerTip({ picked, day }: { picked: Picked; day: Day }) {
       )}
       style={{ left: picked.x }}
     >
-      {markerWords(picked.change, day)}
+      {picked.changes.map((c) => (
+        <p key={`${c.kind} ${c.what}`}>{markerWords(c, day)}</p>
+      ))}
     </div>
   );
 }
 
 /**
  * A mistake's daily share over the window: grey up to its latest rule change, blue from it, with a marker at every rule
- * change and trial start. Its axis tops out at 25%, 50% or 100%, whichever the data fits.
+ * change and trial start (one per day). Its axis tops out at 20%, 50% or 100%, whichever the data fits.
  */
 export function HistoryChart({ mistake, day }: { mistake: Mistake; day: Day }) {
   const [picked, setPicked] = useState<Picked | null>(null);
   const rows = historyRows(mistake);
   const ceiling = rateCeiling(mistake.series.map((p) => p.rate));
-  const twoRows = mistake.changes.length > 1;
+  const twoRows = new Set(mistake.changes.map((c) => c.day)).size > 1;
   return (
     <div className="relative">
       <ChartContainer className="aspect-auto h-[220px] w-full md:h-[260px]">
@@ -201,7 +205,7 @@ export function HistoryChart({ mistake, day }: { mistake: Mistake; day: Day }) {
               activeDot={{ r: 4 }}
             />
           ))}
-          <Markers changes={mistake.changes} day={day} picked={picked?.change ?? null} onPick={setPicked} />
+          <Markers changes={mistake.changes} day={day} picked={picked?.day ?? null} onPick={setPicked} />
         </LineChart>
       </ChartContainer>
       {picked && <MarkerTip picked={picked} day={day} />}

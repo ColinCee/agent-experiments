@@ -6,7 +6,7 @@ import { Empty, Section } from "@/components/section";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Mistake, Report, Trial } from "@/data/report";
 import { type AttentionItem, attentionItems, calmLine } from "@/lib/attention";
-import { percent, plural } from "@/lib/format";
+import { fewTasks, percent, plural } from "@/lib/format";
 import { NO_RECENT_TASKS, slug, sortByChange, withoutRule, withRule } from "@/lib/mistakes";
 import { permanentSummary, statusCounts } from "@/lib/permanent";
 import { sortTrials, trialSummary, verdictWords } from "@/lib/trials";
@@ -123,6 +123,14 @@ function RateCell({ rate, side, label }: { rate: number | null | undefined; side
   );
 }
 
+function FewTasksLine({ mistake }: { mistake: Mistake }) {
+  const few = fewTasks([
+    { tasks: mistake.before?.tasks, label: "before" },
+    { tasks: mistake.after?.tasks, label: "since the rule" },
+  ]);
+  return few && <span className="block text-sm text-muted-foreground">{few}</span>;
+}
+
 function RulesTable({ mistakes }: { mistakes: Mistake[] }) {
   const rows = sortByChange(withRule(mistakes));
   if (rows.length === 0) return <Empty>No rule has been tried on a mistake yet</Empty>;
@@ -143,7 +151,10 @@ function RulesTable({ mistakes }: { mistakes: Mistake[] }) {
       </GridHeader>
       {rows.map((m, i) => (
         <GridRow key={m.name} href={href("mistakes", slug(m.name))}>
-          <span className="block font-medium">{m.name}</span>
+          <div>
+            <span className="block font-medium">{m.name}</span>
+            <FewTasksLine mistake={m} />
+          </div>
           <div className="md:contents">
             <RateCell rate={m.before?.rate} side="without" label="Before rule" />
             <RateCell rate={m.after?.rate} side="with" label="Since rule" />

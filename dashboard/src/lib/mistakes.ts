@@ -33,9 +33,12 @@ export function markerWords(change: MistakeChange, day: Day): string {
 
 /** The chip beside a mistake's name, only when its rate on the report day is outside its usual range. */
 export function todayChip(mistake: Mistake): { text: string; tone: "good" | "bad" } | null {
-  if (mistake.today?.outside === "above") return { text: "Above usual today", tone: "bad" };
-  if (mistake.today?.outside === "below") return { text: "Below usual today", tone: "good" };
-  return null;
+  const today = mistake.today;
+  if (!today?.outside) return null;
+  const numbers = `${percent(today.rate)}, usually ${percent(today.usual_low)} to ${percent(today.usual_high)}`;
+  return today.outside === "above"
+    ? { text: `Above usual today: ${numbers}`, tone: "bad" }
+    : { text: `Below usual today: ${numbers}`, tone: "good" };
 }
 
 /** "79 tasks before · 103 since". */
@@ -65,4 +68,11 @@ export function historyRows(mistake: Mistake): { day: Day; before: number | null
     before: ruleDay === undefined || day <= ruleDay ? rate : null,
     after: ruleDay !== undefined && day >= ruleDay ? rate : null,
   }));
+}
+
+/** Rule changes and trial starts grouped by day, so changes on one day share one marker. */
+export function changesByDay(changes: MistakeChange[]): { day: Day; changes: MistakeChange[] }[] {
+  const days = new Map<Day, MistakeChange[]>();
+  for (const change of changes) days.set(change.day, [...(days.get(change.day) ?? []), change]);
+  return [...days].map(([day, all]) => ({ day, changes: all }));
 }

@@ -3,7 +3,7 @@ import { dayLabel, percent, plural } from "./format";
 
 /** "Replayed 12 Nov · 191 moments". */
 export function replayedLine(replay: Replay, day: Day): string {
-  return `Replayed ${dayLabel(replay.day, day)} · ${plural(replay.moments, "moment")}`;
+  return `Replayed ${dayLabel(replay.day, day)} · ${plural(replay.moments, "past moment")}`;
 }
 
 /** Why the replay can or can't be trusted: the real rate against the replay's under the same rules. */

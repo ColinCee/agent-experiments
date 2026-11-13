@@ -5,17 +5,8 @@ import { Empty } from "@/components/section";
 import { StatusBadge } from "@/components/status-badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Day, Report, Trial } from "@/data/report";
-import { number, percent } from "@/lib/format";
-import {
-  hasResult,
-  neededWords,
-  sortTrials,
-  taskScale,
-  tasksNote,
-  trialBadge,
-  trialWhen,
-  verdictWords,
-} from "@/lib/trials";
+import { fewTasks, number, percent } from "@/lib/format";
+import { hasResult, neededWords, sortTrials, taskScale, tasksNote, trialBadge, trialWhen } from "@/lib/trials";
 import { cn } from "@/lib/utils";
 
 function TaskBar({ side, label, tasks, scale }: { side: Side; label: string; tasks: number; scale: number }) {
@@ -69,13 +60,18 @@ function Tasks({ trial }: { trial: Trial }) {
   );
 }
 
+function FewTasks({ trial }: { trial: Trial }) {
+  const few = fewTasks([
+    { tasks: trial.tasks_without, label: "without the rule" },
+    { tasks: trial.tasks_with, label: "with it" },
+  ]);
+  return few && <p className="text-sm text-muted-foreground">{few}</p>;
+}
+
 function Result({ trial, axis }: { trial: Trial; axis: boolean }) {
   return (
     <div className="space-y-3">
-      <h3 className="flex items-baseline gap-2">
-        <span className="text-sm font-medium text-muted-foreground">Result so far</span>
-        <span className="font-semibold">{verdictWords(trial.verdict)}</span>
-      </h3>
+      <h3 className="text-sm font-medium text-muted-foreground">Result so far</h3>
       <div className="flex flex-wrap gap-x-6 text-sm">
         <Swatch side="without">
           Without <RateValue rate={trial.rate_without === null ? "–" : percent(trial.rate_without)} side="without" />
@@ -84,6 +80,7 @@ function Result({ trial, axis }: { trial: Trial; axis: boolean }) {
           With the rule <RateValue rate={trial.rate_with === null ? "–" : percent(trial.rate_with)} side="with" />
         </Swatch>
       </div>
+      <FewTasks trial={trial} />
       <AlignWithStrip>
         <RatePair without={trial.rate_without} withRule={trial.rate_with} />
       </AlignWithStrip>

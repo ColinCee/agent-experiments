@@ -1,6 +1,7 @@
 import { expect, test } from "vitest";
 import type { Mistake, Range } from "@/data/report";
 import {
+  changesByDay,
   currentWords,
   historyRows,
   markerWords,
@@ -50,8 +51,14 @@ test("under the chart only the latest rule is named; a marker names a rule or a 
 
 test("the today chip shows only outside the usual range", () => {
   const today = (outside: "above" | "below" | null) => ({ rate: 0.2, usual_low: 0.1, usual_high: 0.3, outside });
-  expect(todayChip(mistake({ today: today("above") }))).toEqual({ text: "Above usual today", tone: "bad" });
-  expect(todayChip(mistake({ today: today("below") }))).toEqual({ text: "Below usual today", tone: "good" });
+  expect(todayChip(mistake({ today: today("above") }))).toEqual({
+    text: "Above usual today: 20%, usually 10% to 30%",
+    tone: "bad",
+  });
+  expect(todayChip(mistake({ today: today("below") }))).toEqual({
+    text: "Below usual today: 20%, usually 10% to 30%",
+    tone: "good",
+  });
   expect(todayChip(mistake({ today: today(null) }))).toBeNull();
   expect(todayChip(mistake({ today: null }))).toBeNull();
 });
@@ -91,4 +98,16 @@ test("history rows split at the latest rule change, sharing its day, and keep ga
 
 test("slugs are lower-case words joined by dashes", () => {
   expect(slug("Tests skipped, before a commit!")).toBe("tests-skipped-before-a-commit");
+});
+
+test("changes on the same day share one marker, in order", () => {
+  const groups = changesByDay([
+    { day: "2026-11-02", what: "A", kind: "rule" },
+    { day: "2026-11-07", what: "B", kind: "rule" },
+    { day: "2026-11-07", what: "C", kind: "trial" },
+  ]);
+  expect(groups.map((g) => [g.day, g.changes.map((c) => c.what)])).toEqual([
+    ["2026-11-02", ["A"]],
+    ["2026-11-07", ["B", "C"]],
+  ]);
 });

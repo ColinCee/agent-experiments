@@ -9,12 +9,30 @@ const shift = (day: Day, n: number): Day => format(addDays(parseISO(day), n), "y
 const seriesStart = shift(DAY, 1 - SERIES_DAYS);
 const round = (x: number) => Math.round(x * 1000) / 1000;
 
-/** A wavy daily rate that steps from `before` to `after` on `ruleDay`, with no data on days where `gap(i)` holds. */
-function series(before: number, after: number, ruleDay: Day | null, phase: number, gap: (i: number) => boolean) {
+/** A small seeded generator (mulberry32), so the made-up series are noisy but the same on every run. */
+function random(seed: number) {
+  let t = seed >>> 0;
+  return () => {
+    t = (t + 0x6d2b79f5) >>> 0;
+    let r = Math.imul(t ^ (t >>> 15), 1 | t);
+    r = (r + Math.imul(r ^ (r >>> 7), 61 | r)) ^ r;
+    return ((r ^ (r >>> 14)) >>> 0) / 2 ** 32;
+  };
+}
+
+/**
+ * A noisy daily rate around `before`, stepping to `after` on `ruleDay`: a random walk that drifts back to its level,
+ * with about one day in twelve missing. Days in `keep` (where markers sit) always have data.
+ */
+function series(before: number, after: number, ruleDay: Day | null, seed: number, keep: Day[] = []) {
+  const next = random(seed);
+  let walk = 0;
   return Array.from({ length: SERIES_DAYS }, (_, i) => {
     const day = shift(seriesStart, i);
     const base = ruleDay !== null && day >= ruleDay ? after : before;
-    return { day, rate: gap(i) ? null : round(base * (1 + 0.25 * Math.sin(i * 0.9 + phase))) };
+    walk = 0.7 * walk + (next() - 0.5) * 0.6;
+    const gap = next() < 1 / 12 && !keep.includes(day);
+    return { day, rate: gap ? null : round(Math.min(1, base * Math.exp(walk))) };
   });
 }
 
@@ -47,7 +65,13 @@ function withRule(
     change,
     sure,
     current: null,
-    series: series(before.rate, after.rate, rule.day, phase, (i) => i % 13 === 4),
+    series: series(
+      before.rate,
+      after.rate,
+      rule.day,
+      phase * 1000,
+      [...earlier, rule].map((c) => c.day),
+    ),
     changes: [...earlier, { ...rule, kind: "rule" as const }].filter((c) => c.day >= seriesStart),
   };
 }
@@ -68,7 +92,13 @@ function noRule(
     change: null,
     sure: false,
     current,
-    series: series(current.rate, current.rate, null, phase, (i) => i % 9 === 7),
+    series: series(
+      current.rate,
+      current.rate,
+      null,
+      phase * 1000,
+      changes.map((c) => c.day),
+    ),
     changes,
   };
 }
@@ -116,7 +146,7 @@ const mistakes: Mistake[] = [
   withRule(
     "Long logs pasted into a reply",
     { day: "2026-10-28", what: "Quote the failing lines, link the rest" },
-    [],
+    [{ day: "2026-10-28", what: "Long logs pasted into a reply", kind: "trial" }],
     side(0.4, 0.33, 0.47, 120, seriesStart),
     side(0.22, 0.16, 0.29, 90, "2026-10-28"),
     { low: -0.63, high: -0.24 },
@@ -369,7 +399,7 @@ export const fixture: Report = {
   },
 };
 
-const noData = series(0, 0, null, 0, () => true);
+const noData = series(0, 0, null, 0).map(({ day }) => ({ day, rate: null }));
 
 /** A report with nothing in it yet: no trials, permanent rules or replays, and mistakes without any data. */
 export const emptyReport: Report = {

@@ -156,7 +156,7 @@ for (const [width, viewport] of Object.entries(widths)) {
     for (const mistake of fixture.mistakes) {
       const chart = charts.find((c) => c.id === mistake.name.toLowerCase().replace(/[^a-z0-9]+/g, "-"));
       if (!chart) throw new Error(`no chart for ${mistake.name}`);
-      expect(chart.markers.map((m) => m.day)).toEqual(mistake.changes.map((c) => c.day));
+      expect(chart.markers.map((m) => m.day)).toEqual([...new Set(mistake.changes.map((c) => c.day))]);
       for (const marker of chart.markers) {
         const point = chart.points.find((p) => p.day === marker.day);
         if (!point) continue; // no data on that day: a gap, not a point
@@ -236,4 +236,25 @@ test("tapping a rule-change marker on a phone says what changed then", async ({ 
   await card.locator('[data-marker-day="2026-10-08"]').tap();
   await expect(card.locator("[data-marker-tip]")).toHaveText("Rule changed 8 Oct: Replies open with the answer");
   await context.close();
+});
+
+test("a rule change and a trial start on one day share a marker that names both", async ({ page }) => {
+  await page.setViewportSize(widths.desktop);
+  const opened = await openBuilt(page);
+  await page.goto(`${opened.url}#/mistakes`);
+  const card = page.locator("#long-logs-pasted-into-a-reply");
+  await expect(card.locator("[data-marker-day]")).toHaveCount(1);
+  await card.locator('[data-marker-day="2026-10-28"]').hover();
+  await expect(card.locator("[data-marker-tip] p")).toHaveText([
+    "Trial started 28 Oct",
+    "Rule changed 28 Oct: Quote the failing lines, link the rest",
+  ]);
+});
+
+test("the data's date shows once: in the sidebar on a computer, in the header on a phone", async ({ page }) => {
+  for (const viewport of [widths.desktop, widths.phone]) {
+    await page.setViewportSize(viewport);
+    await openBuilt(page);
+    await expect(page.getByText("Data up to 12 Nov", { exact: true }).filter({ visible: true })).toHaveCount(1);
+  }
 });
