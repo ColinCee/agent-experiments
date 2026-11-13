@@ -129,6 +129,25 @@ def test_the_last_look_finishes_a_trial_and_replays_and_sizes_are_reported(tmp_p
     assert report["sizes"]["largest"] == [{"file": "home/a.md", "words": 120}]
 
 
+def test_trial_starts_are_marked_but_never_move_the_before_and_after_boundary(tmp_path: Path):
+    trials = tmp_path / "trials"
+    trials.mkdir()
+    (trials / "new.md").write_text("---\nname: New wording\nmeasures: bad-word\nstarted: 2026-01-03\n---\n")
+    (trials / "kept.md").write_text("---\nstatus: settled\nmeasures: bad-word\nstarted: 2026-01-04\n---\n")
+
+    daily(tmp_path, "2026-01-05")
+
+    report = json.loads((tmp_path / "report.json").read_text(encoding="utf-8"))
+    (bad,) = [m for m in report["mistakes"] if m["name"] == "Bad words"]
+    assert bad["rule"] == {"day": "2026-01-02", "what": "rule added"}
+    assert bad["after"]["from"] == "2026-01-02" and bad["after"]["tasks"] == 2
+    assert bad["changes"] == [
+        {"day": "2026-01-01", "what": "A plain name", "kind": "trial"},
+        {"day": "2026-01-02", "what": "rule added", "kind": "rule"},
+        {"day": "2026-01-03", "what": "New wording", "kind": "trial"},
+    ]
+
+
 def test_a_change_below_zero_is_fewer_misses_with_its_range_around_it():
     effect = cli.Effect(off=0.4, on=0.2, drop=0.5, low=0.2, high=0.7, p=0.01)
 

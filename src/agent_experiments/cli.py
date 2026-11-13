@@ -129,9 +129,15 @@ def build(db: Path, trials: list[looks.Trial], day: str, errors: list[str]) -> t
                     new_looks += [new] if new else []
         except Exception:
             errors.append(f"Trial {trial.name} left off the page:\n{traceback.format_exc()}")
-    changes = con.execute('SELECT measure, "day", what FROM changes WHERE "day" <= ? ORDER BY "day"', [day]).fetchall()
+    changes = con.execute(
+        """SELECT measure, "day", what, 'rule' FROM changes WHERE "day" <= ? ORDER BY "day\"""", [day]
+    ).fetchall()
+    # Trial starts are marked, never a before and after boundary (docs/architecture.md#overview-page).
     changes += [
-        (m, t.started, f"trial started: {t.title or t.name}") for t in trials if t.started <= day for m in t.measures
+        (m, t.started, t.title or t.name, "trial")
+        for t in trials
+        if t.status != "settled" and t.started <= day
+        for m in t.measures
     ]
     mistakes = [_mistake(con, m, names.get(m, m), changes, day, rng) for m in looks.measures(con)]
     mistakes.sort(key=lambda r: r["name"])
@@ -183,10 +189,11 @@ def _side(con, measure: str, first: str, last: str, rng: np.random.Generator) ->
 
 
 def _mistake(con, measure: str, name: str, changes: list, day: str, rng: np.random.Generator) -> dict:
-    """A tracked measure's day against its usual range, its timeline with the rule changes on it, and its misses before
-    and after the latest change, the before side starting at the change before it; with no rule yet, its misses over
-    the last USUAL_DAYS (docs/architecture.md#overview-page)."""
-    days = sorted({(d, w) for m, d, w in changes if m == measure})
+    """A tracked measure's day against its usual range, its timeline with the rule changes and trial starts on it, and
+    its misses before and after the latest rule change, the before side starting at the rule change before it; with no
+    rule yet, its misses over the last USUAL_DAYS (docs/architecture.md#overview-page)."""
+    marks = sorted({(d, w, k) for m, d, w, k in changes if m == measure})
+    days = [(d, w) for d, w, k in marks if k == "rule"]
     flag = looks.flag(con, measure, day, rng)
     first = shift(day, 1 - TIMELINE_DAYS)
     today = None
@@ -207,7 +214,7 @@ def _mistake(con, measure: str, name: str, changes: list, day: str, rng: np.rand
             {"day": d, "rate": r}
             for d, r in looks.rolling(looks.by_day(con, measure, shift(first, -2), day), first, day)
         ],
-        "changes": [{"day": d, "what": w} for d, w in days if d >= first],
+        "changes": [{"day": d, "what": w, "kind": k} for d, w, k in marks if d >= first],
     }
     if not days:
         row["current"] = _side(con, measure, shift(day, 1 - looks.USUAL_DAYS), day, rng)[0]

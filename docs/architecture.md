@@ -73,7 +73,7 @@ A continued session copies its parent's entries; each counts once, for the root 
 
 - **Trials.** Per trial and measure: each half's tasks and miss rate, the change with its 90% range, tasks needed (Method), its looks, and each half's rate over 3 days since the start.
 - **Permanent checks.** Each settled rule against its holdout (Looks).
-- **Mistakes.** Each measure's latest day against its usual range, its rate over 3 days for 6 weeks with each day a rule for it changed (`changes`, and each trial's start), and its misses before and after the latest change, or over the last 28 days with no rule. Before and after is not a test: whatever else changed that day moves it too, which a trial's random halves rule out.
+- **Mistakes.** Each measure's latest day against its usual range, its rate over 3 days for 6 weeks with each day a rule for it changed (`changes`) and each testing trial's start, and its misses before and after the latest rule change, or over the last 28 days with no rule. A trial's start is no such boundary: a testing trial gives the rule to half the tasks, and a settled one changes nothing. Before and after is not a test: whatever else changed that day moves it too, which a trial's random halves rule out.
 - **Replays**, with whether the replay passed its check, and **rule and skill size**: words over time, largest files, and per month and pattern the share of changes deleting no line and of changed lines added.
 
 A trial that fails is left out, and `daily` prints why and exits 1 after writing the page.
