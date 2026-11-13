@@ -1,6 +1,6 @@
 // A made-up report about a fictional team's agents, for the dev server and tests. It covers every state the page shows.
 import { addDays, format, parseISO } from "date-fns";
-import type { Day, Mistake, Report, Side } from "./report";
+import type { Day, Mistake, Range, Report, Side } from "./report";
 
 const DAY = "2026-11-12";
 const SERIES_DAYS = 42;
@@ -32,23 +32,23 @@ function withRule(
   earlier: { day: Day; what: string }[],
   before: Side,
   after: Side,
-  change: { low: number | null; high: number | null },
+  range: { low: number | null; high: number | null } | null,
   today: Mistake["today"],
   phase: number,
 ): Mistake {
-  const value = round(after.rate / before.rate - 1);
-  const sure = change.low !== null && change.high !== null && (change.high < 0 || change.low > 0);
+  const change: Range | null = range && { value: round(after.rate / before.rate - 1), ...range };
+  const sure = change?.low != null && change.high != null && change.low * change.high > 0;
   return {
     name,
     today,
     rule,
     before,
     after,
-    change: { value, ...change },
+    change,
     sure,
     current: null,
     series: series(before.rate, after.rate, rule.day, phase, (i) => i % 13 === 4),
-    changes: [...earlier, rule],
+    changes: [...earlier, rule].filter((c) => c.day >= seriesStart),
   };
 }
 
@@ -74,12 +74,14 @@ const usual = (rate: number, usual_low: number, usual_high: number): Mistake["to
   outside: rate > usual_high ? "above" : rate < usual_low ? "below" : null,
 });
 
+const usualStart = shift(DAY, -27);
+
 const mistakes: Mistake[] = [
   withRule(
     "Replies with no summary line",
     { day: "2026-10-20", what: "Replies end with one line saying what is left" },
     [{ day: "2026-10-08", what: "Replies open with the answer" }],
-    side(0.32, 0.27, 0.38, 140, seriesStart),
+    side(0.32, 0.27, 0.38, 140, "2026-10-08"),
     side(0.12, 0.08, 0.17, 110, "2026-10-20"),
     { low: -0.78, high: -0.45 },
     usual(0.1, 0.06, 0.18),
@@ -87,10 +89,10 @@ const mistakes: Mistake[] = [
   ),
   withRule(
     "Tests skipped before a commit",
-    { day: "2026-10-24", what: "Run the checks before every commit" },
-    [],
-    side(0.25, 0.2, 0.3, 180, seriesStart),
-    side(0.1, 0.07, 0.14, 150, "2026-10-24"),
+    { day: "2026-11-07", what: "Run the checks before every commit" },
+    [{ day: "2026-11-01", what: "trial started: Tests skipped before a commit" }],
+    side(0.25, 0.2, 0.3, 180, "2026-11-01"),
+    side(0.1, 0.07, 0.14, 60, "2026-11-07"),
     { low: -0.74, high: -0.42 },
     usual(0.31, 0.04, 0.17),
     1.1,
@@ -117,10 +119,10 @@ const mistakes: Mistake[] = [
   ),
   withRule(
     "Questions asked that the notes answer",
-    { day: "2026-10-18", what: "Search the team notes before asking" },
+    { day: "2026-09-20", what: "Search the team notes before asking" },
     [],
-    side(0.15, 0.11, 0.2, 130, seriesStart),
-    side(0.135, 0.09, 0.19, 115, "2026-10-18"),
+    side(0.15, 0.11, 0.2, 130, "2026-08-09"),
+    side(0.135, 0.09, 0.19, 115, "2026-09-20"),
     { low: -0.38, high: 0.25 },
     usual(0.14, 0.07, 0.22),
     0.6,
@@ -129,9 +131,9 @@ const mistakes: Mistake[] = [
     "Ports taken without checking",
     { day: "2026-10-22", what: "Check a port is free before using it" },
     [],
-    side(0.1, 0.06, 0.15, 90, seriesStart),
-    side(0.12, 0.07, 0.18, 80, "2026-10-22"),
-    { low: -0.15, high: 0.7 },
+    side(0.06, 0.03, 0.1, 90, seriesStart),
+    side(0.14, 0.09, 0.2, 80, "2026-10-22"),
+    { low: 0.2, high: 2.1 },
     null,
     4.4,
   ),
@@ -145,19 +147,29 @@ const mistakes: Mistake[] = [
     usual(0.33, 0.2, 0.6),
     5.2,
   ),
-  noRule("Screenshots sent without a link", side(0.21, 0.16, 0.27, 160, seriesStart), usual(0.2, 0.12, 0.3), 1.8),
-  noRule("Config read from memory", side(0.09, 0.06, 0.13, 210, seriesStart), usual(0.08, 0.03, 0.15), 2.9),
-  noRule("Old branches left open", side(0.27, 0.2, 0.35, 95, seriesStart), null, 0.3),
-];
+  withRule(
+    "Config read from memory",
+    { day: shift(DAY, -3), what: "trial started: Config read from memory" },
+    [],
+    side(0.2, 0.15, 0.26, 150, seriesStart),
+    side(0.14, 0.08, 0.22, 65, shift(DAY, -3)),
+    null,
+    usual(0.08, 0.03, 0.15),
+    2.9,
+  ),
+  noRule("Screenshots sent without a link", side(0.21, 0.16, 0.27, 160, usualStart), usual(0.2, 0.12, 0.3), 1.8),
+  noRule("Old branches left open", side(0.27, 0.2, 0.35, 95, usualStart), null, 0.3),
+].sort((a, b) => a.name.localeCompare(b.name));
 
 const sizePoints = (first: number, last: number) =>
   Array.from({ length: 20 }, (_, i) => ({
     day: shift("2026-10-05", i * 2),
-    words: Math.round(first + ((last - first) * i) / 19 + (i % 3 === 1 ? -40 : 0)),
+    words: Math.max(0, Math.round(first + ((last - first) * i) / 19 + (i % 3 === 1 ? -40 : 0))),
   }));
 
 const ruleWords = sizePoints(3200, 4100);
-const skillWords = sizePoints(9800, 12600);
+// Skills start from nothing, so their growth as a fraction is null.
+const skillWords = sizePoints(0, 12600);
 
 export const fixture: Report = {
   day: DAY,
@@ -167,7 +179,7 @@ export const fixture: Report = {
     {
       name: "Screenshots sent without a link",
       started: shift(DAY, 1),
-      ends: shift(DAY, 7),
+      ends: shift(DAY, 8),
       state: "scheduled",
       verdict: null,
       tasks_with: 0,
@@ -183,7 +195,7 @@ export const fixture: Report = {
     {
       name: "Config read from memory",
       started: shift(DAY, -3),
-      ends: shift(DAY, 3),
+      ends: shift(DAY, 4),
       state: "running",
       verdict: "no verdict yet",
       tasks_with: 34,
@@ -203,8 +215,8 @@ export const fixture: Report = {
     },
     {
       name: "Tests skipped before a commit",
-      started: "2026-10-24",
-      ends: "2026-10-30",
+      started: "2026-11-01",
+      ends: "2026-11-08",
       state: "finished",
       verdict: "works",
       tasks_with: 70,
@@ -215,11 +227,11 @@ export const fixture: Report = {
       needed: 90,
       per_week: 65,
       looks: [
-        { look: 1, day: "2026-10-27", verdict: "no verdict yet", tasks_with: 31, tasks_without: 29 },
-        { look: 2, day: "2026-10-30", verdict: "works", tasks_with: 70, tasks_without: 66 },
+        { look: 1, day: "2026-11-04", verdict: "no verdict yet", tasks_with: 31, tasks_without: 29 },
+        { look: 2, day: "2026-11-06", verdict: "works", tasks_with: 70, tasks_without: 66 },
       ],
-      trend: Array.from({ length: 7 }, (_, i) => ({
-        day: shift("2026-10-24", i),
+      trend: Array.from({ length: 6 }, (_, i) => ({
+        day: shift("2026-11-01", i),
         with: i === 0 ? null : round(0.13 - i * 0.005),
         without: round(0.23 + (i % 2) * 0.03),
       })),
@@ -228,37 +240,37 @@ export const fixture: Report = {
   permanent: [
     {
       name: "Replies with no summary line",
-      since: "2026-11-10",
-      model: "model-b",
-      tasks_with: 0,
-      tasks_without: 0,
-      change: null,
+      since: "2026-10-30",
+      model: "model-a",
+      tasks_with: 140,
+      tasks_without: 15,
+      change: { value: -0.55, low: -0.8, high: -0.1 },
       slipping: false,
     },
     {
       name: "Branch pushed without a pull request",
       since: DAY,
-      model: null,
-      tasks_with: 0,
+      model: "model-a",
+      tasks_with: 3,
       tasks_without: 0,
       change: null,
       slipping: false,
     },
     {
-      name: "Tests skipped before a commit",
-      since: "2026-11-01",
+      name: "Questions asked that the notes answer",
+      since: "2026-11-05",
       model: "model-a",
-      tasks_with: 120,
-      tasks_without: 13,
-      change: { value: -0.55, low: -0.8, high: -0.1 },
+      tasks_with: 40,
+      tasks_without: 3,
+      change: { value: -0.3, low: -0.9, high: 0.8 },
       slipping: false,
     },
     {
       name: "Long logs pasted into a reply",
       since: "2026-10-30",
-      model: null,
-      tasks_with: 140,
-      tasks_without: 15,
+      model: "model-a",
+      tasks_with: 150,
+      tasks_without: 16,
       change: { value: -0.4, low: -0.7, high: 0.15 },
       slipping: false,
     },
@@ -303,7 +315,7 @@ export const fixture: Report = {
     {
       name: "Ports taken without checking",
       day: DAY,
-      verdict: "replay can't test this",
+      verdict: "no useful effect",
       trusted: false,
       real_rate: 0.1,
       replay_rate: 0.4,
@@ -312,6 +324,19 @@ export const fixture: Report = {
       moments: 20,
       paired: 12,
       change: { value: -0.05, low: -0.3, high: 0.25 },
+    },
+    {
+      name: "Old branches left open",
+      day: DAY,
+      verdict: "replay can't test this",
+      trusted: false,
+      real_rate: null,
+      replay_rate: null,
+      rate_old: null,
+      rate_new: null,
+      moments: 8,
+      paired: 0,
+      change: null,
     },
   ],
   sizes: {
@@ -322,12 +347,7 @@ export const fixture: Report = {
         change: round(ruleWords[19].words / ruleWords[0].words - 1),
         points: ruleWords,
       },
-      {
-        label: "Skills",
-        now: skillWords[19].words,
-        change: round(skillWords[19].words / skillWords[0].words - 1),
-        points: skillWords,
-      },
+      { label: "Skills", now: skillWords[19].words, change: null, points: skillWords },
     ],
     largest: [
       { file: "skills/release-checklist/SKILL.md", words: 2100 },
@@ -340,10 +360,49 @@ export const fixture: Report = {
       { file: "skills/screenshots/SKILL.md", words: 540 },
     ],
     months: [
-      { month: "2026-10", label: "Rules", changes: 14, only_added: 9, added_share: 0.643 },
-      { month: "2026-10", label: "Skills", changes: 22, only_added: 17, added_share: 0.773 },
-      { month: "2026-11", label: "Rules", changes: 5, only_added: 2, added_share: 0.4 },
-      { month: "2026-11", label: "Skills", changes: 8, only_added: 6, added_share: 0.75 },
+      { month: "2026-10", label: "Rules", changes: 14, only_added: 0.643, added_share: 0.71 },
+      { month: "2026-10", label: "Skills", changes: 22, only_added: 0.773, added_share: 0.86 },
+      { month: "2026-11", label: "Rules", changes: 5, only_added: 0.4, added_share: 0.52 },
+      { month: "2026-11", label: "Skills", changes: 8, only_added: 0.75, added_share: 0.8 },
     ],
   },
+};
+
+const noData = series(0, 0, null, 0, () => true);
+
+/** A report with nothing in it yet: no trials, permanent rules or replays, and mistakes without any data. */
+export const emptyReport: Report = {
+  day: DAY,
+  written: "2026-11-13T06:00:00Z",
+  sessions: { total: 0, in_group: 0, split_since: null },
+  trials: [],
+  permanent: [],
+  mistakes: [
+    {
+      name: "Replies with no summary line",
+      today: null,
+      rule: { day: "2026-11-01", what: "Replies end with one line saying what is left" },
+      before: null,
+      after: null,
+      change: null,
+      sure: false,
+      current: null,
+      series: noData,
+      changes: [{ day: "2026-11-01", what: "Replies end with one line saying what is left" }],
+    },
+    {
+      name: "Screenshots sent without a link",
+      today: null,
+      rule: null,
+      before: null,
+      after: null,
+      change: null,
+      sure: false,
+      current: null,
+      series: noData,
+      changes: [],
+    },
+  ],
+  replays: [],
+  sizes: { series: [], largest: [], months: [] },
 };

@@ -1,5 +1,6 @@
-// The report `agent-experiments daily` writes. Facts only: rates and changes are fractions, dates are YYYY-MM-DD,
-// and every rate is a mistake rate, so lower is always better. A change is after / before - 1 (or with / without - 1).
+// The report `agent-experiments daily` writes (its source of truth: `build()` in src/agent_experiments/cli.py). Facts
+// only: rates and changes are fractions, dates are YYYY-MM-DD, and every rate is a mistake rate, so lower is always
+// better. A change is after / before - 1 (or with / without - 1).
 
 export type Day = string;
 
@@ -27,7 +28,7 @@ export interface Trial {
   /** The mistake it targets, in plain words. */
   name: string;
   started: Day;
-  /** started + 6 days (the last look). */
+  /** started + 7 days, the day of the last look. */
   ends: Day;
   state: "scheduled" | "running" | "finished";
   /** Latest look's verdict; null before any look. */
@@ -36,7 +37,7 @@ export interface Trial {
   tasks_without: number;
   rate_with: number | null;
   rate_without: number | null;
-  /** Null until both halves have tasks. */
+  /** Null until each half has 2 tasks, or when there were no mistakes without the rule. */
   change: Range | null;
   /** Tasks per half to detect a true halving; null if over 320. */
   needed: number | null;
@@ -68,9 +69,9 @@ export interface Side {
 
 export interface Mistake {
   name: string;
-  /** `day`'s rate against its usual range; null when there were no chances that day. */
+  /** `day`'s rate against its usual range; null with no chances that day or under 10 tasks of history. */
   today: { rate: number; usual_low: number; usual_high: number; outside: "above" | "below" | null } | null;
-  /** Latest rule change; null when there is no rule yet. */
+  /** Latest rule change, a trial's start included (`what` is then "trial started: <name>"); null with no rule yet. */
   rule: { day: Day; what: string } | null;
   /** With a rule: before vs since its latest change. */
   before: Side | null;
@@ -78,7 +79,7 @@ export interface Mistake {
   change: Range | null;
   /** The change's range excludes 0. */
   sure: boolean;
-  /** No rule: the rate over the last weeks. */
+  /** No rule: the rate over the last 28 days. */
   current: Side | null;
   /** 6 weeks, 3-day rolling. */
   series: { day: Day; rate: number | null }[];
@@ -93,18 +94,21 @@ export interface Replay {
   /** False when the replay did not reproduce the real rate. */
   trusted: boolean;
   /** What agents really did under the rules in force. */
-  real_rate: number;
+  real_rate: number | null;
   /** What the replay did under the same rules. */
-  replay_rate: number;
-  rate_old: number;
-  rate_new: number;
+  replay_rate: number | null;
+  rate_old: number | null;
+  rate_new: number | null;
   moments: number;
   paired: number;
-  change: Range;
+  /** new / old - 1. */
+  change: Range | null;
 }
 
 export interface Sizes {
-  series: { label: "Rules" | "Skills"; now: number; change: number; points: { day: Day; words: number }[] }[];
+  /** `change` is now / first point - 1, null when the first point has no words. */
+  series: { label: "Rules" | "Skills"; now: number; change: number | null; points: { day: Day; words: number }[] }[];
   largest: { file: string; words: number }[];
+  /** Per month (YYYY-MM): edits, the share of them that only added lines, and the share of changed lines added. */
   months: { month: string; label: "Rules" | "Skills"; changes: number; only_added: number; added_share: number }[];
 }

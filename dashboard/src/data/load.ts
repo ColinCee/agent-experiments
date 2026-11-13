@@ -1,8 +1,8 @@
 import { fixture } from "./fixture";
 import type { Report } from "./report";
 
-// Matched by shape, not by the literal placeholder: `daily` replaces every copy of the literal in the built file,
-// so it may appear only once, inside index.html's report tag.
+// Matched by shape, not by the literal placeholder, so the placeholder appears only once in the built file: `daily`
+// replaces only the copy in the report tag.
 const UNREPLACED = /^__[A-Z]+__$/;
 
 export function loadReport(): Report {
