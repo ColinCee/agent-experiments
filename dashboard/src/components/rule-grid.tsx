@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
  * with the change at its right, then the chart full width. Cells place themselves with the `CELL` classes.
  */
 export const RULE_COLUMNS =
-  "grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-2 md:grid-cols-[minmax(min(var(--name-w,16rem),calc(100%_-_22rem)),1fr)_minmax(13rem,22.5rem)_7.5rem] md:items-center md:gap-x-3 md:px-2";
+  "grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-2 md:grid-cols-[minmax(min(var(--name-w,16rem),calc(100%_-_23.5rem)),1fr)_minmax(15.5rem,24rem)_7rem] md:items-center md:gap-x-2 md:px-2";
 
 export const CELL = {
   name: "col-start-1 row-start-1",

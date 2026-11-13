@@ -185,7 +185,7 @@ const mistakes: Mistake[] = [
     4.4,
   ),
   withRule(
-    "Release notes left unwritten",
+    "Release notes left unwritten for breaking changes",
     { day: "2026-11-06", what: "Write the release note with the change" },
     [{ day: "2026-11-03", what: "Name the release in the note", kind: "rule" }],
     // Every one of the few tasks before the rule had the mistake: a before rate of 100%.

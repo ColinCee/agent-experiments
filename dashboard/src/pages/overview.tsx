@@ -2,7 +2,7 @@ import { ChevronRight, CircleCheck } from "lucide-react";
 import { type CSSProperties, useRef } from "react";
 import { textWidth } from "@/components/measure";
 import { MistakeDetail } from "@/components/mistake-detail";
-import { PairLegend, RateBar, RatePair } from "@/components/rate-pair";
+import { LABEL_GUTTER, PairLegend, RateBar, RatePair } from "@/components/rate-pair";
 import { CELL, GridHeader, GridRow } from "@/components/rule-grid";
 import { Empty, Section } from "@/components/section";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -126,9 +126,11 @@ function Name({ name }: { name: string }) {
 /** The 0% and 100% ends of the chart column, under its legend, lined up with every row's track. */
 function Scale() {
   return (
-    <div data-scale className="relative h-4 text-xs leading-4 text-muted-foreground">
-      <span className="absolute left-0">0%</span>
-      <span className="absolute right-0">100%</span>
+    <div className={LABEL_GUTTER}>
+      <div data-scale className="relative h-4 text-xs leading-4 text-muted-foreground">
+        <span className="absolute left-0 -translate-x-1/2">0%</span>
+        <span className="absolute right-0 translate-x-1/2">100%</span>
+      </div>
     </div>
   );
 }
@@ -136,7 +138,7 @@ function Scale() {
 /** The chart column's header, which is also its legend: before the rule, then since, on one 0–100% scale. */
 function ChartLegend() {
   return (
-    <div className="space-y-0.5 px-1.5">
+    <div className="space-y-0.5">
       <PairLegend from="before the rule" to="since" />
       <Scale />
     </div>
@@ -193,7 +195,8 @@ function RulesTable({ rows, picking }: { rows: Mistake[]; picking: Picking }) {
               className={cn(
                 CELL.result,
                 "leading-5",
-                words.hasRange ? cn("font-semibold", LEAD[words.tone]) : "text-sm text-muted-foreground",
+                // A reason ("Nothing to compare") in 13px, so the column stays as narrow as its bold words.
+                words.hasRange ? cn("font-semibold", LEAD[words.tone]) : "text-[13px] text-muted-foreground",
               )}
             >
               {words.lead}
@@ -218,7 +221,7 @@ function NoRuleTable({ rows, picking }: { rows: Mistake[]; picking: Picking }) {
     >
       <GridHeader>
         <span>Mistake</span>
-        <div className="space-y-0.5 px-1.5">
+        <div className="space-y-0.5">
           <div className="text-sm">rate now</div>
           <Scale />
         </div>
@@ -312,7 +315,7 @@ export function OverviewPage({ report, selected }: { report: Report; selected: s
   if (order.length === 0) return <div className="max-w-3xl">{tables}</div>;
   if (wide) {
     return (
-      <div className="grid grid-cols-[minmax(0,840px)_minmax(400px,1fr)] gap-6">
+      <div className="grid grid-cols-[minmax(0,840px)_minmax(384px,1fr)] gap-6">
         {tables}
         {picked && (
           <aside

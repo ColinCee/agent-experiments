@@ -374,8 +374,9 @@ for (const [width, viewport] of Object.entries(widths)) {
             const r = el.getBoundingClientRect();
             return { left: r.left, right: r.right, top: r.top, bottom: r.bottom };
           };
+          // Numbers sit in the gutters around the track, so they must stay inside the track's padded column.
           return {
-            track: box(track),
+            track: box(track.parentElement as Element),
             labels: [...track.querySelectorAll("[data-label]")].map(box),
             dots: [...track.querySelectorAll("[data-rate]")].map(box),
             lines: [...track.querySelectorAll("[data-line] line, [data-line] polygon")].map(box),

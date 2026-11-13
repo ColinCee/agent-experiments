@@ -12,18 +12,26 @@ const DOT = { with: "bg-with", without: "bg-without" } as const;
 const at = (rate: number) => `${Math.min(1, Math.max(0, rate)) * 100}%`;
 
 /**
+ * The inset of a labelled track at each end: room for a number ("100%") beside a dot at 0% or 100%. Any header scale
+ * over such tracks takes the same inset, so its 0% and 100% mark the tracks' ends.
+ */
+export const LABEL_GUTTER = "px-[46px]";
+
+/**
  * The fixed 0–100% track every rate is drawn on, so rows line up to the pixel. Padded by a dot's radius at each end,
- * so a dot at 0% or 100% draws whole.
+ * so a dot at 0% or 100% draws whole, or by `LABEL_GUTTER` when numbers are written beside the dots.
  */
 function RateTrack({
   children,
   trackRef,
+  gutter = false,
 }: {
   children: ReactNode;
   trackRef?: (element: HTMLDivElement | null) => void;
+  gutter?: boolean;
 }) {
   return (
-    <div className="px-1.5">
+    <div className={gutter ? LABEL_GUTTER : "px-1.5"}>
       <div ref={trackRef} data-track="rate" className="relative h-5 w-full">
         <div className="absolute inset-x-0 top-1/2 h-px bg-border" />
         <div className="absolute top-1/2 left-0 h-2 w-px -translate-y-1/2 bg-border" />
@@ -45,7 +53,7 @@ function Dot({ rate, side }: { rate: number; side: Side }) {
   );
 }
 
-const LABEL_SIZE = 14;
+const LABEL_SIZE = 13;
 const LABEL_WEIGHT = 500;
 const TEXT = { with: "text-with", without: "text-without" } as const;
 
@@ -84,7 +92,7 @@ export function RatePair({
   const width = useWidth(labelled ? track : null);
   const labels = labelled && width > 0 ? layoutPair(without, withRule, width, labelWidth) : [];
   return (
-    <RateTrack trackRef={setTrack}>
+    <RateTrack trackRef={setTrack} gutter={labelled}>
       {without !== null && withRule !== null && !labelled && (
         <div
           className="absolute top-1/2 h-0.5 -translate-y-1/2 bg-muted-foreground/70"
@@ -98,34 +106,30 @@ export function RatePair({
       {withRule !== null && <Dot rate={withRule} side="with" />}
       {labels.map((label) => (
         <span
-          key={label.parts.map((p) => p.text).join("")}
+          key={label.side}
           data-label
           className={cn(
-            "absolute text-sm leading-none font-medium whitespace-nowrap",
-            label.below ? "top-[calc(50%+3px)]" : "top-1/2 -translate-y-1/2",
+            "absolute top-1/2 -translate-y-1/2 text-[13px] leading-none font-medium whitespace-nowrap",
+            TEXT[label.side],
           )}
           style={{ left: label.left }}
         >
-          {label.parts.map((part) => (
-            <span key={part.text} className={part.side ? TEXT[part.side] : "text-muted-foreground"}>
-              {part.text}
-            </span>
-          ))}
+          {label.text}
         </span>
       ))}
     </RateTrack>
   );
 }
 
-/** One grey rate as a bar from 0, for a mistake with no rule yet, its number just past the bar's end. */
+/**
+ * One grey rate as a bar from 0, for a mistake with no rule yet, its number just past the bar's end. It keeps the
+ * labelled pair's gutters, so its track lines up with theirs and a bar at 100% still has room for its number.
+ */
 export function RateBar({ rate }: { rate: number }) {
   const [track, setTrack] = useState<HTMLDivElement | null>(null);
   const width = useWidth(track);
-  const text = percent(rate);
-  // Past the end when it fits; a bar near 100% has its number held at the track's end instead.
-  const left = Math.min(rate * width + 4, width - labelWidth(text));
   return (
-    <RateTrack trackRef={setTrack}>
+    <RateTrack trackRef={setTrack} gutter>
       <div
         className="absolute top-1/2 left-0 h-2 -translate-y-1/2 rounded-r-sm bg-without"
         style={{ width: at(rate) }}
@@ -134,10 +138,10 @@ export function RateBar({ rate }: { rate: number }) {
       {width > 0 && (
         <span
           data-label
-          className="absolute top-1/2 -translate-y-1/2 text-sm leading-none font-medium whitespace-nowrap text-without"
-          style={{ left }}
+          className="absolute top-1/2 -translate-y-1/2 text-[13px] leading-none font-medium whitespace-nowrap text-without"
+          style={{ left: rate * width + 4 }}
         >
-          {text}
+          {percent(rate)}
         </span>
       )}
     </RateTrack>
