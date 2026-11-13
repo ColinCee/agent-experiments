@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { changeInBrief, changeWords, isClipped, stripPosition } from "./change";
+import { changeWords, isClipped, rangeWords, stripPosition } from "./change";
 
 describe("changeWords", () => {
   test("a range wholly below no change reads as fewer mistakes", () => {
@@ -21,13 +21,17 @@ describe("changeWords", () => {
   });
 
   test("a range whose ends round alike names one number", () => {
-    expect(changeWords({ value: -1, low: -1, high: -0.998 }).hint).toBe("likely 100% fewer");
+    expect(changeWords({ value: -0.9, low: -1, high: -0.998 }).hint).toBe("likely 100% fewer");
+  });
+
+  test("a range that only repeats the lead is left out", () => {
+    expect(changeWords({ value: -1, low: -1, high: -0.998 })).toMatchObject({ lead: "100% fewer", hint: null });
   });
 
   test("a range across no change is unclear, whichever side the value is", () => {
     for (const value of [-0.4, 0.3]) {
       const words = changeWords({ value, low: -0.6, high: 0.5 });
-      expect(words).toMatchObject({ tone: "unclear", lead: "Unclear", hint: "could be no change" });
+      expect(words).toMatchObject({ tone: "unclear", lead: "Unclear", hint: "60% fewer to 50% more" });
     }
   });
 
@@ -46,10 +50,26 @@ describe("changeWords", () => {
   });
 });
 
-test("changeInBrief gives the lead when clear and a hint otherwise", () => {
-  expect(changeInBrief({ value: 0.37, low: 0.1, high: 1 })).toBe("37% more");
-  expect(changeInBrief({ value: 0.05, low: -0.2, high: 0.4 })).toBe("could be no change");
-  expect(changeInBrief(null)).toBe("too few tasks to tell");
+test("a range reads from its fewer end to its more end", () => {
+  expect(rangeWords({ value: 0, low: -0.4, high: 0.12 })).toBe("40% fewer to 12% more");
+  expect(rangeWords({ value: 0, low: -0.001, high: 0.3 })).toBe("no change to 30% more");
+  expect(rangeWords({ value: 0, low: null, high: null })).toBeNull();
+});
+
+test("a slipping rule reads little or no change in red, whatever its range", () => {
+  expect(changeWords({ value: 0.05, low: -0.2, high: 0.4 }, "slipping")).toEqual({
+    tone: "bad",
+    lead: "Little or no change",
+    hint: "20% fewer to 40% more",
+    hasRange: true,
+  });
+});
+
+test("an untrusted result keeps its words but is never green or red", () => {
+  expect(changeWords({ value: -0.6, low: -0.8, high: -0.4 }, "untrusted")).toMatchObject({
+    tone: "unclear",
+    lead: "60% fewer",
+  });
 });
 
 describe("stripPosition", () => {

@@ -24,42 +24,54 @@ export function changeTone(change: Range | null): Tone {
   return "unclear";
 }
 
-/** "likely 74% to 89% fewer", or "likely 100% fewer" when both ends round alike. */
-function likely(from: number, to: number, side: "fewer" | "more"): string {
-  const [a, b] = [percent(from), percent(to)];
-  return a === b ? `likely ${a} ${side}` : `likely ${a} to ${b} ${side}`;
+/** "likely 74% to 89% fewer"; null when both ends round to the lead's own number, which would only repeat it. */
+function likely(lead: number, from: number, to: number, side: "fewer" | "more"): string | null {
+  const [l, a, b] = [percent(lead), percent(from), percent(to)];
+  if (a === b) return a === l ? null : `likely ${a} ${side}`;
+  return `likely ${a} to ${b} ${side}`;
 }
 
-/** How a change in the mistake rate and its 90% range read on screen; lower is better. */
-export function changeWords(change: Range | null): ChangeWords {
+/** One end of a range in words: "40% fewer", "12% more", "no change". */
+function end(x: number): string {
+  const p = percent(Math.abs(x));
+  return p === "0%" ? "no change" : x < 0 ? `${p} fewer` : `${p} more`;
+}
+
+/** A range in words from its fewer end to its more end: "40% fewer to 12% more". */
+export function rangeWords(change: Range): string | null {
+  return change.low == null || change.high == null ? null : `${end(change.low)} to ${end(change.high)}`;
+}
+
+export type ChangeMode = "plain" | "slipping" | "untrusted";
+
+/**
+ * How a change in the mistake rate and its 90% range read on screen; lower is better. A `slipping` proven rule reads
+ * "Little or no change" in red whatever the range; an `untrusted` replay keeps its words but loses its colour.
+ */
+export function changeWords(change: Range | null, mode: ChangeMode = "plain"): ChangeWords {
   if (change?.low == null || change.high == null) {
     return { tone: "unclear", lead: "Too few tasks to tell", hint: null, hasRange: false };
   }
+  if (mode === "slipping")
+    return { tone: "bad", lead: "Little or no change", hint: rangeWords(change), hasRange: true };
   const tone = changeTone(change);
-  if (tone === "good") {
-    return {
-      tone,
-      lead: `${percent(-change.value)} fewer`,
-      hint: likely(-change.high, -change.low, "fewer"),
-      hasRange: true,
-    };
-  }
-  if (tone === "bad") {
-    return {
-      tone,
-      lead: `${percent(change.value)} more`,
-      hint: likely(change.low, change.high, "more"),
-      hasRange: true,
-    };
-  }
-  return { tone, lead: "Unclear", hint: "could be no change", hasRange: true };
-}
-
-/** The change in a few words for a line of text: "52% more", "could be no change". */
-export function changeInBrief(change: Range | null): string {
-  const words = changeWords(change);
-  if (!words.hasRange) return "too few tasks to tell";
-  return words.tone === "unclear" ? "could be no change" : words.lead;
+  const words: ChangeWords =
+    tone === "good"
+      ? {
+          tone,
+          lead: `${percent(-change.value)} fewer`,
+          hint: likely(-change.value, -change.high, -change.low, "fewer"),
+          hasRange: true,
+        }
+      : tone === "bad"
+        ? {
+            tone,
+            lead: `${percent(change.value)} more`,
+            hint: likely(change.value, change.low, change.high, "more"),
+            hasRange: true,
+          }
+        : { tone, lead: "Unclear", hint: rangeWords(change), hasRange: true };
+  return mode === "untrusted" ? { ...words, tone: "unclear" } : words;
 }
 
 /** True when the change or its range goes past +100%, the strip's right edge, so the strip shows a cap there. */

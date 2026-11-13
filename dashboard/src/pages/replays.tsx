@@ -23,12 +23,11 @@ function ReplayCard({ replay, day, axis }: { replay: Replay; day: Day; axis: boo
           <StatusBadge tone={replay.trusted ? "unclear" : "bad"}>{trustWords(replay).badge}</StatusBadge>
           <p className="text-sm text-muted-foreground">{trustReason(replay)}</p>
         </div>
-        {/* Dims the marks, not the words, so the text keeps its contrast. */}
         <div
           data-trusted={replay.trusted}
           className={cn(
             "-mx-3 space-y-3 rounded-lg border border-transparent p-3",
-            !replay.trusted && "border-border border-dashed bg-muted/40 [&_[data-track]]:opacity-40",
+            !replay.trusted && "border-border border-dashed bg-muted/40",
           )}
         >
           <h3 className="flex items-baseline gap-2">
@@ -46,7 +45,7 @@ function ReplayCard({ replay, day, axis }: { replay: Replay; day: Day; axis: boo
           <AlignWithStrip>
             <RatePair without={replay.rate_old} withRule={replay.rate_new} />
           </AlignWithStrip>
-          <ChangeStrip change={replay.change} axis={axis} />
+          <ChangeStrip change={replay.change} axis={axis} mode={replay.trusted ? "plain" : "untrusted"} />
         </div>
       </CardContent>
     </Card>

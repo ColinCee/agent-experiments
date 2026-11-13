@@ -1,6 +1,6 @@
 import { differenceInCalendarDays, parseISO } from "date-fns";
 import type { Day, Report } from "@/data/report";
-import { changeInBrief } from "./change";
+import { changeWords } from "./change";
 import { dayLabel, percent } from "./format";
 import { finishedOn, verdictWords } from "./trials";
 
@@ -36,7 +36,7 @@ export function attentionItems(report: Report): AttentionItem[] {
       (p): AttentionItem => ({
         tone: "bad",
         title: p.name,
-        detail: `Rule no longer cuts this mistake · ${changeInBrief(p.change)}`,
+        detail: `Rule no longer cuts this mistake · ${changeWords(p.change, "slipping").hint ?? "too few tasks to tell"}`,
       }),
     );
   const finished = report.trials

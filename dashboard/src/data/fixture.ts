@@ -1,6 +1,6 @@
 // A made-up report about a fictional team's agents, for the dev server and tests. It covers every state the page shows.
 import { addDays, format, parseISO } from "date-fns";
-import type { Day, Mistake, Range, Report, Side } from "./report";
+import type { Day, Mistake, MistakeChange, Range, Report, Side } from "./report";
 
 const DAY = "2026-11-12";
 const SERIES_DAYS = 42;
@@ -29,7 +29,7 @@ const side = (rate: number, low: number | null, high: number | null, tasks: numb
 function withRule(
   name: string,
   rule: { day: Day; what: string },
-  earlier: { day: Day; what: string }[],
+  earlier: MistakeChange[],
   before: Side,
   after: Side,
   range: { low: number | null; high: number | null } | null,
@@ -48,11 +48,17 @@ function withRule(
     sure,
     current: null,
     series: series(before.rate, after.rate, rule.day, phase, (i) => i % 13 === 4),
-    changes: [...earlier, rule].filter((c) => c.day >= seriesStart),
+    changes: [...earlier, { ...rule, kind: "rule" as const }].filter((c) => c.day >= seriesStart),
   };
 }
 
-function noRule(name: string, current: Side, today: Mistake["today"], phase: number): Mistake {
+function noRule(
+  name: string,
+  current: Side,
+  today: Mistake["today"],
+  phase: number,
+  changes: MistakeChange[] = [],
+): Mistake {
   return {
     name,
     today,
@@ -63,7 +69,7 @@ function noRule(name: string, current: Side, today: Mistake["today"], phase: num
     sure: false,
     current,
     series: series(current.rate, current.rate, null, phase, (i) => i % 9 === 7),
-    changes: [],
+    changes,
   };
 }
 
@@ -80,7 +86,7 @@ const mistakes: Mistake[] = [
   withRule(
     "Replies with no summary line",
     { day: "2026-10-20", what: "Replies end with one line saying what is left" },
-    [{ day: "2026-10-08", what: "Replies open with the answer" }],
+    [{ day: "2026-10-08", what: "Replies open with the answer", kind: "rule" }],
     side(0.32, 0.27, 0.38, 140, "2026-10-08"),
     side(0.12, 0.08, 0.17, 110, "2026-10-20"),
     { low: -0.78, high: -0.45 },
@@ -90,7 +96,7 @@ const mistakes: Mistake[] = [
   withRule(
     "Tests skipped before a commit",
     { day: "2026-11-07", what: "Run the checks before every commit" },
-    [{ day: "2026-11-01", what: "trial started: Tests skipped before a commit" }],
+    [{ day: "2026-11-01", what: "Tests skipped before a commit", kind: "trial" }],
     side(0.25, 0.2, 0.3, 180, "2026-11-01"),
     side(0.1, 0.07, 0.14, 60, "2026-11-07"),
     { low: -0.74, high: -0.42 },
@@ -140,25 +146,20 @@ const mistakes: Mistake[] = [
   withRule(
     "Release notes left unwritten",
     { day: "2026-11-06", what: "Write the release note with the change" },
-    [],
+    [{ day: "2026-11-04", what: "Name the release in the note", kind: "rule" }],
     side(0.5, null, null, 6, seriesStart),
     side(0.333, null, null, 3, "2026-11-06"),
     { low: null, high: null },
     usual(0.33, 0.2, 0.6),
     5.2,
   ),
-  withRule(
-    "Config read from memory",
-    { day: shift(DAY, -3), what: "trial started: Config read from memory" },
-    [],
-    side(0.2, 0.15, 0.26, 150, seriesStart),
-    side(0.14, 0.08, 0.22, 65, shift(DAY, -3)),
-    null,
-    usual(0.08, 0.03, 0.15),
-    2.9,
-  ),
+  noRule("Config read from memory", side(0.18, 0.13, 0.24, 150, usualStart), usual(0.08, 0.03, 0.15), 2.9, [
+    { day: shift(DAY, -3), what: "Config read from memory", kind: "trial" },
+  ]),
   noRule("Screenshots sent without a link", side(0.21, 0.16, 0.27, 160, usualStart), usual(0.2, 0.12, 0.3), 1.8),
-  noRule("Old branches left open", side(0.27, 0.2, 0.35, 95, usualStart), null, 0.3),
+  noRule("Old branches left open", side(0.27, 0.2, 0.35, 95, usualStart), null, 0.3, [
+    { day: DAY, what: "Old branches left open", kind: "trial" },
+  ]),
 ].sort((a, b) => a.name.localeCompare(b.name));
 
 const sizePoints = (first: number, last: number) =>
@@ -388,7 +389,7 @@ export const emptyReport: Report = {
       sure: false,
       current: null,
       series: noData,
-      changes: [{ day: "2026-11-01", what: "Replies end with one line saying what is left" }],
+      changes: [{ day: "2026-11-01", what: "Replies end with one line saying what is left", kind: "rule" }],
     },
     {
       name: "Screenshots sent without a link",

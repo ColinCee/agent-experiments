@@ -1,5 +1,5 @@
 import { ChevronRight, CircleCheck } from "lucide-react";
-import { ChangeStrip } from "@/components/change-strip";
+import { ChangeStrip, StripAxisCell } from "@/components/change-strip";
 import { RateBar, RatePair, RateValue, type Side, Swatch } from "@/components/rate-pair";
 import { GridHeader, GridRow } from "@/components/rule-grid";
 import { Empty, Section } from "@/components/section";
@@ -110,7 +110,7 @@ function RunningNow({ report }: { report: Report }) {
 /** A rate in its column, labelled on phones where there is no header. */
 function RateCell({ rate, side, label }: { rate: number | null | undefined; side: Side; label: string }) {
   return (
-    <span className="mr-4 inline-block md:mr-0">
+    <span className="mr-4 inline-block md:mr-0 md:text-right">
       <span className="mr-1.5 text-sm text-muted-foreground md:hidden">
         <Swatch side={side}>{label}</Swatch>
       </span>
@@ -130,9 +130,15 @@ function RulesTable({ mistakes }: { mistakes: Mistake[] }) {
     <div data-table="rules" className="space-y-3 md:space-y-0">
       <GridHeader>
         <span>Mistake</span>
-        <Swatch side="without">Before rule</Swatch>
-        <Swatch side="with">Since rule</Swatch>
+        {/* Wider than their number columns; aligned to the end, they overflow leftwards into the gap. */}
+        <span className="flex justify-end whitespace-nowrap">
+          <Swatch side="without">Before rule</Swatch>
+        </span>
+        <span className="flex justify-end whitespace-nowrap">
+          <Swatch side="with">Since rule</Swatch>
+        </span>
         <span />
+        <StripAxisCell />
         <span>Change</span>
       </GridHeader>
       {rows.map((m, i) => (
@@ -142,8 +148,10 @@ function RulesTable({ mistakes }: { mistakes: Mistake[] }) {
             <RateCell rate={m.before?.rate} side="without" label="Before rule" />
             <RateCell rate={m.after?.rate} side="with" label="Since rule" />
           </div>
-          <RatePair without={m.before?.rate ?? null} withRule={m.after?.rate ?? null} />
-          <ChangeStrip change={m.change} axis={i === 0} />
+          <div className="pr-2.5">
+            <RatePair without={m.before?.rate ?? null} withRule={m.after?.rate ?? null} />
+          </div>
+          <ChangeStrip change={m.change} axis={i === 0} cells />
         </GridRow>
       ))}
     </div>
@@ -157,10 +165,10 @@ function NoRuleTable({ mistakes }: { mistakes: Mistake[] }) {
     <div data-table="no-rule" className="space-y-3 md:space-y-0">
       <GridHeader>
         <span>Mistake</span>
-        <span>Rate now</span>
+        <span className="text-right">Rate now</span>
         <span />
         <span />
-        <span>Tasks</span>
+        <span className="col-span-2">Tasks</span>
       </GridHeader>
       {rows.map((m) => (
         <GridRow key={m.name} href={href("mistakes", slug(m.name))}>
@@ -169,11 +177,15 @@ function NoRuleTable({ mistakes }: { mistakes: Mistake[] }) {
             <>
               <RateCell rate={m.current.rate} side="without" label="Rate now" />
               <span className="hidden md:block" />
-              <RateBar rate={m.current.rate} />
-              <span className="block text-sm text-muted-foreground">{plural(m.current.tasks, "task")}</span>
+              <div className="pr-2.5">
+                <RateBar rate={m.current.rate} />
+              </div>
+              <span className="block text-sm text-muted-foreground md:col-span-2">
+                {plural(m.current.tasks, "task")}
+              </span>
             </>
           ) : (
-            <span className="block text-sm text-muted-foreground md:col-span-4">{NO_RECENT_TASKS}</span>
+            <span className="block text-sm text-muted-foreground md:col-span-5">{NO_RECENT_TASKS}</span>
           )}
         </GridRow>
       ))}

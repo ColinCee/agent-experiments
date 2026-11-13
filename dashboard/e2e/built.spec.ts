@@ -17,14 +17,19 @@ async function measureTracks(page: Page) {
     const centre = (el: Element) => box(el).left + box(el).width / 2;
     return (["rate", "change"] as const).map((kind) => ({
       kind,
-      tracks: [...document.querySelectorAll(`[data-track="${kind}"]`)].map((track) => ({
-        left: box(track).left,
-        width: box(track).width,
-        marks: [...track.querySelectorAll(kind === "rate" ? "[data-rate]" : "[data-value]")].map((m) => ({
-          value: Number(m.getAttribute(kind === "rate" ? "data-rate" : "data-value")),
-          x: centre(m),
+      // A strip's captions (in a table's header row or over a card's strip) must line up with the strips too.
+      tracks: [
+        ...document.querySelectorAll(kind === "rate" ? '[data-track="rate"]' : '[data-track="change"], [data-axis]'),
+      ]
+        .filter((track) => box(track).width > 0)
+        .map((track) => ({
+          left: box(track).left,
+          width: box(track).width,
+          marks: [...track.querySelectorAll(kind === "rate" ? "[data-rate]" : "[data-value]")].map((m) => ({
+            value: Number(m.getAttribute(kind === "rate" ? "data-rate" : "data-value")),
+            x: centre(m),
+          })),
         })),
-      })),
     }));
   });
 }
@@ -85,6 +90,44 @@ for (const [width, viewport] of Object.entries(widths)) {
       }
     }
     expect(checked).toBeGreaterThan(20);
+  });
+
+  test(`a table's rate track and change strip are equally wide at ${width} width`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    await openBuilt(page);
+    const [rate, change] = await measureTracks(page);
+    expect(Math.abs(rate.tracks[0].width - change.tracks[0].width)).toBeLessThanOrEqual(0.5);
+  });
+
+  test(`history marker labels neither overlap nor run off the chart at ${width} width`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    const opened = await openBuilt(page);
+    await page.goto(`${opened.url}#/mistakes`);
+    const charts = await page.evaluate(() =>
+      [...document.querySelectorAll("[data-slot=chart]")].map((chart) => {
+        const surface = chart.querySelector(".recharts-surface")?.getBoundingClientRect();
+        const labels = [...chart.querySelectorAll("[data-marker-label]")].map((l) => {
+          const r = l.getBoundingClientRect();
+          return { left: r.left, right: r.right, top: r.top, bottom: r.bottom };
+        });
+        return { surface: surface && { left: surface.left, right: surface.right, top: surface.top }, labels };
+      }),
+    );
+    let labels = 0;
+    for (const { surface, labels: boxes } of charts) {
+      if (!surface) throw new Error("a chart has no surface");
+      boxes.forEach((a, i) => {
+        expect(a.left).toBeGreaterThanOrEqual(surface.left);
+        expect(a.right).toBeLessThanOrEqual(surface.right);
+        expect(a.top).toBeGreaterThanOrEqual(surface.top);
+        for (const b of boxes.slice(i + 1)) {
+          const apart = a.right <= b.left || b.right <= a.left || a.bottom <= b.top || b.bottom <= a.top;
+          expect(apart, `labels overlap: ${JSON.stringify([a, b])}`).toBe(true);
+        }
+        labels++;
+      });
+    }
+    expect(labels).toBeGreaterThan(8);
   });
 
   test(`history markers sit on their day and the line turns blue at the latest rule at ${width} width`, async ({
@@ -166,15 +209,22 @@ test("a row on the overview opens that mistake on the tracked mistakes page", as
   await expect(page.locator("#ports-taken-without-checking")).toBeInViewport();
 });
 
-test("hovering a rule-change marker on a computer says what changed then", async ({ page }) => {
+test("hovering a marker on a computer says what changed then; the line under the chart stays the rule", async ({
+  page,
+}) => {
   await page.setViewportSize(widths.desktop);
   const opened = await openBuilt(page);
   await page.goto(`${opened.url}#/mistakes`);
   const card = page.locator("#replies-with-no-summary-line");
-  const line = card.locator("[data-rule-line]");
-  await expect(line).toHaveText("Rule since 20 Oct: Replies end with one line saying what is left");
   await card.locator('[data-marker-day="2026-10-08"]').hover();
-  await expect(line).toHaveText("Rule changed 8 Oct: Replies open with the answer");
+  await expect(card.locator("[data-marker-tip]")).toHaveText("Rule changed 8 Oct: Replies open with the answer");
+  await expect(card.locator("[data-rule-line]")).toHaveText(
+    "Rule since 20 Oct: Replies end with one line saying what is left",
+  );
+  const trial = page.locator("#config-read-from-memory");
+  await trial.locator('[data-marker-kind="trial"]').hover();
+  await expect(trial.locator("[data-marker-tip]")).toHaveText("Trial started 9 Nov");
+  await expect(trial.locator("[data-rule-line]")).toHaveCount(0);
 });
 
 test("tapping a rule-change marker on a phone says what changed then", async ({ browser }) => {
@@ -184,6 +234,6 @@ test("tapping a rule-change marker on a phone says what changed then", async ({ 
   await page.goto(`${opened.url}#/mistakes`);
   const card = page.locator("#replies-with-no-summary-line");
   await card.locator('[data-marker-day="2026-10-08"]').tap();
-  await expect(card.locator("[data-rule-line]")).toHaveText("Rule changed 8 Oct: Replies open with the answer");
+  await expect(card.locator("[data-marker-tip]")).toHaveText("Rule changed 8 Oct: Replies open with the answer");
   await context.close();
 });

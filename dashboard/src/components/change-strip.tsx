@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import type { Range } from "@/data/report";
-import { type ChangeWords, changeWords, isClipped, stripPosition, type Tone } from "@/lib/change";
+import { type ChangeMode, type ChangeWords, changeWords, isClipped, stripPosition, type Tone } from "@/lib/change";
 import { cn } from "@/lib/utils";
 
 const MARK: Record<Tone, string> = { good: "bg-good", bad: "bg-bad", unclear: "bg-muted-foreground" };
@@ -11,7 +11,7 @@ const at = (change: number) => `${stripPosition(change) * 100}%`;
 /** Captions over the first strip of a column: where fewer and more mistakes lie. */
 function StripAxis() {
   return (
-    <div className="relative h-4 text-xs leading-4 text-muted-foreground">
+    <div data-axis className="relative h-4 text-xs leading-4 text-muted-foreground">
       <span className="absolute left-0">fewer mistakes</span>
       <span className="absolute left-1/2 -translate-x-1/2">no change</span>
       <span className="absolute right-0">more</span>
@@ -84,18 +84,43 @@ export function AlignWithStrip({ children }: { children: ReactNode }) {
   );
 }
 
+/** The captions in a table's header row, over the column of strips below it. */
+export function StripAxisCell() {
+  return (
+    <div className="pr-2.5">
+      <StripAxis />
+    </div>
+  );
+}
+
 /**
  * A change in the mistake rate with its 90% range, and the words for it. Every strip in a column comes from here so
- * they share one scale; `axis` puts the captions over the first one.
+ * they share one scale. `axis` puts the captions over this strip; in a table row (`cells`) the strip and its words
+ * become the row's own cells, and the captions show only on phones, where the header row is hidden.
  */
-export function ChangeStrip({ change, axis = false }: { change: Range | null; axis?: boolean }) {
-  const words = changeWords(change);
+export function ChangeStrip({
+  change,
+  axis = false,
+  mode = "plain",
+  cells = false,
+}: {
+  change: Range | null;
+  axis?: boolean;
+  mode?: ChangeMode;
+  cells?: boolean;
+}) {
+  const words = changeWords(change, mode);
   return (
     // Words go beside the strip only when that leaves the strip room for its captions; otherwise below it.
-    <div className="@container">
-      <div className="grid items-center gap-x-5 gap-y-1 @min-[27rem]:grid-cols-[minmax(0,1fr)_9.5rem]">
+    <div className={cn("@container", cells && "md:contents")}>
+      <div
+        className={cn(
+          "grid items-center gap-x-5 gap-y-1 @min-[27rem]:grid-cols-[minmax(0,1fr)_9.5rem]",
+          cells && "md:contents",
+        )}
+      >
         {axis && (
-          <div className="pr-2.5 @min-[27rem]:col-start-1">
+          <div className={cn("pr-2.5 @min-[27rem]:col-start-1", cells && "md:hidden")}>
             <StripAxis />
           </div>
         )}

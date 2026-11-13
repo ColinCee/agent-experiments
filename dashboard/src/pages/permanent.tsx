@@ -1,4 +1,4 @@
-import { ChangeStrip } from "@/components/change-strip";
+import { ChangeStrip, StripAxisCell } from "@/components/change-strip";
 import { Empty, PageIntro } from "@/components/section";
 import { StatusBadge } from "@/components/status-badge";
 import type { PermanentCheck, Report } from "@/data/report";
@@ -6,7 +6,8 @@ import { dayLabel, number } from "@/lib/format";
 import { permanentNote, permanentStatus, STATUS_TONE, STATUS_WORDS, sharedModel } from "@/lib/permanent";
 import { cn } from "@/lib/utils";
 
-const COLUMNS = "md:grid md:grid-cols-[minmax(0,1fr)_4.5rem_9rem_minmax(0,1.8fr)_9.5rem] md:items-center md:gap-x-5";
+const COLUMNS =
+  "md:grid md:grid-cols-[minmax(0,1fr)_4.5rem_8rem_minmax(0,1fr)_9.5rem_9.5rem] md:items-center md:gap-x-5";
 
 function Row({ check, day, axis }: { check: PermanentCheck; day: string; axis: boolean }) {
   const note = permanentNote(check);
@@ -33,9 +34,9 @@ function Row({ check, day, axis }: { check: PermanentCheck; day: string; axis: b
         <span className="md:hidden"> tasks without / with the rule</span>
       </span>
       {note === null ? (
-        <ChangeStrip change={check.change} axis={axis} />
+        <ChangeStrip change={check.change} axis={axis} mode={check.slipping ? "slipping" : "plain"} cells />
       ) : (
-        <span className="block text-muted-foreground">{note}</span>
+        <span className="block text-muted-foreground md:col-span-2">{note}</span>
       )}
       <span className="hidden md:block">
         <StatusBadge tone={STATUS_TONE[status]}>{STATUS_WORDS[status]}</StatusBadge>
@@ -58,10 +59,11 @@ export function PermanentPage({ report }: { report: Report }) {
         <Empty>No proven rules yet. A rule joins the check once its trial finds that it works.</Empty>
       ) : (
         <div data-table="permanent" className="space-y-3 md:space-y-0">
-          <div className={cn(COLUMNS, "hidden border-b pb-2 text-sm text-muted-foreground md:grid")}>
+          <div className={cn(COLUMNS, "hidden items-end border-b pb-2 text-sm text-muted-foreground md:grid")}>
             <span>Rule</span>
             <span>Since</span>
             <span>Tasks without / with</span>
+            <StripAxisCell />
             <span>Result</span>
             <span>Status</span>
           </div>

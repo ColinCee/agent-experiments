@@ -45,7 +45,7 @@ test("a slipping proven rule needs attention, after mistakes above their range",
     }),
   );
   expect(items.map((i) => i.title)).toEqual(["above", "slips"]);
-  expect(items[1].detail).toBe("Rule no longer cuts this mistake · 50% more");
+  expect(items[1].detail).toBe("Rule no longer cuts this mistake · 10% more to 100% more");
 });
 
 test("a trial that finished in the last 7 days is news, green only when it works", () => {

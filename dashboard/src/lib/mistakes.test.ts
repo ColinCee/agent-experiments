@@ -1,6 +1,15 @@
 import { expect, test } from "vitest";
 import type { Mistake, Range } from "@/data/report";
-import { currentWords, historyRows, ruleLine, ruleTasks, slug, sortByChange, todayChip } from "./mistakes";
+import {
+  currentWords,
+  historyRows,
+  markerWords,
+  ruleSince,
+  ruleTasks,
+  slug,
+  sortByChange,
+  todayChip,
+} from "./mistakes";
 
 const mistake = (over: Partial<Mistake>): Mistake => ({
   name: "A mistake",
@@ -29,11 +38,14 @@ test("rules sort clearly fewer (largest first), then unclear, then clearly more"
   expect(sorted.map((m) => m.name)).toEqual(["much fewer", "a bit fewer", "unclear", "few tasks", "more"]);
 });
 
-test("a rule line names the rule, and a trial's start as a trial", () => {
+test("under the chart only the latest rule is named; a marker names a rule or a trial's start", () => {
   const m = mistake({ rule: { day: "2026-11-08", what: "Do it right" } });
-  expect(ruleLine({ day: "2026-11-08", what: "Do it right" }, m, "2026-11-12")).toBe("Rule since 8 Nov: Do it right");
-  expect(ruleLine({ day: "2026-10-01", what: "Do it" }, m, "2026-11-12")).toBe("Rule changed 1 Oct: Do it");
-  expect(ruleLine({ day: "2026-11-09", what: "trial started: Do it" }, m, "2026-11-12")).toBe("Trial started 9 Nov");
+  expect(ruleSince(m, "2026-11-12")).toBe("Rule since 8 Nov: Do it right");
+  expect(ruleSince(mistake({ rule: null }), "2026-11-12")).toBeNull();
+  expect(markerWords({ day: "2026-10-01", what: "Do it", kind: "rule" }, "2026-11-12")).toBe(
+    "Rule changed 1 Oct: Do it",
+  );
+  expect(markerWords({ day: "2026-11-09", what: "A trial", kind: "trial" }, "2026-11-12")).toBe("Trial started 9 Nov");
 });
 
 test("the today chip shows only outside the usual range", () => {

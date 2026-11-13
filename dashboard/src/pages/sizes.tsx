@@ -51,7 +51,7 @@ function Months({ months, day }: { months: Sizes["months"]; day: Day }) {
       <TableHeader>
         <TableRow>
           <TableHead className="whitespace-normal">Month</TableHead>
-          <TableHead className="whitespace-normal">Rules or Skills</TableHead>
+          <TableHead className="whitespace-normal">Files</TableHead>
           <TableHead className="text-right whitespace-normal">Edits</TableHead>
           <TableHead className="text-right whitespace-normal">Only added text</TableHead>
           <TableHead className="text-right whitespace-normal">Of changed lines, added</TableHead>

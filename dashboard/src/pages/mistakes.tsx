@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { ChangeText } from "@/components/change-strip";
 import { HistoryChart } from "@/components/charts/history-chart";
 import { RateValue, Swatch } from "@/components/rate-pair";
@@ -10,7 +9,7 @@ import { percent } from "@/lib/format";
 import {
   currentWords,
   NO_RECENT_TASKS,
-  ruleLine,
+  ruleSince,
   ruleTasks,
   slug,
   todayChip,
@@ -18,8 +17,6 @@ import {
   withRule,
 } from "@/lib/mistakes";
 import { cn } from "@/lib/utils";
-
-type Change = Mistake["changes"][number];
 
 function RuleNumbers({ mistake }: { mistake: Mistake }) {
   const rate = (r: number | undefined) => (r === undefined ? "–" : percent(r));
@@ -51,9 +48,8 @@ function CurrentNumbers({ mistake, day }: { mistake: Mistake; day: Day }) {
 }
 
 function MistakeCard({ mistake, day, target }: { mistake: Mistake; day: Day; target: boolean }) {
-  const [picked, setPicked] = useState<Change | null>(null);
   const chip = todayChip(mistake);
-  const shown = picked ?? mistake.rule;
+  const since = ruleSince(mistake, day);
   const hasData = mistake.series.some((p) => p.rate !== null);
   return (
     <Card id={slug(mistake.name)} className={cn("scroll-mt-4", target && "ring-2 ring-foreground/40")}>
@@ -64,13 +60,13 @@ function MistakeCard({ mistake, day, target }: { mistake: Mistake; day: Day; tar
       <CardContent className="space-y-4">
         {mistake.rule ? <RuleNumbers mistake={mistake} /> : <CurrentNumbers mistake={mistake} day={day} />}
         {hasData ? (
-          <HistoryChart mistake={mistake} day={day} picked={picked} onPick={setPicked} />
+          <HistoryChart mistake={mistake} day={day} />
         ) : (
           <Empty className="text-sm">No chances for this mistake in the last 6 weeks</Empty>
         )}
-        {shown && (
+        {since && (
           <p data-rule-line className="text-sm">
-            {ruleLine(shown, mistake, day)}
+            {since}
           </p>
         )}
       </CardContent>

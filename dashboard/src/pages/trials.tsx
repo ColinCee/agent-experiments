@@ -94,6 +94,7 @@ function Result({ trial, axis }: { trial: Trial; axis: boolean }) {
 
 function TrialCard({ trial, day, first }: { trial: Trial; day: Day; first: boolean }) {
   const badge = trialBadge(trial);
+  const chart = trial.state !== "scheduled" && trial.trend.length > 0;
   return (
     <Card>
       <CardHeader className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
@@ -103,12 +104,12 @@ function TrialCard({ trial, day, first }: { trial: Trial; day: Day; first: boole
           {trialWhen(trial, day, true)}
         </div>
       </CardHeader>
-      <CardContent className="grid gap-x-10 gap-y-6 lg:grid-cols-2">
+      <CardContent className={cn("grid gap-x-10 gap-y-6", chart && "lg:grid-cols-2")}>
         <div className="min-w-0 space-y-6">
           <Tasks trial={trial} />
           {hasResult(trial) && <Result trial={trial} axis={first} />}
         </div>
-        {trial.state !== "scheduled" && trial.trend.length > 0 && (
+        {chart && (
           <div className="min-w-0">
             <TrendChart trial={trial} />
           </div>

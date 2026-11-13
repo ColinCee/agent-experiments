@@ -67,11 +67,17 @@ export interface Side {
   from: Day;
 }
 
+export interface MistakeChange {
+  day: Day;
+  what: string;
+  kind: "rule" | "trial";
+}
+
 export interface Mistake {
   name: string;
   /** `day`'s rate against its usual range; null with no chances that day or under 10 tasks of history. */
   today: { rate: number; usual_low: number; usual_high: number; outside: "above" | "below" | null } | null;
-  /** Latest rule change, a trial's start included (`what` is then "trial started: <name>"); null with no rule yet. */
+  /** Latest rule change (never a trial's start); null with no rule yet. */
   rule: { day: Day; what: string } | null;
   /** With a rule: before vs since its latest change. */
   before: Side | null;
@@ -83,8 +89,8 @@ export interface Mistake {
   current: Side | null;
   /** 6 weeks, 3-day rolling. */
   series: { day: Day; rate: number | null }[];
-  /** Every rule change inside the series window. */
-  changes: { day: Day; what: string }[];
+  /** Every rule change and trial start inside the series window; a trial's `what` is the trial's name. */
+  changes: MistakeChange[];
 }
 
 export interface Replay {

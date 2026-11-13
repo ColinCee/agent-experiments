@@ -1,10 +1,11 @@
 import { CartesianGrid, Line, LineChart, XAxis, YAxis } from "recharts";
 import { ChartContainer, ChartTooltip } from "@/components/ui/chart";
 import type { Trial } from "@/data/report";
+import { rateCeiling, rateTicks } from "@/lib/charts";
 import { percent } from "@/lib/format";
 import { trendRows } from "@/lib/trials";
 import { ChartTip } from "./chart-tip";
-import { PERCENT_TICKS, PointMark } from "./marks";
+import { PointMark } from "./marks";
 
 const SERIES = [
   { key: "without", name: "Without", stroke: "var(--without)", fill: "fill-without", swatch: "bg-without" },
@@ -14,14 +15,15 @@ const SERIES = [
 /** A trial's mistake rate by day of the trial, with and without the rule, each line named at its end. */
 export function TrendChart({ trial }: { trial: Trial }) {
   const rows = trendRows(trial);
+  const ceiling = rateCeiling(rows.flatMap((r) => [r.with, r.without]));
   return (
     <ChartContainer className="aspect-auto h-[220px] w-full md:h-[260px]">
       <LineChart data={rows} margin={{ top: 12, right: 96, bottom: 0, left: 0 }}>
         <CartesianGrid vertical={false} />
         <XAxis dataKey="label" tickLine={false} axisLine={false} interval="preserveStartEnd" />
         <YAxis
-          domain={[0, 1]}
-          ticks={PERCENT_TICKS}
+          domain={[0, ceiling]}
+          ticks={rateTicks(ceiling)}
           tickFormatter={percent}
           tickLine={false}
           axisLine={false}

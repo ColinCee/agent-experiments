@@ -2,16 +2,19 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 /**
- * The column template shared by every table of mistakes on a page, so their rate tracks line up across tables:
- * name · first rate · second rate · track · change (or tasks). Phones stack each row instead.
+ * The column template shared by every table of mistakes on a page, so their tracks line up across tables:
+ * name · first rate · second rate · rate track · change strip · change words. The two tracks get equal widths so a row
+ * reads as two matched instruments. Phones stack each row instead.
  */
 export const RULE_COLUMNS =
-  "md:grid md:grid-cols-[minmax(0,1fr)_5.5rem_5.5rem_minmax(0,0.6fr)_minmax(0,1.9fr)] md:items-center md:gap-x-5";
+  "md:grid md:grid-cols-[minmax(0,0.8fr)_4.5rem_4.5rem_minmax(0,1fr)_minmax(0,1fr)_10rem] md:items-center md:gap-x-5";
 
 /** The header row: on phones it is hidden and each row labels its own numbers. */
 export function GridHeader({ children }: { children: ReactNode }) {
   return (
-    <div className={cn(RULE_COLUMNS, "hidden border-b pb-2 text-sm text-muted-foreground md:grid")}>{children}</div>
+    <div className={cn(RULE_COLUMNS, "hidden items-end border-b pb-2 text-sm text-muted-foreground md:grid")}>
+      {children}
+    </div>
   );
 }
 

@@ -1,8 +1,6 @@
-import type { Day, Mistake } from "@/data/report";
+import type { Day, Mistake, MistakeChange } from "@/data/report";
 import { changeTone, type Tone } from "./change";
 import { dayLabel, percent, plural } from "./format";
-
-const TRIAL_START = "trial started: ";
 
 export function slug(name: string): string {
   return name
@@ -22,15 +20,15 @@ export function sortByChange(mistakes: Mistake[]): Mistake[] {
   return mistakes.toSorted((a, b) => tone(a) - tone(b) || (a.change?.value ?? 0) - (b.change?.value ?? 0));
 }
 
-/**
- * A rule change in words, with its date: "Rule since 8 Nov: …" for the mistake's latest, "Rule changed 1 Oct: …" for
- * an earlier one, or "Trial started 8 Nov" for a trial's start.
- */
-export function ruleLine(change: { day: Day; what: string }, mistake: Mistake, day: Day): string {
+/** The line under a mistake's chart: its latest rule and since when, or null with no rule. */
+export function ruleSince(mistake: Mistake, day: Day): string | null {
+  return mistake.rule && `Rule since ${dayLabel(mistake.rule.day, day)}: ${mistake.rule.what}`;
+}
+
+/** What a marker on the history chart says when hovered or tapped. */
+export function markerWords(change: MistakeChange, day: Day): string {
   const when = dayLabel(change.day, day);
-  if (change.what.startsWith(TRIAL_START)) return `Trial started ${when}`;
-  const latest = change.day === mistake.rule?.day && change.what === mistake.rule.what;
-  return `${latest ? "Rule since" : "Rule changed"} ${when}: ${change.what}`;
+  return change.kind === "trial" ? `Trial started ${when}` : `Rule changed ${when}: ${change.what}`;
 }
 
 /** The chip beside a mistake's name, only when its rate on the report day is outside its usual range. */
