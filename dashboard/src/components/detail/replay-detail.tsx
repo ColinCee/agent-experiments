@@ -1,39 +1,47 @@
-import { ChangeStrip } from "@/components/change-strip";
+import { RangeStrip } from "@/components/change-strip";
 import { PairLegend, RatePair } from "@/components/rate-pair";
-import { StatusBadge } from "@/components/status-badge";
+import { Empty } from "@/components/section";
 import type { Day, Replay } from "@/data/report";
-import { replayedLine, trustReason, trustWords } from "@/lib/replays";
-import { verdictWords } from "@/lib/trials";
-import { cn } from "@/lib/utils";
+import { changeWords } from "@/lib/change";
+import { REPLAY_LINE, replayChangeAside, replayFacts, replayHeadline, UNRELIABLE } from "@/lib/details";
+import { DetailLayout } from "./detail-layout";
 
-/** A replay in full: when and on how many moments, whether it can be trusted and why, and its result. */
+/**
+ * A replay in full. Trusted, its verdict, its old → new pair and its change; untrusted, only that it cannot be trusted,
+ * with its chart faded and its change said as muted words about the replay, never as an answer.
+ */
 export function ReplayDetail({ replay, day }: { replay: Replay; day: Day }) {
-  const words = trustWords(replay);
+  const headline = replayHeadline(replay);
+  const words = changeWords(replay.change, replay.trusted ? "plain" : "untrusted");
+  const below = replay.trusted
+    ? words.hint
+      ? `${words.lead} · ${words.hint}`
+      : words.lead
+    : replayChangeAside(replay);
   return (
-    <div className="space-y-5">
-      <div className="space-y-1">
-        <h3 className="text-lg leading-snug font-medium">{replay.name}</h3>
-        <p className="text-sm text-muted-foreground">{replayedLine(replay, day)}</p>
-      </div>
-      <div className="space-y-1.5">
-        <StatusBadge tone={replay.trusted ? "unclear" : "bad"}>{words.badge}</StatusBadge>
-        <p className="text-sm text-muted-foreground">{trustReason(replay)}</p>
-      </div>
-      <div
-        data-trusted={replay.trusted}
-        className={cn(
-          "-mx-3 space-y-3 rounded-lg border border-transparent p-3",
-          !replay.trusted && "border-border border-dashed bg-muted/40",
-        )}
-      >
-        <h4 className="flex items-baseline gap-2">
-          <span className="text-sm font-medium text-muted-foreground">{words.heading}</span>
-          <span className="font-semibold">{verdictWords(replay.verdict)}</span>
-        </h4>
-        <PairLegend from="old wording" to="new wording" />
-        <RatePair without={replay.rate_old} withRule={replay.rate_new} labelled hollow={!replay.trusted} />
-        <ChangeStrip change={replay.change} same="same as old wording" mode={replay.trusted ? "plain" : "untrusted"} />
-      </div>
-    </div>
+    <DetailLayout
+      kind="Replay"
+      title={replay.name}
+      headline={headline}
+      outlined={headline.outlined}
+      line={REPLAY_LINE}
+      blocks={[
+        {
+          caption: replay.trusted ? "Share of moments with the mistake, old wording against new" : UNRELIABLE,
+          dim: !replay.trusted,
+          node:
+            replay.rate_old === null && replay.rate_new === null ? (
+              <Empty className="text-sm">No rates to compare</Empty>
+            ) : (
+              <div className="space-y-3">
+                <PairLegend from="old wording" to="new wording" />
+                <RatePair without={replay.rate_old} withRule={replay.rate_new} labelled hollow={!replay.trusted} />
+                <RangeStrip change={replay.change} tone={words.tone} same="same as old wording" words={below} />
+              </div>
+            ),
+        },
+      ]}
+      facts={replayFacts(replay, day)}
+    />
   );
 }

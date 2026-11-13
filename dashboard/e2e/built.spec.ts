@@ -373,39 +373,75 @@ test("the data's date shows once on the screen, in the top bar", async ({ page }
   }
 });
 
-test("a mistake's detail reads its change against before the rule with its range, and draws its strip", async ({
+test("every kind's detail has the one shape: kind, title, one headline, one line, captioned charts, no text twice", async ({
   page,
 }) => {
   await page.setViewportSize(widths.desktop);
   const opened = await openBuilt(page);
+  const ids = [
+    "trial-screenshots-sent-without-a-link",
+    "trial-config-read-from-memory",
+    "trial-tests-skipped-before-a-commit",
+    "permanent-replies-with-no-summary-line",
+    "permanent-branch-pushed-without-a-pull-request",
+    "permanent-drafts-saved-in-the-wrong-folder",
+    "mistake-branch-pushed-without-a-pull-request",
+    "mistake-questions-asked-that-the-notes-answer",
+    "mistake-old-branches-left-open",
+    "replay-replies-with-no-summary-line",
+    "replay-ports-taken-without-checking",
+    "size-rules",
+    "size-skills",
+  ];
+  for (const id of ids) {
+    await pick(page, opened.url, id);
+    const found = await page.evaluate((id) => {
+      const detail = document.querySelector(`[data-detail="${id}"]`) as Element;
+      // Text outside the charts' own drawing, where a repeated tick or label is the chart's business.
+      const texts = [...detail.querySelectorAll("*")]
+        .filter((el) => !el.closest("svg") && [...el.childNodes].some((n) => n.nodeType === Node.TEXT_NODE))
+        .map((el) =>
+          [...el.childNodes]
+            .filter((n) => n.nodeType === Node.TEXT_NODE)
+            .map((n) => n.textContent)
+            .join("")
+            .trim(),
+        )
+        .filter((t) => t.length > 3);
+      return {
+        kinds: detail.querySelectorAll("[data-kind-label]").length,
+        headlines: detail.querySelectorAll("[data-headline]").length,
+        lines: detail.querySelectorAll("[data-description]").length,
+        captions: detail.querySelectorAll("[data-caption]").length,
+        repeated: texts.filter((t, i) => texts.indexOf(t) !== i),
+      };
+    }, id);
+    expect(found, id).toMatchObject({ kinds: 1, headlines: 1, lines: 1, repeated: [] });
+    expect(found.captions, id).toBeGreaterThan(0);
+  }
   await pick(page, opened.url, "mistake-branch-pushed-without-a-pull-request");
-  await expect(page.locator("[data-detail] [data-change-line]")).toHaveText(
-    "100% fewer than before the rule · likely 88% to 100% fewer",
-  );
-  await expect(page.locator('[data-detail] [data-track="change"]')).toHaveCount(1);
+  await expect(page.locator("[data-detail] [data-headline]")).toHaveText("100% fewer than before the rule");
+  await pick(page, opened.url, "replay-ports-taken-without-checking");
+  await expect(page.locator("[data-detail] [data-headline]")).toHaveText("Can't be trusted");
 });
 
-test("hovering a marker on a computer says what changed then; the line under the chart stays the rule", async ({
-  page,
-}) => {
+test("hovering a marker on a computer says what changed then", async ({ page }) => {
   await page.setViewportSize(widths.desktop);
   const opened = await openBuilt(page);
   await pick(page, opened.url, "mistake-replies-with-no-summary-line");
   const detail = page.locator("[data-detail]");
-  await detail.locator('[data-marker-day="2026-10-08"]').hover();
-  await expect(detail.locator("[data-marker-tip]")).toHaveText("Rule changed 8 Oct: Replies open with the answer");
-  await expect(detail.locator("[data-rule-line]")).toHaveText(
-    "Rule since 20 Oct: Replies end with one line saying what is left",
+  await detail.locator('[data-marker-day="2026-10-20"] [data-marker-label]').hover();
+  await expect(detail.locator("[data-marker-tip]")).toHaveText(
+    "Rule changed 20 Oct: Replies end with one line saying what is left",
   );
   await pick(page, opened.url, "mistake-config-read-from-memory");
-  await detail.locator('[data-marker-kind="trial"]').hover();
-  await expect(detail.locator("[data-marker-tip]")).toHaveText("Trial started 9 Nov");
-  await expect(detail.locator("[data-rule-line]")).toHaveCount(0);
+  await detail.locator('[data-marker-kind="trial"] [data-marker-label]').hover();
+  await expect(detail.locator("[data-marker-tip]")).toHaveText("Trial began 9 Nov");
   await pick(page, opened.url, "mistake-long-logs-pasted-into-a-reply");
   await expect(detail.locator("[data-marker-day]")).toHaveCount(1);
-  await detail.locator('[data-marker-day="2026-10-28"]').hover();
+  await detail.locator('[data-marker-day="2026-10-28"] [data-marker-label]').hover();
   await expect(detail.locator("[data-marker-tip] p")).toHaveText([
-    "Trial started 28 Oct",
+    "Trial began 28 Oct",
     "Rule changed 28 Oct: Quote the failing lines, link the rest",
   ]);
 });
@@ -416,7 +452,9 @@ test("tapping a rule-change marker on a phone says what changed then", async ({ 
   const opened = await openBuilt(page);
   await pick(page, opened.url, "mistake-replies-with-no-summary-line");
   const detail = page.locator("[data-detail]");
-  await detail.locator('[data-marker-day="2026-10-08"]').tap();
-  await expect(detail.locator("[data-marker-tip]")).toHaveText("Rule changed 8 Oct: Replies open with the answer");
+  await detail.locator('[data-marker-day="2026-10-20"] [data-marker-label]').tap();
+  await expect(detail.locator("[data-marker-tip]")).toHaveText(
+    "Rule changed 20 Oct: Replies end with one line saying what is left",
+  );
   await context.close();
 });

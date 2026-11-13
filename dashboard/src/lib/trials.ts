@@ -53,18 +53,6 @@ export function taskScale(trial: Trial): number {
   return Math.max(trial.needed ?? MOST_NEEDED, trial.tasks_with, trial.tasks_without, 1);
 }
 
-export function neededWords(trial: Trial): string {
-  return trial.needed === null ? `over ${MOST_NEEDED} needed` : `about ${number(trial.needed)} needed`;
-}
-
-/** The one line under a trial's task bars, or null when there is nothing to warn about. */
-export function tasksNote(trial: Trial): string | null {
-  const short = trial.state !== "finished" && trial.per_week < (trial.needed ?? Number.POSITIVE_INFINITY);
-  const warning = `A week usually brings about ${number(trial.per_week)} per half, so this trial may end unclear.`;
-  if (trial.state === "scheduled") return short ? `No tasks yet. ${warning}` : "No tasks yet.";
-  return short ? warning : null;
-}
-
 const ORDER: Record<Trial["state"], number> = { running: 0, scheduled: 1, finished: 2 };
 
 /** Running first, then scheduled (soonest first), then finished (latest first). */

@@ -1,7 +1,6 @@
-import { format, parseISO, subDays } from "date-fns";
 import type { Day, Mistake, MistakeChange } from "@/data/report";
 import { type ChangeWords, changeTone, changeWords, FEWEST_TASKS, missingChange, type Tone } from "./change";
-import { dayLabel, fewTasks, percent, plural } from "./format";
+import { dayLabel, fewTasks } from "./format";
 
 export function slug(name: string): string {
   return name
@@ -21,62 +20,32 @@ export function sortByChange(mistakes: Mistake[]): Mistake[] {
   return mistakes.toSorted((a, b) => tone(a) - tone(b) || (a.change?.value ?? 0) - (b.change?.value ?? 0));
 }
 
-/** The line under a mistake's chart: its latest rule and since when, or null with no rule. */
-export function ruleSince(mistake: Mistake, day: Day): string | null {
-  return mistake.rule && `Rule since ${dayLabel(mistake.rule.day, day)}: ${mistake.rule.what}`;
-}
-
 /** What a marker on the history chart says when hovered or tapped. */
 export function markerWords(change: MistakeChange, day: Day): string {
   const when = dayLabel(change.day, day);
-  return change.kind === "trial" ? `Trial started ${when}` : `Rule changed ${when}: ${change.what}`;
+  return change.kind === "trial" ? `Trial began ${when}` : `Rule changed ${when}: ${change.what}`;
 }
 
-/** The chip beside a mistake's name, only when its rate on the report day is outside its usual range. */
-export function todayChip(mistake: Mistake): { text: string; tone: "good" | "bad" } | null {
-  const today = mistake.today;
-  if (!today?.outside) return null;
-  const numbers = `${percent(today.rate)}, usually ${percent(today.usual_low)} to ${percent(today.usual_high)}`;
-  return today.outside === "above"
-    ? { text: `Above usual today: ${numbers}`, tone: "bad" }
-    : { text: `Below usual today: ${numbers}`, tone: "good" };
-}
-
-/** The days a before or since window covers: "2 Nov to 4 Nov", or "on 4 Nov" for a single day. */
-function span(from: Day, to: Day, day: Day): string {
-  return from === to ? `on ${dayLabel(from, day)}` : `${dayLabel(from, day)} to ${dayLabel(to, day)}`;
-}
-
-/** The last day of the before window: the day before the latest rule change. */
-const beforeEnds = (rule: { day: Day }) => format(subDays(parseISO(rule.day), 1), "yyyy-MM-dd");
-
-/** The windows the before and since rates cover: "14 tasks 2 Nov to 4 Nov · 82 since 5 Nov". */
-export function ruleTasks(mistake: Mistake, day: Day): string {
-  if (!mistake.rule) return "";
-  const before = mistake.before
-    ? `${plural(mistake.before.tasks, "task")} ${span(mistake.before.from, beforeEnds(mistake.rule), day)}`
-    : "No tasks before the rule";
-  return `${before} · ${mistake.after?.tasks ?? 0} since ${dayLabel(mistake.rule.day, day)}`;
+/**
+ * The label over a day's marker on the history chart: "Rule changed 8 Nov" (a rule change wins a shared day), or
+ * "Trial began 6 Nov". Null for a rule change that only opens the compared window, as its shaded band shows that.
+ */
+export function markerLabel(changes: MistakeChange[], mistake: Mistake, day: Day): string | null {
+  const when = dayLabel(changes[0].day, day);
+  const rule = changes.some((c) => c.kind === "rule");
+  if (rule && changes[0].day === mistake.before?.from && changes[0].day !== mistake.rule?.day) return null;
+  return rule ? `Rule changed ${when}` : `Trial began ${when}`;
 }
 
 /**
  * How few tasks a mistake's before and since rates rest on ("only 7 tasks before and 3 since the rule"), or null when
- * both sides have enough. The windows' dates are in the task line already.
+ * both sides have enough.
  */
 export function fewTasksNote(mistake: Mistake): string | null {
   return fewTasks([
     { tasks: mistake.before?.tasks, label: "before" },
     { tasks: mistake.after?.tasks, label: "since the rule" },
   ]);
-}
-
-/** A mistake with no rule: its rate now and what it rests on. */
-export function currentWords(mistake: Mistake, day: Day): { rate: string; tasks: string } | null {
-  if (mistake.current === null) return null;
-  return {
-    rate: `${percent(mistake.current.rate)} now`,
-    tasks: `${plural(mistake.current.tasks, "task")} since ${dayLabel(mistake.current.from, day)}`,
-  };
 }
 
 export const NO_RECENT_TASKS = "No tasks in the last 4 weeks";
@@ -148,14 +117,4 @@ export function scoreWords(mistake: Mistake): ChangeWords {
   if (words.hasRange) return words;
   const enough = Math.min(mistake.before?.tasks ?? 0, mistake.after?.tasks ?? 0) >= FEWEST_TASKS;
   return { ...words, lead: mistake.change === null && enough ? "Nothing to compare" : "Too few tasks" };
-}
-
-/**
- * The change line of a mistake's detail, read without hovering: "89% fewer than before the rule" in its colour, then
- * the range ("likely 57% to 100% fewer"); "Unclear" with its range; or why there is no change.
- */
-export function detailChange(mistake: Mistake): { tone: Tone; lead: string; rest: string | null } {
-  const words = changeWords(mistake.change, "plain", missingMistakeChange(mistake));
-  const lead = words.hasRange && words.tone !== "unclear" ? `${words.lead} than before the rule` : words.lead;
-  return { tone: words.tone, lead, rest: words.hint };
 }

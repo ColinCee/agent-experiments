@@ -2,10 +2,8 @@ import { describe, expect, test } from "vitest";
 import type { Trial } from "@/data/report";
 import {
   missingTrialChange,
-  neededWords,
   sortTrials,
   taskScale,
-  tasksNote,
   trendRows,
   trialBadge,
   trialDay,
@@ -68,36 +66,10 @@ test("verdicts read as plain words, never the word effect", () => {
   expect(verdictWords(null)).toBe("Too early");
 });
 
-describe("tasksNote", () => {
-  test("warns when a week brings fewer tasks than needed", () => {
-    expect(tasksNote(trial({ per_week: 23 }))).toBe(
-      "A week usually brings about 23 per half, so this trial may end unclear.",
-    );
-  });
-
-  test("says nothing when a week brings enough, or the trial is over", () => {
-    expect(tasksNote(trial({ per_week: 90 }))).toBeNull();
-    expect(tasksNote(trial({ per_week: 23, state: "finished" }))).toBeNull();
-  });
-
-  test("a trial needing over the most the report counts is always short", () => {
-    expect(tasksNote(trial({ per_week: 300, needed: null }))).toContain("may end unclear");
-  });
-
-  test("a scheduled trial says it has no tasks yet, without repeating its start", () => {
-    expect(tasksNote(trial({ state: "scheduled", tasks_with: 0, tasks_without: 0 }))).toBe("No tasks yet.");
-    expect(tasksNote(trial({ state: "scheduled", per_week: 23 }))).toBe(
-      "No tasks yet. A week usually brings about 23 per half, so this trial may end unclear.",
-    );
-  });
-});
-
 test("the task bars span the tasks needed, or the tasks done when more", () => {
   expect(taskScale(trial({ needed: 70, tasks_with: 14 }))).toBe(70);
   expect(taskScale(trial({ needed: 70, tasks_with: 95 }))).toBe(95);
   expect(taskScale(trial({ needed: null }))).toBe(320);
-  expect(neededWords(trial({ needed: 70 }))).toBe("about 70 needed");
-  expect(neededWords(trial({ needed: null }))).toBe("over 320 needed");
 });
 
 test("trials sort running, then scheduled soonest first, then finished latest first", () => {

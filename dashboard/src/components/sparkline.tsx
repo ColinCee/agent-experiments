@@ -1,5 +1,5 @@
-import type { Day, Sizes } from "@/data/report";
-import { dayLabel, number } from "@/lib/format";
+import type { Sizes } from "@/data/report";
+import { number } from "@/lib/format";
 import { sparkPoints } from "@/lib/sizes";
 import { LABEL_GUTTER } from "./rate-pair";
 
@@ -8,17 +8,17 @@ const HEIGHT = 20;
 
 /**
  * Words over time in one line, on its own scale from 0: no shared axis with the rate tracks, but the same inset, so it
- * sits in their column. The first day is written in the left gutter and the words now in the right one.
+ * sits in their column. The first day's words are written in the left gutter and the latest in the right one.
  */
-export function Sparkline({ points, day }: { points: Sizes["series"][number]["points"]; day: Day }) {
+export function Sparkline({ points }: { points: Sizes["series"][number]["points"] }) {
   const first = points[0];
   const last = points.at(-1);
   if (!first || !last) return null;
   return (
     <div className={LABEL_GUTTER}>
       <div data-spark className="relative h-5">
-        <span className="absolute top-1/2 right-full mr-1.5 -translate-y-1/2 text-xs whitespace-nowrap text-muted-foreground">
-          {dayLabel(first.day, day)}
+        <span className="absolute top-1/2 right-full mr-1.5 -translate-y-1/2 text-[13px] whitespace-nowrap text-muted-foreground">
+          {number(first.words)}
         </span>
         <svg
           viewBox={`0 0 ${WIDTH} ${HEIGHT}`}

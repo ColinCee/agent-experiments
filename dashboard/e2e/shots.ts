@@ -16,6 +16,23 @@ await mkdir(outDir, { recursive: true });
 
 const KINDS = ["trial", "permanent", "mistake", "replay", "size"];
 
+/** Every state of every kind of row in the fixture, by name and row. */
+const FIXTURE_STATES = [
+  ["trial-scheduled", '[data-row="trial-screenshots-sent-without-a-link"]'],
+  ["trial-running", '[data-row="trial-config-read-from-memory"]'],
+  ["trial-finished", '[data-row="trial-tests-skipped-before-a-commit"]'],
+  ["permanent-working", '[data-row="permanent-replies-with-no-summary-line"]'],
+  ["permanent-slipping", '[data-row="permanent-drafts-saved-in-the-wrong-folder"]'],
+  ["permanent-waiting", '[data-row="permanent-branch-pushed-without-a-pull-request"]'],
+  ["mistake-sure", '[data-row="mistake-replies-with-no-summary-line"]'],
+  ["mistake-unclear", '[data-row="mistake-questions-asked-that-the-notes-answer"]'],
+  ["mistake-no-rule", '[data-row="mistake-old-branches-left-open"]'],
+  ["replay-trusted", '[data-row="replay-replies-with-no-summary-line"]'],
+  ["replay-untrusted", '[data-row="replay-ports-taken-without-checking"]'],
+  ["size-rules", '[data-row="size-rules"]'],
+  ["size-skills", '[data-row="size-skills"]'],
+] as const;
+
 async function save(page: Page, name: string, whole: boolean) {
   const file = fileURLToPath(new URL(`${source}-${name}.png`, outDir));
   if (whole) {
@@ -42,13 +59,17 @@ try {
     const opened = await openBuilt(page, report);
     await save(page, `page-${width}-${colorScheme}`, true);
     if (width === "desktop" && colorScheme === "light") {
-      for (const kind of KINDS) {
-        const row = page.locator(`[data-row^="${kind}-"]`).first();
+      // The fixture shoots every state of every kind; a real report, the first row of each kind.
+      const picks =
+        report === undefined ? FIXTURE_STATES : KINDS.map((kind) => [kind, `[data-row^="${kind}-"]`] as const);
+      for (const [name, selector] of picks) {
+        const row = page.locator(selector).first();
         if ((await row.count()) === 0) continue;
-        await row.click();
-        await page.locator(`[data-detail^="${kind}-"]`).waitFor();
-        await page.evaluate(() => window.scrollTo(0, 0));
-        await save(page, `panel-${kind}-${width}-${colorScheme}`, false);
+        await row.locator("[data-name]").click();
+        await page.locator("[data-detail]").waitFor();
+        // Scrolled so the picked row and the panel are both in view.
+        await row.evaluate((el) => el.scrollIntoView({ block: "center" }));
+        await save(page, `panel-${name}-${width}-${colorScheme}`, false);
       }
     }
     if (width === "phone") {

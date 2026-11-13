@@ -69,7 +69,8 @@ export function Dashboard({ report }: { report: Report }) {
           aria-label="Picked row"
           className="sticky top-4 max-h-[calc(100svh-2rem)] self-start overflow-y-auto border-l pl-6"
         >
-          <Detail row={picked} report={report} />
+          {/* Keyed by row, so a chart's hover state never carries over to the next row picked. */}
+          <Detail key={picked.id} row={picked} report={report} />
         </aside>
       </div>
     );
@@ -85,7 +86,7 @@ export function Dashboard({ report }: { report: Report }) {
           finalFocus={() => rowElement(lastPicked.current)}
         >
           <SheetTitle className="sr-only">{shown?.name ?? "Detail"}</SheetTitle>
-          {shown && <Detail row={shown} report={report} />}
+          {shown && <Detail key={shown.id} row={shown} report={report} />}
         </SheetContent>
       </Sheet>
     </>

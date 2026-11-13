@@ -2,19 +2,15 @@ import { expect, test } from "vitest";
 import type { Mistake, Range } from "@/data/report";
 import {
   changesByDay,
-  currentWords,
-  detailChange,
   fewTasksNote,
   historyBands,
   historyRows,
+  markerLabel,
   markerWords,
   missingMistakeChange,
-  ruleSince,
-  ruleTasks,
   scoreWords,
   slug,
   sortByChange,
-  todayChip,
 } from "./mistakes";
 
 const mistake = (over: Partial<Mistake>): Mistake => ({
@@ -44,55 +40,10 @@ test("rules sort clearly fewer (largest first), then unclear, then clearly more"
   expect(sorted.map((m) => m.name)).toEqual(["much fewer", "a bit fewer", "unclear", "few tasks", "more"]);
 });
 
-test("under the chart only the latest rule is named; a marker names a rule or a trial's start", () => {
-  const m = mistake({ rule: { day: "2026-11-08", what: "Do it right" } });
-  expect(ruleSince(m, "2026-11-12")).toBe("Rule since 8 Nov: Do it right");
-  expect(ruleSince(mistake({ rule: null }), "2026-11-12")).toBeNull();
-  expect(markerWords({ day: "2026-10-01", what: "Do it", kind: "rule" }, "2026-11-12")).toBe(
-    "Rule changed 1 Oct: Do it",
-  );
-  expect(markerWords({ day: "2026-11-09", what: "A trial", kind: "trial" }, "2026-11-12")).toBe("Trial started 9 Nov");
-});
-
-test("the today chip shows only outside the usual range", () => {
-  const today = (outside: "above" | "below" | null) => ({ rate: 0.2, usual_low: 0.1, usual_high: 0.3, outside });
-  expect(todayChip(mistake({ today: today("above") }))).toEqual({
-    text: "Above usual today: 20%, usually 10% to 30%",
-    tone: "bad",
-  });
-  expect(todayChip(mistake({ today: today("below") }))).toEqual({
-    text: "Below usual today: 20%, usually 10% to 30%",
-    tone: "good",
-  });
-  expect(todayChip(mistake({ today: today(null) }))).toBeNull();
-  expect(todayChip(mistake({ today: null }))).toBeNull();
-});
-
-test("the task line names the windows the before and since rates cover", () => {
-  const side = { rate: 0.1, low: null, high: null, tasks: 14, from: "2026-11-02" };
-  const rule = { day: "2026-11-05", what: "Do it" };
-  expect(ruleTasks(mistake({ rule, before: side, after: { ...side, tasks: 82 } }), "2026-11-12")).toBe(
-    "14 tasks 2 Nov to 4 Nov · 82 since 5 Nov",
-  );
-  expect(ruleTasks(mistake({ rule, before: { ...side, tasks: 1, from: "2026-11-04" } }), "2026-11-12")).toBe(
-    "1 task on 4 Nov · 0 since 5 Nov",
-  );
-  expect(ruleTasks(mistake({ rule, after: side }), "2026-11-12")).toBe("No tasks before the rule · 14 since 5 Nov");
-});
-
 test("a mistake's small samples are said once, and nothing when both sides have enough", () => {
   const side = (tasks: number) => ({ rate: 0.1, low: null, high: null, tasks, from: "2026-11-02" });
   expect(fewTasksNote(mistake({ before: side(7), after: side(3) }))).toBe("only 7 tasks before and 3 since the rule");
   expect(fewTasksNote(mistake({ before: side(40), after: side(30) }))).toBeNull();
-});
-
-test("a mistake with no rule reads its rate now and since when", () => {
-  const current = { rate: 0.33, low: 0.25, high: 0.41, tasks: 96, from: "2026-10-27" };
-  expect(currentWords(mistake({ rule: null, current }), "2026-11-12")).toEqual({
-    rate: "33% now",
-    tasks: "96 tasks since 27 Oct",
-  });
-  expect(currentWords(mistake({ rule: null }), "2026-11-12")).toBeNull();
 });
 
 test("history rows are earlier history, the before window, then since the rule, sharing boundary days", () => {
@@ -173,24 +124,28 @@ test("history bands shade the before window grey and since the rule blue, held i
   ]);
 });
 
-test("the scorecard says the change in short words, and the detail says it against before the rule with its range", () => {
+test("the scorecard says the change in short words, or a short reason", () => {
   const side = (tasks: number) => ({ rate: 0.1, low: null, high: null, tasks, from: "2026-10-01" });
   const m = (change: Mistake["change"], before = 30, after = 30) =>
     mistake({ change, before: side(before), after: side(after) });
   expect(scoreWords(m({ value: -0.79, low: -0.9, high: -0.6 }))).toMatchObject({ lead: "79% fewer", tone: "good" });
-  expect(detailChange(m({ value: -0.79, low: -0.9, high: -0.6 }))).toEqual({
-    tone: "good",
-    lead: "79% fewer than before the rule",
-    rest: "likely 60% to 90% fewer",
-  });
-  expect(detailChange(m({ value: 0.52, low: 0.1, high: 1 })).lead).toBe("52% more than before the rule");
-  expect(detailChange(m({ value: 0.1, low: -0.3, high: 0.5 }))).toEqual({
-    tone: "unclear",
-    lead: "Unclear",
-    rest: "30% fewer to 50% more",
-  });
   expect(scoreWords(m(null)).lead).toBe("Nothing to compare");
-  expect(detailChange(m(null)).lead).toBe("No mistakes before the rule, so nothing to compare");
   expect(scoreWords(m(null, 3, 30)).lead).toBe("Too few tasks");
   expect(scoreWords(m({ value: -0.4, low: null, high: null })).lead).toBe("Too few tasks");
+});
+
+test("a marker's tip names what changed; its label says what it is, and a window's opening rule has none", () => {
+  expect(markerWords({ day: "2026-10-01", what: "Do it", kind: "rule" }, "2026-11-12")).toBe(
+    "Rule changed 1 Oct: Do it",
+  );
+  expect(markerWords({ day: "2026-11-09", what: "A trial", kind: "trial" }, "2026-11-12")).toBe("Trial began 9 Nov");
+  const before = { rate: 0.3, low: null, high: null, tasks: 20, from: "2026-11-02" };
+  const m = mistake({ rule: { day: "2026-11-08", what: "Do it right" }, before });
+  const rule = (day: string) => ({ day, what: "x", kind: "rule" as const });
+  const trial = (day: string) => ({ day, what: "x", kind: "trial" as const });
+  expect(markerLabel([rule("2026-11-08")], m, "2026-11-12")).toBe("Rule changed 8 Nov");
+  expect(markerLabel([trial("2026-11-06")], m, "2026-11-12")).toBe("Trial began 6 Nov");
+  expect(markerLabel([trial("2026-11-08"), rule("2026-11-08")], m, "2026-11-12")).toBe("Rule changed 8 Nov");
+  expect(markerLabel([rule("2026-11-02")], m, "2026-11-12")).toBeNull();
+  expect(markerLabel([trial("2026-11-02")], m, "2026-11-12")).toBe("Trial began 2 Nov");
 });

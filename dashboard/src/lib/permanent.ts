@@ -40,9 +40,6 @@ export function permanentSummary(checks: PermanentCheck[], day: Day): string {
   return `Proven rules, each left off for 1 task in 10${when}`;
 }
 
-/** What slipping means, said once in a slipping rule's detail. */
-export const SLIPPING_LINE = "Slipping: the rule can no longer be shown to cut this mistake by 30% or more.";
-
 /** The reason in a proven rule's row where no strip is drawn: as in its detail, but short where the status says the rest. */
 export function permanentRowNote(check: PermanentCheck): string | null {
   return permanentStatus(check) === "nothing" ? "No mistakes without the rule" : permanentNote(check);

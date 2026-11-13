@@ -117,3 +117,29 @@ export function ChangeStrip({
     </div>
   );
 }
+
+/**
+ * A strip with its captions and, under it, one muted line of words (its range, or how it reads): the form a change
+ * takes in the detail panel, where the answer is already said above it.
+ */
+export function RangeStrip({
+  change,
+  tone,
+  same,
+  words,
+}: {
+  change: Range | null;
+  tone: Tone;
+  same: string;
+  words: string | null;
+}) {
+  return (
+    <div className="max-w-sm space-y-1">
+      <div className="pr-2.5">
+        <StripAxis same={same} />
+        <ChangeMarks change={change} tone={tone} />
+      </div>
+      {words && <p className="text-sm text-muted-foreground">{words}</p>}
+    </div>
+  );
+}

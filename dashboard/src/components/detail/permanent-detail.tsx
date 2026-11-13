@@ -1,34 +1,40 @@
-import { ChangeStrip } from "@/components/change-strip";
-import { StatusBadge } from "@/components/status-badge";
+import { RangeStrip } from "@/components/change-strip";
+import { Empty } from "@/components/section";
 import type { Day, PermanentCheck } from "@/data/report";
-import { dayLabel, number } from "@/lib/format";
-import { permanentNote, permanentStatus, SLIPPING_LINE, STATUS_TONE, STATUS_WORDS } from "@/lib/permanent";
+import { changeWords } from "@/lib/change";
+import { PERMANENT_LINE, permanentFacts, permanentHeadline } from "@/lib/details";
+import { permanentNote } from "@/lib/permanent";
+import { DetailLayout } from "./detail-layout";
 
-/** A proven rule in full: since when it is checked and on which model, its tasks, and the change it still makes. */
+/** A proven rule in full: whether it still earns its place, the change it still makes, and its counts. */
 export function PermanentDetail({ check, day }: { check: PermanentCheck; day: Day }) {
-  const status = permanentStatus(check);
   const note = permanentNote(check);
+  const words = changeWords(check.change, check.slipping ? "slipping" : "plain");
   return (
-    <div className="space-y-5">
-      <div className="space-y-2">
-        <h3 className="text-lg leading-snug font-medium">{check.name}</h3>
-        <StatusBadge tone={STATUS_TONE[status]}>{STATUS_WORDS[status]}</StatusBadge>
-      </div>
-      <div className="space-y-1 text-sm text-muted-foreground">
-        <p>
-          Checked since {dayLabel(check.since, day)}
-          {check.model && ` on ${check.model}`}
-        </p>
-        <p>
-          {number(check.tasks_without)} tasks without the rule · {number(check.tasks_with)} with it
-        </p>
-      </div>
-      {note === null ? (
-        <ChangeStrip change={check.change} same="same as without" mode={check.slipping ? "slipping" : "plain"} />
-      ) : (
-        <p className="text-muted-foreground">{note}</p>
-      )}
-      {check.slipping && <p className="text-sm">{SLIPPING_LINE}</p>}
-    </div>
+    <DetailLayout
+      kind="Proven rule"
+      title={check.name}
+      headline={permanentHeadline(check)}
+      line={PERMANENT_LINE}
+      blocks={[
+        {
+          caption: "Mistakes with the rule, against without it",
+          node:
+            note === null ? (
+              <RangeStrip
+                change={check.change}
+                tone={words.tone}
+                same="same as without"
+                words={words.hint ? `${words.lead} · ${words.hint}` : words.lead}
+              />
+            ) : (
+              <Empty className="text-sm">
+                {check.tasks_without === 0 ? "No task has run without the rule yet" : note}
+              </Empty>
+            ),
+        },
+      ]}
+      facts={permanentFacts(check, day)}
+    />
   );
 }

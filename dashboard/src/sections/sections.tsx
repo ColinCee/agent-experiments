@@ -187,14 +187,14 @@ export function Sections({ report, rows, picking }: { report: Report; rows: Row[
         id="size"
         title="Rule size"
         heads={{ name: "Files", result: "Added" }}
-        legend={<SparkHeader title="words over time" />}
+        legend={<SparkHeader title="words, first day → latest" />}
         rows={inSection(rows, "size")}
         empty="No rule or skill files measured yet"
         picking={picking}
         cells={(row) => {
           if (row.kind !== "size") return { chart: null, result: null };
           return {
-            chart: <Sparkline points={row.series.points} day={day} />,
+            chart: <Sparkline points={row.series.points} />,
             result: <Result tone="waiting">{wordsAdded(row.series)}</Result>,
           };
         }}

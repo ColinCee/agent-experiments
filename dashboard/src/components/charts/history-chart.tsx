@@ -1,18 +1,16 @@
-import { FlaskConical } from "lucide-react";
 import { useState } from "react";
 import { CartesianGrid, Line, LineChart, usePlotArea, useXAxisScale, XAxis, YAxis } from "recharts";
 import { ChartContainer, ChartTooltip } from "@/components/ui/chart";
 import type { Day, Mistake, MistakeChange } from "@/data/report";
 import { layoutLabels, rateCeiling, rateTicks } from "@/lib/charts";
 import { dayLabel, percent } from "@/lib/format";
-import { changesByDay, historyBands, historyRows, markerWords } from "@/lib/mistakes";
+import { changesByDay, historyBands, historyRows, markerLabel, markerWords } from "@/lib/mistakes";
 import { cn } from "@/lib/utils";
 import { textWidth } from "../measure";
 import { ChartTip } from "./chart-tip";
 import { PointMark } from "./marks";
 
 const LABEL_FONT = 12;
-const ICON = 12;
 const ROW_HEIGHT = 16;
 
 /**
@@ -38,11 +36,13 @@ export interface Picked {
  */
 function Markers({
   changes,
+  mistake,
   day,
   picked,
   onPick,
 }: {
   changes: MistakeChange[];
+  mistake: Mistake;
   day: Day;
   picked: Day | null;
   onPick: (picked: Picked | null) => void;
@@ -55,11 +55,15 @@ function Markers({
     if (x === undefined) return [];
     // A day with a rule change is drawn as a rule change; only a day of trial starts alone gets the trial style.
     const trial = group.changes.every((c) => c.kind === "trial");
-    const label = dayLabel(group.day, day);
-    const width = textWidth(label, LABEL_FONT) + (trial ? ICON + 2 : 0);
-    return [{ group, trial, x, label, width }];
+    const label = markerLabel(group.changes, mistake, day);
+    return [{ group, trial, x, label, width: label ? textWidth(label, LABEL_FONT) : 0 }];
   });
-  const slots = layoutLabels(marks, plot.x, plot.x + plot.width);
+  // Only labelled markers take part in the layout: an unlabelled one is a line under the shaded band's edge.
+  const labelled = marks.filter((m) => m.label !== null);
+  const placed = layoutLabels(labelled, plot.x, plot.x + plot.width);
+  const slots = marks.map((m) =>
+    m.label === null ? { row: null, anchor: "middle" as const } : placed[labelled.indexOf(m)],
+  );
   const third = plot.width / 3;
   return (
     <g>
@@ -101,22 +105,15 @@ function Markers({
             />
             {/* A wide invisible line, so the marker is easy to hover and tap. */}
             <line x1={x} x2={x} y1={plot.y - 30} y2={plot.y + plot.height} stroke="transparent" strokeWidth={16} />
-            {row !== null && (
-              <g data-marker-label className={trial ? "fill-muted-foreground" : "fill-foreground"}>
-                {trial && (
-                  <FlaskConical
-                    x={from}
-                    y={y - ICON + 2}
-                    width={ICON}
-                    height={ICON}
-                    className="stroke-muted-foreground"
-                    fill="none"
-                  />
-                )}
-                <text x={trial ? from + ICON + 2 : from} y={y} className="text-xs">
-                  {label}
-                </text>
-              </g>
+            {row !== null && label && (
+              <text
+                data-marker-label
+                x={from}
+                y={y}
+                className={cn("text-xs", trial ? "fill-muted-foreground" : "fill-foreground")}
+              >
+                {label}
+              </text>
             )}
           </g>
         );
@@ -239,7 +236,13 @@ export function HistoryChart({ mistake, day }: { mistake: Mistake; day: Day }) {
               activeDot={{ r: 4 }}
             />
           ))}
-          <Markers changes={mistake.changes} day={day} picked={picked?.day ?? null} onPick={setPicked} />
+          <Markers
+            changes={mistake.changes}
+            mistake={mistake}
+            day={day}
+            picked={picked?.day ?? null}
+            onPick={setPicked}
+          />
         </LineChart>
       </ChartContainer>
       {picked && <MarkerTip picked={picked} day={day} />}
