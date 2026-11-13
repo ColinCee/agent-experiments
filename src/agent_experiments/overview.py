@@ -10,8 +10,7 @@ from pathlib import Path
 
 import numpy as np
 
-# The dashboard's own script holds the bare placeholder too, to tell whether a report was put in, so only the one
-# closing its data tag is replaced.
+# Matched with the tag's end, so the placeholder written anywhere else in the bundle's script is left alone.
 SLOT = ">__REPORT__</script>"
 
 

@@ -3,12 +3,14 @@ import math
 import re
 from pathlib import Path
 
+import duckdb
 import numpy as np
 import pytest
 from test_counting import reply, stamp, typed, write
 
 from agent_experiments import cli, overview
 from agent_experiments.cli import main
+from agent_experiments.counting import SCHEMA
 
 # Two measures on reply text: one a rule changed for, one no rule covers. A name with `</script><!--` in it must not
 # end the page's data early.
@@ -19,7 +21,7 @@ CREATE TEMP TABLE measure_names AS
 SELECT * FROM (VALUES ('bad-word', 'Bad words'), ('long-reply', 'Long </script><!-- replies')) t(measure, name);
 CREATE TEMP TABLE changes AS SELECT * FROM (VALUES ('bad-word', '2026-01-02', 'rule added')) t(measure, "day", what);
 """
-# The dashboard's script checks for the bare placeholder too, which must stay as it is.
+# The placeholder anywhere but the report's tag must stay as it is.
 TEMPLATE = (
     '<html><script>const empty = "__REPORT__"</script>'
     '<script id="report" type="application/json">__REPORT__</script></html>'
@@ -99,6 +101,32 @@ def test_daily_writes_the_report_and_puts_it_in_the_page(tmp_path: Path, capsys)
     assert 'const empty = "__REPORT__"' in html
     data = re.search(r'<script id="report" type="application/json">(.*?)</script>', html, re.DOTALL)
     assert data and json.loads(data.group(1))["mistakes"] == report["mistakes"]
+
+
+def test_the_last_look_finishes_a_trial_and_replays_and_sizes_are_reported(tmp_path: Path):
+    with duckdb.connect(str(tmp_path / "x.duckdb")) as con:
+        con.execute(SCHEMA)
+        # A replay that missed far less often than the real agents did: its drop stands for nothing.
+        con.execute(
+            "INSERT INTO replays VALUES ('r', 'bad-word', '2026-01-07', 'old', 9, 8, 5, .4, .2, .5, .2, .8, .01, .3, .1, 'replay can''t test this')"
+        )
+        con.execute("""INSERT INTO sizes VALUES (1, 'a', '2025-12-01', 'home/*.md', 'home/a.md', 100, 10, 0),
+                       (2, 'b', '2026-01-05', 'home/*.md', 'home/a.md', 120, 20, 0)""")
+
+    assert daily(tmp_path, "2026-01-08") == 1
+
+    report = json.loads((tmp_path / "report.json").read_text(encoding="utf-8"))
+    (trial,) = [t for t in report["trials"] if t["started"] == "2026-01-01"]
+    assert (trial["state"], trial["verdict"]) == ("finished", "can't tell")
+    assert trial["looks"] == [
+        {"look": 3, "day": "2026-01-08", "verdict": "can't tell", "tasks_with": 1, "tasks_without": 1}
+    ]
+    (r,) = report["replays"]
+    assert (r["name"], r["trusted"], r["real_rate"], r["replay_rate"]) == ("Bad words", False, 0.3, 0.1)
+    assert r["change"] == pytest.approx({"value": -0.5, "low": -0.8, "high": -0.2})
+    (series,) = report["sizes"]["series"]
+    assert (series["label"], series["now"], series["change"]) == ("Rules", 120, pytest.approx(0.2))
+    assert report["sizes"]["largest"] == [{"file": "home/a.md", "words": 120}]
 
 
 def test_a_change_below_zero_is_fewer_misses_with_its_range_around_it():

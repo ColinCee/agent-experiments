@@ -71,7 +71,7 @@ A continued session copies its parent's entries; each counts once, for the root 
 
 `daily` writes `report.json`, the facts the page shows (its shape: [`report.ts`](../dashboard/src/data/report.ts)), and beside it `overview.html`: the dashboard built from `dashboard/` into [`dashboard.html`](../src/agent_experiments/dashboard.html), with the report put in its `<script id="report">` by [`overview.py`](../src/agent_experiments/overview.py). Neither replaces the last one until both are ready, so a failed run leaves yesterday's page. A change there is `with / without - 1` (or `after / before - 1`), the drop's opposite, so below 0 is fewer misses.
 
-- **Trials.** Per trial and measure: tasks and miss rate in each half, the change with its 90% range, tasks needed, looks, and each half's rate over 3 days since the start. The last look is 7 days after `started`.
+- **Trials.** Per trial and measure: each half's tasks and miss rate, the change with its 90% range, tasks needed (Method), its looks, and each half's rate over 3 days since the start.
 - **Permanent checks.** Each settled rule against its holdout (Looks).
 - **Mistakes.** Each measure's latest day against its usual range, its rate over 3 days for 6 weeks with each day a rule for it changed (`changes`, and each trial's start), and its misses before and after the latest change, or over the last 28 days with no rule. Before and after is not a test: whatever else changed that day moves it too, which a trial's random halves rule out.
 - **Replays**, with whether the replay passed its check, and **rule and skill size**: words over time, largest files, and per month and pattern the share of changes deleting no line and of changed lines added.
