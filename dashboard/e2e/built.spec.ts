@@ -289,3 +289,22 @@ test("the data's date shows once: in the sidebar on a computer, in the header on
     await expect(page.getByText("Data up to 12 Nov", { exact: true }).filter({ visible: true })).toHaveCount(1);
   }
 });
+
+test("a scorecard row's range shows in its strip's tip: on hover with a mouse, on a tap without leaving the page", async ({
+  browser,
+}) => {
+  const row = (page: import("@playwright/test").Page) =>
+    page.locator('[data-table="rules"] a', { hasText: "Branch pushed without a pull request" });
+  const desktop = await browser.newPage({ viewport: widths.desktop });
+  await openBuilt(desktop);
+  await row(desktop).locator('[data-track="change"]').hover();
+  await expect(row(desktop).locator("[data-strip-tip]")).toHaveText("likely 47% to 82% fewer");
+  await desktop.close();
+  const context = await browser.newContext({ viewport: widths.phone, hasTouch: true });
+  const phone = await context.newPage();
+  await openBuilt(phone);
+  await row(phone).locator('[data-track="change"]').tap();
+  await expect(row(phone).locator("[data-strip-tip]")).toHaveText("likely 47% to 82% fewer");
+  await expect(phone.locator("header h1")).toHaveText("Overview");
+  await context.close();
+});

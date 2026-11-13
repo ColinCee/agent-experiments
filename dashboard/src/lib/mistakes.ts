@@ -1,6 +1,6 @@
 import { differenceInCalendarDays, format, parseISO, subDays } from "date-fns";
 import type { Day, Mistake, MistakeChange } from "@/data/report";
-import { changeTone, missingChange, type Tone } from "./change";
+import { type ChangeWords, changeTone, changeWords, FEWEST_TASKS, missingChange, type Tone } from "./change";
 import { dayLabel, fewTasks, percent, plural } from "./format";
 
 export function slug(name: string): string {
@@ -153,4 +153,16 @@ export function historyBands(mistake: Mistake): { kind: "before" | "after"; from
   if (from !== undefined && end >= first) bands.push({ kind: "before", from: notBefore(from, first), to: end });
   if (ruleDay !== undefined) bands.push({ kind: "after", from: notBefore(ruleDay, first), to: last });
   return bands;
+}
+
+/**
+ * A mistake's result in the overview's scorecard: short words for the row (the bold lead, or a two-word reason when
+ * there is no change) and the longer sentence its strip shows on hover or tap; `tip` is null when the row says it all.
+ */
+export function scoreWords(mistake: Mistake): ChangeWords & { tip: string | null } {
+  const words = changeWords(mistake.change, "plain", missingMistakeChange(mistake));
+  if (words.hasRange) return { ...words, tip: words.hint };
+  const enough = Math.min(mistake.before?.tasks ?? 0, mistake.after?.tasks ?? 0) >= FEWEST_TASKS;
+  const nothing = mistake.change === null && enough;
+  return { ...words, lead: nothing ? "Nothing to compare" : "Too few tasks", tip: nothing ? words.lead : null };
 }

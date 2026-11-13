@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { type ReactNode, useRef, useState } from "react";
 import type { Range } from "@/data/report";
 import { type ChangeMode, type ChangeWords, changeWords, isClipped, stripPosition, type Tone } from "@/lib/change";
 import { cn } from "@/lib/utils";
@@ -9,7 +9,7 @@ const LEAD: Record<Tone, string> = { good: "text-good", bad: "text-bad", unclear
 const at = (change: number) => `${stripPosition(change) * 100}%`;
 
 /** Captions over a strip: where fewer and more mistakes lie. */
-function StripAxis() {
+export function StripAxis() {
   return (
     <div data-axis className="relative mx-1.5 h-4 text-xs leading-4 text-muted-foreground">
       <span className="absolute left-0">fewer mistakes</span>
@@ -75,6 +75,44 @@ function Words({ words, inline = false }: { words: ChangeWords; inline?: boolean
       <span className={cn("font-semibold", LEAD[words.tone])}>{words.lead}</span>
       {words.hint && (
         <span className={cn("text-sm text-muted-foreground", inline ? "ml-2" : "block")}>{words.hint}</span>
+      )}
+    </div>
+  );
+}
+
+/**
+ * A strip whose longer words (`tip`) show on hover with a mouse or on a tap. A tap on the strip opens the tip instead of
+ * following the row's link; a mouse click still follows it.
+ */
+export function ChangeMarks({ change, tone, tip }: { change: Range | null; tone: Tone; tip: string | null }) {
+  const [open, setOpen] = useState(false);
+  const touch = useRef(false);
+  return (
+    // biome-ignore lint/a11y/noStaticElementInteractions: the tip only repeats the range; the row's link stays the control.
+    // biome-ignore lint/a11y/useKeyWithClickEvents: the click only opens the tip after a tap; keyboards use the row's link.
+    <div
+      className="relative"
+      onPointerEnter={(e) => e.pointerType === "mouse" && setOpen(true)}
+      onPointerLeave={(e) => e.pointerType === "mouse" && setOpen(false)}
+      onPointerDown={(e) => {
+        touch.current = e.pointerType !== "mouse";
+      }}
+      onClick={(e) => {
+        if (!tip || !touch.current) return;
+        e.preventDefault();
+        e.stopPropagation();
+        setOpen((was) => !was);
+      }}
+    >
+      <Strip change={change} tone={tone} />
+      {open && tip && (
+        <div
+          data-strip-tip
+          role="tooltip"
+          className="absolute bottom-full left-1/2 z-10 mb-1 -translate-x-1/2 rounded-md border bg-popover px-2.5 py-1.5 text-xs whitespace-nowrap text-popover-foreground"
+        >
+          {tip}
+        </div>
       )}
     </div>
   );

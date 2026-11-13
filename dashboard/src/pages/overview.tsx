@@ -1,21 +1,13 @@
 import { ChevronRight, CircleCheck } from "lucide-react";
-import { ChangeStrip, StripAxisCell } from "@/components/change-strip";
-import { RateBar, RatePair, RateValue, type Side, Swatch } from "@/components/rate-pair";
-import { GridHeader, GridRow } from "@/components/rule-grid";
+import { ChangeMarks, StripAxis, StripAxisCell } from "@/components/change-strip";
+import { RateBar, RateValue, type Side } from "@/components/rate-pair";
+import { CELL, GridHeader, GridRow } from "@/components/rule-grid";
 import { Empty, Section } from "@/components/section";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Day, Mistake, Report, Trial } from "@/data/report";
 import { type AttentionItem, attentionItems, calmLine } from "@/lib/attention";
 import { percent, plural } from "@/lib/format";
-import {
-  missingMistakeChange,
-  NO_RECENT_TASKS,
-  overviewHint,
-  slug,
-  sortByChange,
-  withoutRule,
-  withRule,
-} from "@/lib/mistakes";
+import { NO_RECENT_TASKS, overviewHint, scoreWords, slug, sortByChange, withoutRule, withRule } from "@/lib/mistakes";
 import { permanentSummary, statusCounts } from "@/lib/permanent";
 import { sortTrials, trialSummary, verdictWords } from "@/lib/trials";
 import { cn } from "@/lib/utils";
@@ -115,18 +107,24 @@ function RunningNow({ report }: { report: Report }) {
   );
 }
 
-/** A rate in its column, labelled on phones where there is no header. */
-function RateCell({ rate, side, label }: { rate: number | null | undefined; side: Side; label: string }) {
+/** A rate as text in its side's colour, or a dash when that side had no tasks. */
+function Rate({ rate, side }: { rate: number | null | undefined; side: Side }) {
+  return rate == null ? (
+    <span className="text-muted-foreground">–</span>
+  ) : (
+    <RateValue rate={percent(rate)} side={side} className="font-medium" />
+  );
+}
+
+/** "31% → 6%", in fixed-width parts so the arrows of every row line up. */
+function BeforeSince({ mistake }: { mistake: Mistake }) {
   return (
-    <span className="mr-4 inline-block md:mr-0 md:text-right">
-      <span className="mr-1.5 text-sm text-muted-foreground md:hidden">
-        <Swatch side={side}>{label}</Swatch>
+    <span className="inline-grid grid-cols-[3rem_1.5rem_3rem] items-baseline">
+      <span className="text-right">
+        <Rate rate={mistake.before?.rate} side="without" />
       </span>
-      {rate == null ? (
-        <span className="text-sm text-muted-foreground">no tasks</span>
-      ) : (
-        <RateValue rate={percent(rate)} side={side} />
-      )}
+      <span className="text-center text-muted-foreground">→</span>
+      <Rate rate={mistake.after?.rate} side="with" />
     </span>
   );
 }
@@ -136,72 +134,76 @@ function HintLine({ mistake, day }: { mistake: Mistake; day: Day }) {
   return hint && <span className="block text-sm text-muted-foreground">{hint}</span>;
 }
 
+const LEAD = { good: "text-good", bad: "text-bad", unclear: "text-foreground" } as const;
+
+/** The overview's scorecard: one row per mistake with a rule, and one chart, the change, in each row. */
 function RulesTable({ mistakes, day }: { mistakes: Mistake[]; day: Day }) {
   const rows = sortByChange(withRule(mistakes));
   if (rows.length === 0) return <Empty>No rule has been tried on a mistake yet</Empty>;
   return (
-    <div data-table="rules" className="space-y-3 md:space-y-0">
+    <div data-table="rules" className="space-y-3 md:max-w-[880px] md:space-y-0">
       <GridHeader>
         <span>Mistake</span>
-        {/* Wider than their number columns; aligned to the end, they overflow leftwards into the gap. */}
-        <span className="flex justify-end whitespace-nowrap">
-          <Swatch side="without">Before rule</Swatch>
-        </span>
-        <span className="flex justify-end whitespace-nowrap">
-          <Swatch side="with">Since rule</Swatch>
-        </span>
-        <span />
+        <span className="text-right whitespace-nowrap">Before → since rule</span>
         <StripAxisCell />
-        <span>Change</span>
+        <span>Result</span>
       </GridHeader>
-      {rows.map((m, i) => (
-        <GridRow key={m.name} href={href("mistakes", slug(m.name))}>
-          <div>
-            <span className="block font-medium">{m.name}</span>
-            <HintLine mistake={m} day={day} />
-          </div>
-          <div className="md:contents">
-            <RateCell rate={m.before?.rate} side="without" label="Before rule" />
-            <RateCell rate={m.after?.rate} side="with" label="Since rule" />
-          </div>
-          <div className="pr-2.5">
-            <RatePair without={m.before?.rate ?? null} withRule={m.after?.rate ?? null} />
-          </div>
-          <ChangeStrip change={m.change} axis={i === 0} cells missing={missingMistakeChange(m)} />
-        </GridRow>
-      ))}
+      {rows.map((m) => {
+        const words = scoreWords(m);
+        return (
+          <GridRow key={m.name} href={href("mistakes", slug(m.name))}>
+            <div className={CELL.name}>
+              <span className="block font-medium">{m.name}</span>
+              <HintLine mistake={m} day={day} />
+            </div>
+            <div className={CELL.rates}>
+              <BeforeSince mistake={m} />
+            </div>
+            <div className={cn(CELL.chart, "space-y-1 pr-2.5")}>
+              <div className="md:hidden">
+                <StripAxis />
+              </div>
+              <ChangeMarks change={m.change} tone={words.tone} tip={words.tip} />
+            </div>
+            <span className={cn(CELL.result, "font-semibold", LEAD[words.tone])}>{words.lead}</span>
+          </GridRow>
+        );
+      })}
     </div>
   );
 }
 
+/** Mistakes with no rule, on the scorecard's columns so their bars line up with the strips above. */
 function NoRuleTable({ mistakes }: { mistakes: Mistake[] }) {
   const rows = withoutRule(mistakes);
   if (rows.length === 0) return <Empty>Every tracked mistake has a rule</Empty>;
   return (
-    <div data-table="no-rule" className="space-y-3 md:space-y-0">
+    <div data-table="no-rule" className="space-y-3 md:max-w-[880px] md:space-y-0">
       <GridHeader>
         <span>Mistake</span>
         <span className="text-right">Rate now</span>
         <span />
-        <span />
-        <span className="col-span-2">Tasks</span>
+        <span>Tasks</span>
       </GridHeader>
       {rows.map((m) => (
         <GridRow key={m.name} href={href("mistakes", slug(m.name))}>
-          <span className="block font-medium">{m.name}</span>
+          <span className={cn(CELL.name, "font-medium")}>{m.name}</span>
           {m.current ? (
             <>
-              <RateCell rate={m.current.rate} side="without" label="Rate now" />
-              <span className="hidden md:block" />
-              <div className="pr-2.5">
+              <span className={CELL.rates}>
+                <Rate rate={m.current.rate} side="without" />
+              </span>
+              <div className={cn(CELL.chart, "pr-2.5")}>
                 <RateBar rate={m.current.rate} />
               </div>
-              <span className="block text-sm text-muted-foreground md:col-span-2">
+              <span className={cn(CELL.result, "text-sm text-muted-foreground")}>
                 {plural(m.current.tasks, "task")}
               </span>
             </>
           ) : (
-            <span className="block text-sm text-muted-foreground md:col-span-5">{NO_RECENT_TASKS}</span>
+            <span className={cn(CELL.rates, "text-sm text-muted-foreground md:col-span-3 md:justify-self-start")}>
+              {NO_RECENT_TASKS}
+            </span>
           )}
         </GridRow>
       ))}

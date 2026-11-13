@@ -10,6 +10,7 @@ import {
   overviewHint,
   ruleSince,
   ruleTasks,
+  scoreWords,
   slug,
   sortByChange,
   todayChip,
@@ -176,4 +177,22 @@ test("history bands shade the before window grey and since the rule blue, held i
   expect(historyBands(mistake({ series, rule: null, current: side("2026-11-05") }))).toEqual([
     { kind: "before", from: "2026-11-05", to: "2026-11-12" },
   ]);
+});
+
+test("the scorecard keeps the bold words in the row and moves the range into the strip's tip", () => {
+  const side = (tasks: number) => ({ rate: 0.1, low: null, high: null, tasks, from: "2026-10-01" });
+  const scored = (change: Mistake["change"], before = 30, after = 30) =>
+    scoreWords(mistake({ change, before: side(before), after: side(after) }));
+  expect(scored({ value: -0.79, low: -0.9, high: -0.6 })).toMatchObject({
+    lead: "79% fewer",
+    tone: "good",
+    tip: "likely 60% to 90% fewer",
+  });
+  expect(scored({ value: 0.1, low: -0.3, high: 0.5 })).toMatchObject({ lead: "Unclear", tip: "30% fewer to 50% more" });
+  expect(scored(null)).toMatchObject({
+    lead: "Nothing to compare",
+    tip: "No mistakes before the rule, so nothing to compare",
+  });
+  expect(scored(null, 3, 30)).toMatchObject({ lead: "Too few tasks", tip: null });
+  expect(scored({ value: -0.4, low: null, high: null })).toMatchObject({ lead: "Too few tasks", tip: null });
 });
