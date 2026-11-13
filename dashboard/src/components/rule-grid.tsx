@@ -2,12 +2,13 @@ import type { KeyboardEvent, ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 /**
- * The scorecard's column template, shared by the overview's tables of mistakes so their charts line up: the name (all
- * the flexible width) · one chart on a fixed 0–100% track · the change in words. On phones a row is a card: the name
+ * The scorecard's column template, shared by the overview's tables of mistakes so their charts line up: the name (as
+ * wide as the longest name needs, `--name-w`) · one chart on a fixed 0–100% track (up to 360px) · the change in
+ * words. Spare width goes to the chart first, then to the name. On phones a row is a card: the name
  * with the change at its right, then the chart full width. Cells place themselves with the `CELL` classes.
  */
 export const RULE_COLUMNS =
-  "grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-2 md:grid-cols-[minmax(0,1fr)_13rem_7.5rem] md:items-center md:gap-x-3 md:px-2";
+  "grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-2 md:grid-cols-[minmax(min(var(--name-w,16rem),calc(100%_-_22rem)),1fr)_minmax(13rem,22.5rem)_7.5rem] md:items-center md:gap-x-3 md:px-2";
 
 export const CELL = {
   name: "col-start-1 row-start-1",

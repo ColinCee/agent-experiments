@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { chromium } from "@playwright/test";
 import { PAGES } from "../src/routes.ts";
-import { openBuilt, widths } from "./built.ts";
+import { openBuilt, wideWidths, widths } from "./built.ts";
 
 const { values } = parseArgs({ options: { report: { type: "string" } } });
 const report = values.report === undefined ? undefined : JSON.parse(await readFile(values.report, "utf8"));
@@ -43,6 +43,18 @@ try {
       if (opened.errors.length > 0) console.error(`${width} ${colorScheme}: ${opened.errors.join("\n")}`);
       await page.close();
     }
+  }
+  // Wide screens, light only: the pages most at risk of stretching.
+  for (const [width, viewport] of Object.entries(wideWidths)) {
+    const page = await browser.newPage({ viewport, colorScheme: "light" });
+    const opened = await openBuilt(page, report);
+    for (const { id, path } of PAGES.filter((p) => p.id === "overview" || p.id === "mistakes")) {
+      await page.goto(`${opened.url}#/${path}`);
+      const file = fileURLToPath(new URL(`${source}-${id}-${width}-light.png`, outDir));
+      await page.screenshot({ path: file, fullPage: true });
+      console.log(file);
+    }
+    await page.close();
   }
 } finally {
   await browser.close();

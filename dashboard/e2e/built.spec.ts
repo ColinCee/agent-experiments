@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 import { expect, type Page, test } from "@playwright/test";
 import { emptyReport, fixture } from "../src/data/fixture.ts";
 import { PAGES } from "../src/routes.ts";
-import { builtPage, openBuilt, widths } from "./built.ts";
+import { builtPage, openBuilt, wideWidths, widths } from "./built.ts";
 
 // Words the page never uses (the design brief's rule 3); "CI" is matched in capitals only.
 const BANNED =
@@ -432,3 +432,48 @@ test("scorecard rows on a wide screen are one even line each, with the name in n
     expect(row.title).toBe(row.text);
   }
 });
+
+for (const [width, viewport] of Object.entries(wideWidths)) {
+  test(`on a ${width}px screen every page stays in its centred frame, with charts and rows at their caps`, async ({
+    page,
+  }) => {
+    await page.setViewportSize(viewport);
+    const opened = await openBuilt(page);
+    for (const { path, title, frame } of PAGES) {
+      await page.goto(`${opened.url}#/${path}`);
+      await expect(page.locator("header h1")).toHaveText(title);
+      const found = await page.evaluate(() => {
+        const box = (el: Element | null) => el?.getBoundingClientRect() ?? new DOMRect();
+        const frame = box(document.querySelector("[data-frame]"));
+        const area = box(document.querySelector("[data-slot=sidebar-inset]"));
+        const widths = (selector: string) => [...document.querySelectorAll(selector)].map((el) => box(el).width);
+        return {
+          frame: frame.width,
+          offCentre: frame.left + frame.width / 2 - (area.left + area.width / 2),
+          charts: widths("[data-slot=chart]"),
+          history: widths("[data-detail] [data-slot=chart], [data-slot=card][id] [data-slot=chart]"),
+          rows: widths("[data-row]"),
+          overflow: document.documentElement.scrollWidth - window.innerWidth,
+        };
+      });
+      expect(found.frame, title).toBeLessThanOrEqual(frame + 0.5);
+      expect(Math.abs(found.offCentre), title).toBeLessThanOrEqual(1);
+      for (const w of found.charts) expect(w, `${title} chart`).toBeLessThanOrEqual(560);
+      for (const w of found.history) expect(w, `${title} history chart`).toBeLessThanOrEqual(520);
+      for (const w of found.rows) expect(w, `${title} row`).toBeLessThanOrEqual(840);
+      expect(found.overflow).toBeLessThanOrEqual(0);
+      for (const { kind, tracks } of await measureTracks(page)) {
+        for (const track of tracks) {
+          // Tracked mistakes lays its cards out in columns, so only there do tracks share a width but not a left edge.
+          if (path !== "mistakes") expect(Math.abs(track.left - tracks[0].left)).toBeLessThanOrEqual(0.5);
+          expect(Math.abs(track.width - tracks[0].width)).toBeLessThanOrEqual(0.5);
+          for (const mark of track.marks) {
+            const at = kind === "rate" ? mark.value : (Math.min(1, Math.max(-1, mark.value)) + 1) / 2;
+            expect(Math.abs(mark.x - (track.left + at * track.width))).toBeLessThanOrEqual(1);
+          }
+        }
+      }
+    }
+    expect(opened.errors).toEqual([]);
+  });
+}

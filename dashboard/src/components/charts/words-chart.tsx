@@ -7,7 +7,7 @@ import { ChartTip } from "./chart-tip";
 /** Words of a set of files by day, on its own scale from 0, in one neutral colour. */
 export function WordsChart({ points, day }: { points: { day: Day; words: number }[]; day: Day }) {
   return (
-    <ChartContainer className="aspect-auto h-[220px] w-full md:h-[260px]">
+    <ChartContainer className="aspect-auto h-[220px] w-full max-w-[560px] md:h-[260px]">
       <LineChart data={points} margin={{ top: 12, right: 16, bottom: 0, left: 0 }}>
         <CartesianGrid vertical={false} />
         <XAxis

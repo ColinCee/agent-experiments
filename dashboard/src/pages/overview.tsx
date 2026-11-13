@@ -1,5 +1,6 @@
 import { ChevronRight, CircleCheck } from "lucide-react";
-import { useRef } from "react";
+import { type CSSProperties, useRef } from "react";
+import { textWidth } from "@/components/measure";
 import { MistakeDetail } from "@/components/mistake-detail";
 import { PairLegend, RateBar, RatePair } from "@/components/rate-pair";
 import { CELL, GridHeader, GridRow } from "@/components/rule-grid";
@@ -30,7 +31,7 @@ function NeedsAttention({ report }: { report: Report }) {
       {items.length === 0 ? (
         <p data-block className="flex items-start gap-2 text-muted-foreground">
           <CircleCheck className="mt-0.5 size-4 shrink-0 text-good" />
-          {calmLine(report.day)}
+          <span className="max-w-prose">{calmLine(report.day)}</span>
         </p>
       ) : (
         <ul data-block className="grid gap-3 @3xl:grid-cols-2">
@@ -260,6 +261,9 @@ function Detail({ mistake, day }: { mistake: Mistake; day: Day }) {
   );
 }
 
+/** The widest a name column gets; a longer name is cut short with its full text in a tooltip. */
+const NAME_CAP = 380;
+
 /** Wide enough for the tables and the detail panel side by side. */
 const WIDE = "(min-width: 1400px)";
 
@@ -291,8 +295,10 @@ export function OverviewPage({ report, selected }: { report: Report; selected: s
       row(slug(next.name))?.focus();
     },
   };
+  // Every table's name column is as wide as the longest name needs, so the charts get the rest (up to their cap).
+  const nameWidth = Math.ceil(Math.min(NAME_CAP, Math.max(0, ...order.map((m) => textWidth(m.name, 14) * 1.04 + 4))));
   const tables = (
-    <div className="@container min-w-0 space-y-10">
+    <div className="@container min-w-0 space-y-10" style={{ "--name-w": `${nameWidth}px` } as CSSProperties}>
       <NeedsAttention report={report} />
       <RunningNow report={report} />
       <Section title="Rules and their mistakes">
@@ -306,7 +312,7 @@ export function OverviewPage({ report, selected }: { report: Report; selected: s
   if (order.length === 0) return <div className="max-w-3xl">{tables}</div>;
   if (wide) {
     return (
-      <div className="grid grid-cols-[minmax(0,1fr)_400px] gap-6">
+      <div className="grid grid-cols-[minmax(0,840px)_minmax(400px,1fr)] gap-6">
         {tables}
         {picked && (
           <aside

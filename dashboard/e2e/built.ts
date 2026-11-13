@@ -13,6 +13,12 @@ export const widths = {
   phone: { width: 390, height: 844 },
 };
 
+/** Wide screens, where the page must stay within its frame instead of stretching. */
+export const wideWidths = {
+  "2560": { width: 2560, height: 1440 },
+  "3840": { width: 3840, height: 2160 },
+};
+
 /** Writes a copy of the built page with `report` in place of the placeholder and returns its path. */
 export async function injectReport(report: unknown): Promise<string> {
   const html = await readFile(builtPage, "utf8");

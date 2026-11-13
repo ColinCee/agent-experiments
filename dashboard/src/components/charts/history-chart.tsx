@@ -180,7 +180,8 @@ export function HistoryChart({ mistake, day }: { mistake: Mistake; day: Day }) {
   const ceiling = rateCeiling(mistake.series.map((p) => p.rate));
   const twoRows = new Set(mistake.changes.map((c) => c.day)).size > 1;
   return (
-    <div className="relative">
+    // Capped so a wide card or panel never stretches the chart; its text stays the same size at any width.
+    <div className="relative max-w-[520px]">
       <ChartContainer className="aspect-auto h-[220px] w-full md:h-[260px]">
         <LineChart data={rows} margin={{ top: twoRows ? 40 : 24, right: 28, bottom: 0, left: 0 }}>
           <CartesianGrid vertical={false} />

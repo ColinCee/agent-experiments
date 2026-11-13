@@ -29,7 +29,8 @@ function Group({
   if (mistakes.length === 0) return null;
   return (
     <Section title={title}>
-      <div className="grid gap-4 xl:grid-cols-2">
+      {/* Cards of 30 to 35rem, as many to a row as fit: two on a laptop, three on a wide screen, one on a phone. */}
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,30rem),35rem))] gap-4">
         {mistakes.map((m) => (
           <MistakeCard key={m.name} mistake={m} day={day} target={slug(m.name) === target} />
         ))}

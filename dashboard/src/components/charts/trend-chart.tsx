@@ -17,7 +17,7 @@ export function TrendChart({ trial }: { trial: Trial }) {
   const rows = trendRows(trial);
   const ceiling = rateCeiling(rows.flatMap((r) => [r.with, r.without]));
   return (
-    <ChartContainer className="aspect-auto h-[220px] w-full md:h-[260px]">
+    <ChartContainer className="aspect-auto h-[220px] w-full max-w-[560px] md:h-[260px]">
       <LineChart data={rows} margin={{ top: 12, right: 112, bottom: 0, left: 0 }}>
         <CartesianGrid vertical={false} />
         <XAxis dataKey="label" tickLine={false} axisLine={false} interval="preserveStartEnd" />
