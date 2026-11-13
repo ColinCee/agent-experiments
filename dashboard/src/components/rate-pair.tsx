@@ -11,11 +11,11 @@ const DOT = { with: "bg-with", without: "bg-without" } as const;
 
 const at = (rate: number) => `${Math.min(1, Math.max(0, rate)) * 100}%`;
 
-/**
- * The inset of a labelled track at each end: room for a number ("100%") beside a dot at 0% or 100%. Any header scale
- * over such tracks takes the same inset, so its 0% and 100% mark the tracks' ends.
- */
+/** The inset of a labelled track at each end: room for a number ("100%") beside a dot at 0% or 100%. */
 export const LABEL_GUTTER = "px-[46px]";
+
+/** The left half of `LABEL_GUTTER`, for a header that starts at the tracks' left end and may run past their right. */
+export const TRACK_START = "pl-[46px]";
 
 /** The same inset for a change strip, whose own padding (a dot's radius) brings its track to the rate tracks' edges. */
 export const STRIP_GUTTER = "px-[40px]";

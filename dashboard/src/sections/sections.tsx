@@ -71,7 +71,7 @@ export function Sections({ report, rows, picking }: { report: Report; rows: Row[
         id="trials"
         title="Trials"
         heads={{ name: "Trial", result: "Result" }}
-        legend={<PairHeader from="without the rule" to="with the rule" />}
+        legend={<PairHeader from="without" to="with the rule" />}
         rows={inSection(rows, "trials")}
         empty="No trials yet"
         picking={picking}
@@ -94,7 +94,7 @@ export function Sections({ report, rows, picking }: { report: Report; rows: Row[
         title="Permanent check"
         note={permanentSummary(report.permanent, day)}
         heads={{ name: "Proven rule", result: "Status" }}
-        legend={<StripHeader title="change with the rule" same="same as without" />}
+        legend={<StripHeader same="same as without" />}
         rows={inSection(rows, "permanent")}
         empty="No proven rules yet"
         picking={picking}
@@ -122,7 +122,7 @@ export function Sections({ report, rows, picking }: { report: Report; rows: Row[
         id="rules"
         title="Rules and their mistakes"
         heads={{ name: "Mistake", result: "Change" }}
-        legend={<PairHeader from="before the rule" to="since" />}
+        legend={<PairHeader from="before" to="after the rule" />}
         rows={inSection(rows, "rules")}
         empty="No rule has been tried on a mistake yet"
         picking={picking}
@@ -159,7 +159,7 @@ export function Sections({ report, rows, picking }: { report: Report; rows: Row[
         id="replays"
         title="Replays"
         heads={{ name: "Replay", result: "Result" }}
-        legend={<PairHeader from="old wording" to="new wording" />}
+        legend={<PairHeader from="old" to="new wording" />}
         rows={inSection(rows, "replays")}
         empty="No replays yet"
         picking={picking}

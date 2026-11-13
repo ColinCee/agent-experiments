@@ -56,7 +56,7 @@ export function mistakeHeadline(mistake: Mistake): Headline {
 /** What the mistake's chart compares, in one line. */
 export function mistakeLine(mistake: Mistake, day: Day): string {
   return mistake.rule
-    ? `How often this mistake happened, before and since the rule changed on ${dayLabel(mistake.rule.day, day)}.`
+    ? `How often this mistake happened, before and after the rule changed on ${dayLabel(mistake.rule.day, day)}.`
     : "How often this mistake happened over the last 4 weeks; no rule targets it yet.";
 }
 
@@ -72,7 +72,7 @@ export function mistakeFacts(mistake: Mistake, day: Day): Fact[] {
         : "no tasks",
     });
     facts.push({
-      label: "Since the rule",
+      label: "After the rule",
       value: after
         ? `${percent(after.rate)} (${plural(after.tasks, "task")}, from ${dayLabel(rule.day, day)})`
         : "no tasks",

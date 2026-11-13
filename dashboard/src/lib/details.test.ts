@@ -50,7 +50,7 @@ test("a mistake's facts give each side with its tasks and window, today with a d
   });
   expect(mistakeFacts(m, DAY)).toEqual([
     { label: "Before the rule", value: "24% (17 tasks, 6 to 7 Nov)" },
-    { label: "Since the rule", value: "3% (15 tasks, from 8 Nov)" },
+    { label: "After the rule", value: "3% (15 tasks, from 8 Nov)" },
     { label: "Today", value: "0%, usually 1% to 55%", dot: "good" },
     { label: "Rule", value: "Do it right" },
   ]);
@@ -60,7 +60,7 @@ test("a mistake's facts give each side with its tasks and window, today with a d
     label: "Today",
     value: "20%, usually 10% to 30%",
   });
-  expect(mistakeLine(m, DAY)).toBe("How often this mistake happened, before and since the rule changed on 8 Nov.");
+  expect(mistakeLine(m, DAY)).toBe("How often this mistake happened, before and after the rule changed on 8 Nov.");
 });
 
 test("a trial's headline says when it starts, its day and result so far, or its verdict", () => {

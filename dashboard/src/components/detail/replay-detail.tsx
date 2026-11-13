@@ -34,7 +34,7 @@ export function ReplayDetail({ replay, day }: { replay: Replay; day: Day }) {
               <Empty className="text-sm">No rates to compare</Empty>
             ) : (
               <div className="space-y-3">
-                <PairLegend from="old wording" to="new wording" />
+                <PairLegend from="old" to="new wording" />
                 <RatePair without={replay.rate_old} withRule={replay.rate_new} labelled hollow={!replay.trusted} />
                 <RangeStrip change={replay.change} tone={words.tone} same="same as old wording" words={below} />
               </div>

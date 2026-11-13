@@ -20,14 +20,14 @@ const apart = (a: Box, b: Box) =>
   a.right <= b.left + 0.5 || b.right <= a.left + 0.5 || a.bottom <= b.top + 0.5 || b.bottom <= a.top + 0.5;
 
 /**
- * Every 0–100% track, change strip, scale and caption row on the page outside the detail, with its marks, measured
+ * Every 0–100% track, change strip and caption row on the page outside the detail, with its marks, measured
  * where they are drawn: they all sit in the one chart column, so they share a left edge and a width.
  */
 async function measureTracks(page: Page) {
   return page.evaluate(() => {
     const box = (el: Element) => el.getBoundingClientRect();
     const centre = (el: Element) => box(el).left + box(el).width / 2;
-    return [...document.querySelectorAll('[data-track="rate"], [data-track="change"], [data-scale], [data-axis]')]
+    return [...document.querySelectorAll('[data-track="rate"], [data-track="change"], [data-axis]')]
       .filter((track) => box(track).width > 0 && !track.closest("[data-detail]"))
       .map((track) => {
         const rate = track.getAttribute("data-track") !== "change";
@@ -92,7 +92,7 @@ for (const [width, viewport] of Object.entries(allWidths)) {
     await page.setViewportSize(viewport);
     await openBuilt(page);
     const tracks = await measureTracks(page);
-    expect(tracks.length).toBeGreaterThan(20);
+    expect(tracks.length).toBeGreaterThan(15);
     let marks = 0;
     for (const track of tracks) {
       expect(Math.abs(track.left - tracks[0].left), "left edge").toBeLessThanOrEqual(0.5);

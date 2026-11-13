@@ -63,7 +63,7 @@ export function TrialDetail({ trial, day }: { trial: Trial; day: Day }) {
       caption: "Share of tasks with the mistake so far",
       node: (
         <div className="space-y-3">
-          <PairLegend from="without the rule" to="with the rule" />
+          <PairLegend from="without" to="with the rule" />
           <RatePair without={trial.rate_without} withRule={trial.rate_with} labelled />
           <RangeStrip
             change={trial.change}

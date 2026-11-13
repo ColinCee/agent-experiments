@@ -49,8 +49,8 @@ export function timeLabel(iso: string, timeZone?: string): string {
 export const FEW_TASKS = 10;
 
 /**
- * A muted line for a pair of rates resting on few tasks: "only 3 tasks since the rule", or "only 6 tasks before and 3
- * since the rule" when both are few; null when neither side is small (a side with no tasks says so on its own).
+ * A muted line for a pair of rates resting on few tasks: "only 3 tasks after the rule", or "only 6 tasks before and 3
+ * after the rule" when both are few; null when neither side is small (a side with no tasks says so on its own).
  */
 export function fewTasks(sides: { tasks: number | undefined; label: string }[]): string | null {
   const few = sides.filter((s): s is { tasks: number; label: string } => !!s.tasks && s.tasks < FEW_TASKS);

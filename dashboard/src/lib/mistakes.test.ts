@@ -42,7 +42,7 @@ test("rules sort clearly fewer (largest first), then unclear, then clearly more"
 
 test("a mistake's small samples are said once, and nothing when both sides have enough", () => {
   const side = (tasks: number) => ({ rate: 0.1, low: null, high: null, tasks, from: "2026-11-02" });
-  expect(fewTasksNote(mistake({ before: side(7), after: side(3) }))).toBe("only 7 tasks before and 3 since the rule");
+  expect(fewTasksNote(mistake({ before: side(7), after: side(3) }))).toBe("only 7 tasks before and 3 after the rule");
   expect(fewTasksNote(mistake({ before: side(40), after: side(30) }))).toBeNull();
 });
 

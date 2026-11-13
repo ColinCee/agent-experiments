@@ -38,13 +38,13 @@ export function markerLabel(changes: MistakeChange[], mistake: Mistake, day: Day
 }
 
 /**
- * How few tasks a mistake's before and since rates rest on ("only 7 tasks before and 3 since the rule"), or null when
+ * How few tasks a mistake's before and since rates rest on ("only 7 tasks before and 3 after the rule"), or null when
  * both sides have enough.
  */
 export function fewTasksNote(mistake: Mistake): string | null {
   return fewTasks([
     { tasks: mistake.before?.tasks, label: "before" },
-    { tasks: mistake.after?.tasks, label: "since the rule" },
+    { tasks: mistake.after?.tasks, label: "after the rule" },
   ]);
 }
 
