@@ -5,7 +5,7 @@ import { ChartContainer, ChartTooltip } from "@/components/ui/chart";
 import type { Day, Mistake, MistakeChange } from "@/data/report";
 import { layoutLabels, rateCeiling, rateTicks } from "@/lib/charts";
 import { dayLabel, percent } from "@/lib/format";
-import { changesByDay, historyRows, markerWords } from "@/lib/mistakes";
+import { changesByDay, historyBands, historyRows, markerWords } from "@/lib/mistakes";
 import { cn } from "@/lib/utils";
 import { ChartTip } from "./chart-tip";
 import { PointMark } from "./marks";
@@ -15,11 +15,11 @@ const ICON = 12;
 const ROW_HEIGHT = 16;
 
 /**
- * Blue since the latest rule, grey over exactly the window the before rate covers, and earlier history fainter and
- * thinner (about 3:1 on the card) so it reads as context, not as "before".
+ * Blue since the latest rule, grey over exactly the window the before rate covers, and earlier history thin and light
+ * so it reads as context, not as "before" (it may fall under 3:1; the bands carry the meaning).
  */
 const SERIES_STYLE = {
-  earlier: { stroke: "var(--muted-foreground)", strokeOpacity: 0.65, strokeWidth: 1.5 },
+  earlier: { stroke: "var(--muted-foreground)", strokeOpacity: 0.45, strokeWidth: 1 },
   before: { stroke: "var(--without)", strokeWidth: 2 },
   after: { stroke: "var(--with)", strokeWidth: 2 },
 } as const;
@@ -134,6 +134,32 @@ function Markers({
   );
 }
 
+/** Soft grey and blue bands behind the compared windows, so they show at a glance and not only by line shade. */
+function Bands({ mistake }: { mistake: Mistake }) {
+  const scale = useXAxisScale();
+  const plot = usePlotArea();
+  if (!scale || !plot) return null;
+  return (
+    <g>
+      {historyBands(mistake).map(({ kind, from, to }) => {
+        const [x1, x2] = [scale(from), scale(to)];
+        if (x1 === undefined || x2 === undefined) return null;
+        return (
+          <rect
+            key={kind}
+            data-band={kind}
+            x={x1}
+            y={plot.y}
+            width={x2 - x1}
+            height={plot.height}
+            className={kind === "after" ? "fill-with/10" : "fill-without/10"}
+          />
+        );
+      })}
+    </g>
+  );
+}
+
 /** What a hovered or tapped marker says, in a small box at the top of the chart near it. */
 function MarkerTip({ picked, day }: { picked: Picked; day: Day }) {
   return (
@@ -167,6 +193,7 @@ export function HistoryChart({ mistake, day }: { mistake: Mistake; day: Day }) {
       <ChartContainer className="aspect-auto h-[220px] w-full md:h-[260px]">
         <LineChart data={rows} margin={{ top: twoRows ? 40 : 24, right: 20, bottom: 0, left: 0 }}>
           <CartesianGrid vertical={false} />
+          <Bands mistake={mistake} />
           <XAxis
             dataKey="day"
             tickFormatter={(d: Day) => dayLabel(d, day)}
@@ -182,6 +209,8 @@ export function HistoryChart({ mistake, day }: { mistake: Mistake; day: Day }) {
             tickLine={false}
             axisLine={false}
             width={40}
+            // Inner room so a 2px line at exactly 0% or 100% draws whole instead of being cut by the plot edge.
+            padding={{ top: 4, bottom: 4 }}
           />
           <ChartTooltip
             isAnimationActive={false}

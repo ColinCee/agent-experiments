@@ -3,6 +3,7 @@ import type { Mistake, Range } from "@/data/report";
 import {
   changesByDay,
   currentWords,
+  historyBands,
   historyRows,
   markerWords,
   missingMistakeChange,
@@ -158,4 +159,21 @@ test("a mistake's missing change says no mistakes before the rule only when both
   );
   expect(missingMistakeChange(mistake({ before: side, after: { ...side, tasks: 2 } }))).toBe("Too few tasks to tell");
   expect(missingMistakeChange(mistake({ before: null, after: side }))).toBe("Too few tasks to tell");
+});
+
+test("history bands shade the before window grey and since the rule blue, held inside the series", () => {
+  const series = ["2026-11-01", "2026-11-05", "2026-11-12"].map((day) => ({ day, rate: 0.1 }));
+  const side = (from: string) => ({ rate: 0.1, low: null, high: null, tasks: 30, from });
+  const rule = { day: "2026-11-05", what: "Do it" };
+  expect(historyBands(mistake({ series, rule, before: side("2026-11-03") }))).toEqual([
+    { kind: "before", from: "2026-11-03", to: "2026-11-05" },
+    { kind: "after", from: "2026-11-05", to: "2026-11-12" },
+  ]);
+  expect(historyBands(mistake({ series, rule, before: side("2026-10-01") }))[0].from).toBe("2026-11-01");
+  expect(
+    historyBands(mistake({ series, rule: { day: "2026-09-01", what: "Old" }, before: side("2026-08-01") })),
+  ).toEqual([{ kind: "after", from: "2026-11-01", to: "2026-11-12" }]);
+  expect(historyBands(mistake({ series, rule: null, current: side("2026-11-05") }))).toEqual([
+    { kind: "before", from: "2026-11-05", to: "2026-11-12" },
+  ]);
 });

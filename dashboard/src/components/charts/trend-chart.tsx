@@ -18,7 +18,7 @@ export function TrendChart({ trial }: { trial: Trial }) {
   const ceiling = rateCeiling(rows.flatMap((r) => [r.with, r.without]));
   return (
     <ChartContainer className="aspect-auto h-[220px] w-full md:h-[260px]">
-      <LineChart data={rows} margin={{ top: 12, right: 96, bottom: 0, left: 0 }}>
+      <LineChart data={rows} margin={{ top: 12, right: 112, bottom: 0, left: 0 }}>
         <CartesianGrid vertical={false} />
         <XAxis dataKey="label" tickLine={false} axisLine={false} interval="preserveStartEnd" />
         <YAxis
@@ -28,6 +28,8 @@ export function TrendChart({ trial }: { trial: Trial }) {
           tickLine={false}
           axisLine={false}
           width={40}
+          // Inner room so a 2px line at exactly 0% or 100% draws whole instead of being cut by the plot edge.
+          padding={{ top: 4, bottom: 4 }}
         />
         <ChartTooltip
           isAnimationActive={false}
@@ -62,7 +64,7 @@ export function TrendChart({ trial }: { trial: Trial }) {
                 index === last ? (
                   <text
                     key={s.key}
-                    x={Number(x) + 8}
+                    x={Number(x) + 10}
                     y={Number(y)}
                     dominantBaseline="middle"
                     className={`${s.fill} text-xs font-medium`}

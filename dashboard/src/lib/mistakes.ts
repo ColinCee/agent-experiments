@@ -134,3 +134,23 @@ export function changesByDay(changes: MistakeChange[]): { day: Day; changes: Mis
 /** What a mistake's missing before/since change means: too few tasks, or no mistakes before the rule. */
 export const missingMistakeChange = (mistake: Mistake) =>
   missingChange(Math.min(mistake.before?.tasks ?? 0, mistake.after?.tasks ?? 0), "before the rule");
+
+/** `day`, or `first` when `day` is earlier; days are ISO dates, so they compare as text. */
+const notBefore = (day: Day, first: Day) => (day.localeCompare(first) < 0 ? first : day);
+
+/**
+ * The compared windows shaded behind a history chart, within its series: grey from the before window's start (or,
+ * with no rule, the rate now's) to the latest rule change or the last day, and blue from that change to the last day.
+ */
+export function historyBands(mistake: Mistake): { kind: "before" | "after"; from: Day; to: Day }[] {
+  const first = mistake.series[0]?.day;
+  const last = mistake.series.at(-1)?.day;
+  if (!first || !last) return [];
+  const ruleDay = mistake.rule?.day;
+  const from = mistake.rule ? mistake.before?.from : mistake.current?.from;
+  const bands: { kind: "before" | "after"; from: Day; to: Day }[] = [];
+  const end = ruleDay ?? last;
+  if (from !== undefined && end >= first) bands.push({ kind: "before", from: notBefore(from, first), to: end });
+  if (ruleDay !== undefined) bands.push({ kind: "after", from: notBefore(ruleDay, first), to: last });
+  return bands;
+}

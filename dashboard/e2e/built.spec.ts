@@ -149,11 +149,17 @@ for (const [width, viewport] of Object.entries(widths)) {
           x: x(m.querySelector("line") as Element),
         }));
         const strokes = [...card.querySelectorAll(".recharts-line-curve")].map((c) => c.getAttribute("stroke"));
-        return { id: card.id, points, markers, strokes };
+        const bands = [...card.querySelectorAll("[data-band]")].map((b) => ({
+          kind: b.getAttribute("data-band"),
+          left: b.getBoundingClientRect().left,
+          right: b.getBoundingClientRect().right,
+        }));
+        return { id: card.id, points, markers, strokes, bands };
       }),
     );
     let markersChecked = 0;
     let windowsChecked = 0;
+    let bandsChecked = 0;
     for (const mistake of fixture.mistakes) {
       const chart = charts.find((c) => c.id === mistake.name.toLowerCase().replace(/[^a-z0-9]+/g, "-"));
       if (!chart) throw new Error(`no chart for ${mistake.name}`);
@@ -171,8 +177,12 @@ for (const [width, viewport] of Object.entries(widths)) {
       // history ends.
       const from = mistake.rule ? mistake.before?.from : mistake.current?.from;
       const fromX = dayX(from);
+      const band = (kind: string) => chart.bands.find((b) => b.kind === kind);
       if (fromX !== undefined && grey.length > 0) {
         expect(Math.abs(Math.min(...grey) - fromX), `${mistake.name} grey start`).toBeLessThanOrEqual(1);
+        expect(Math.abs((band("before")?.left ?? Number.NaN) - fromX), `${mistake.name} grey band`).toBeLessThanOrEqual(
+          1,
+        );
         expect(Math.abs(Math.max(...faint) - fromX), `${mistake.name} faint end`).toBeLessThanOrEqual(1);
         windowsChecked++;
       }
@@ -190,7 +200,16 @@ for (const [width, viewport] of Object.entries(widths)) {
       // Grey and blue share the change day's point, so the colour switches exactly there.
       expect(Math.abs(Math.max(...grey) - latest.x), mistake.name).toBeLessThanOrEqual(1);
       expect(Math.abs(Math.min(...blue) - latest.x), mistake.name).toBeLessThanOrEqual(1);
+      // The bands meet where the colour switches, and blue runs to the last day.
+      const lastX = chart.points.find((p) => p.day === mistake.series.at(-1)?.day)?.x;
+      if (band("before")) expect(Math.abs((band("before")?.right ?? 0) - latest.x)).toBeLessThanOrEqual(1);
+      expect(Math.abs((band("after")?.left ?? Number.NaN) - latest.x), `${mistake.name} blue band`).toBeLessThanOrEqual(
+        1,
+      );
+      if (lastX !== undefined) expect(Math.abs((band("after")?.right ?? 0) - lastX)).toBeLessThanOrEqual(1);
+      bandsChecked++;
     }
+    expect(bandsChecked).toBeGreaterThan(4);
     expect(windowsChecked).toBeGreaterThan(3);
     expect(markersChecked).toBeGreaterThan(5);
   });

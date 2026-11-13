@@ -2,7 +2,6 @@ import { ChangeText } from "@/components/change-strip";
 import { HistoryChart } from "@/components/charts/history-chart";
 import { RateValue, Swatch } from "@/components/rate-pair";
 import { Empty, PageIntro, Section } from "@/components/section";
-import { StatusBadge } from "@/components/status-badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Day, Mistake, Report } from "@/data/report";
 import { percent } from "@/lib/format";
@@ -56,7 +55,13 @@ function MistakeCard({ mistake, day, target }: { mistake: Mistake; day: Day; tar
     <Card id={slug(mistake.name)} className={cn("scroll-mt-4", target && "ring-2 ring-foreground/40")}>
       <CardHeader className="flex flex-wrap items-start justify-between gap-2">
         <CardTitle className="text-lg">{mistake.name}</CardTitle>
-        {chip && <StatusBadge tone={chip.tone}>{chip.text}</StatusBadge>}
+        {chip && (
+          // Plain words with a dot, not a pill, so it never reads as a status badge.
+          <span data-today className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
+            <span className={cn("size-2 shrink-0 rounded-full", chip.tone === "bad" ? "bg-bad" : "bg-good")} />
+            {chip.text}
+          </span>
+        )}
       </CardHeader>
       <CardContent className="space-y-4">
         {mistake.rule ? <RuleNumbers mistake={mistake} day={day} /> : <CurrentNumbers mistake={mistake} day={day} />}

@@ -8,8 +8,19 @@ const DOT = { with: "bg-with", without: "bg-without" } as const;
 
 const at = (rate: number) => `${Math.min(1, Math.max(0, rate)) * 100}%`;
 
-/** The fixed 0–100% track every rate is drawn on, so rows line up to the pixel. */
+/**
+ * The fixed 0–100% track every rate is drawn on, so rows line up to the pixel. Padded by a dot's radius at each end,
+ * so a dot at 0% or 100% draws whole.
+ */
 function RateTrack({ children }: { children: ReactNode }) {
+  return (
+    <div className="px-1.5">
+      <TrackLine>{children}</TrackLine>
+    </div>
+  );
+}
+
+function TrackLine({ children }: { children: ReactNode }) {
   return (
     <div data-track="rate" className="relative h-5 w-full">
       <div className="absolute inset-x-0 top-1/2 h-px bg-border" />

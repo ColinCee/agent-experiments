@@ -8,10 +8,10 @@ const LEAD: Record<Tone, string> = { good: "text-good", bad: "text-bad", unclear
 
 const at = (change: number) => `${stripPosition(change) * 100}%`;
 
-/** Captions over the first strip of a column: where fewer and more mistakes lie. */
+/** Captions over a strip: where fewer and more mistakes lie. */
 function StripAxis() {
   return (
-    <div data-axis className="relative h-4 text-xs leading-4 text-muted-foreground">
+    <div data-axis className="relative mx-1.5 h-4 text-xs leading-4 text-muted-foreground">
       <span className="absolute left-0">fewer mistakes</span>
       <span className="absolute left-1/2 -translate-x-1/2">no change</span>
       <span className="absolute right-0">more mistakes</span>
@@ -19,45 +19,52 @@ function StripAxis() {
   );
 }
 
-/** The marks only, on the fixed -100%..+100% domain; beyond +100% is held at the edge with a "›" cap. */
+/**
+ * The marks only, on the fixed -100%..+100% domain, padded by a dot's radius at each end so a dot at either edge draws
+ * whole; beyond +100% the dot is held at the edge with an arrowhead after it.
+ */
 function Strip({ change, tone }: { change: Range | null; tone: Tone }) {
   const range = change?.low != null && change.high != null ? { low: change.low, high: change.high } : null;
   const clipped = isClipped(change);
   return (
-    <div data-track="change" className="relative h-5 w-full">
-      <div className="absolute inset-x-0 top-1/2 h-px bg-border" />
-      <div className="absolute top-0 left-1/2 h-full w-px bg-muted-foreground/70" />
-      {range && change && (
-        <>
-          <div
-            data-low={range.low}
-            data-high={range.high}
-            className={cn(
-              "absolute top-1/2 -translate-y-1/2 rounded-full",
-              tone === "unclear" ? "h-0.5" : "h-1",
-              MARK[tone],
+    <div className="px-1.5">
+      <div data-track="change" className="relative h-5 w-full">
+        <div className="absolute inset-x-0 top-1/2 h-px bg-border" />
+        <div className="absolute top-0 left-1/2 h-full w-px bg-muted-foreground/70" />
+        {range && change && (
+          <>
+            <div
+              data-low={range.low}
+              data-high={range.high}
+              className={cn(
+                "absolute top-1/2 -translate-y-1/2 rounded-full",
+                tone === "unclear" ? "h-0.5" : "h-1",
+                MARK[tone],
+              )}
+              style={{ left: at(range.low), width: `calc(${at(range.high)} - ${at(range.low)})` }}
+            />
+            <div
+              data-value={change.value}
+              className={cn(
+                "absolute top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-card",
+                // Hollow when unclear, so it never reads as the solid grey dot of "without the rule".
+                tone === "unclear" ? "border-2 border-muted-foreground bg-card" : MARK[tone],
+              )}
+              style={{ left: at(change.value) }}
+            />
+            {clipped && (
+              <span
+                data-off-scale
+                aria-hidden
+                className={cn(
+                  "absolute top-1/2 left-full ml-2 -translate-y-1/2 border-y-4 border-l-[6px] border-y-transparent border-l-current",
+                  LEAD[tone],
+                )}
+              />
             )}
-            style={{ left: at(range.low), width: `calc(${at(range.high)} - ${at(range.low)})` }}
-          />
-          <div
-            data-value={change.value}
-            className={cn(
-              "absolute top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-card",
-              // Hollow when unclear, so it never reads as the solid grey dot of "without the rule".
-              tone === "unclear" ? "border-2 border-muted-foreground bg-card" : MARK[tone],
-            )}
-            style={{ left: at(change.value) }}
-          />
-          {clipped && (
-            <span
-              aria-hidden
-              className={cn("absolute top-1/2 -right-2.5 -translate-y-1/2 text-sm leading-none font-bold", LEAD[tone])}
-            >
-              ›
-            </span>
-          )}
-        </>
-      )}
+          </>
+        )}
+      </div>
     </div>
   );
 }
@@ -100,8 +107,8 @@ export function StripAxisCell() {
 
 /**
  * A change in the mistake rate with its 90% range, and the words for it. Every strip in a column comes from here so
- * they share one scale. `axis` puts the captions over this strip; in a table row (`cells`) the strip and its words
- * become the row's own cells, and the captions show only on phones, where the header row is hidden.
+ * they share one scale. On phones every strip has its captions; on wider screens only an `axis` strip does, and in a
+ * table row (`cells`), where the strip and its words become the row's own cells, the header row has them instead.
  */
 export function ChangeStrip({
   change,
@@ -127,11 +134,10 @@ export function ChangeStrip({
           cells && "md:contents",
         )}
       >
-        {axis && (
-          <div className={cn("pr-2.5 @min-[27rem]:col-start-1", cells && "md:hidden")}>
-            <StripAxis />
-          </div>
-        )}
+        {/* Every phone card carries its own captions, since the first scrolls away; wider screens show them once. */}
+        <div className={cn("pr-2.5 @min-[27rem]:col-start-1", (cells || !axis) && "md:hidden")}>
+          <StripAxis />
+        </div>
         <div className="pr-2.5 @min-[27rem]:col-start-1">
           <Strip change={change} tone={words.tone} />
         </div>
