@@ -79,8 +79,10 @@ function Markers({
             tabIndex={0}
             aria-label={group.changes.map((c) => markerWords(c, day)).join("; ")}
             className="cursor-pointer outline-none"
-            onMouseEnter={pick}
-            onMouseLeave={() => onPick(null)}
+            // Hover only for a real mouse: after a tap, browsers may send compatibility mouse events (a mouseout on
+            // Linux Chrome) that would close the tip the tap just opened. Taps open it through click.
+            onPointerEnter={(e) => e.pointerType === "mouse" && pick()}
+            onPointerLeave={(e) => e.pointerType === "mouse" && onPick(null)}
             onFocus={pick}
             onBlur={() => onPick(null)}
             onClick={pick}
