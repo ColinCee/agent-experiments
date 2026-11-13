@@ -232,12 +232,79 @@ test("an injected report is shown, even with </script> in a name", async ({ page
   expect(opened.errors).toEqual([]);
 });
 
-test("a row on the overview opens that mistake on the tracked mistakes page", async ({ page }) => {
+test("on a wide screen the detail panel shows the picked mistake: first rule on load, then clicks, arrows and reloads", async ({
+  page,
+}) => {
+  await page.setViewportSize(widths.desktop);
+  const opened = await openBuilt(page);
+  const panel = page.locator("[data-detail]");
+  const row = (name: string) => page.locator("[data-row]", { hasText: name });
+  await expect(panel).toHaveAttribute("data-detail", "branch-pushed-without-a-pull-request");
+  await expect(row("Branch pushed without a pull request")).toHaveAttribute("aria-selected", "true");
+  await row("Ports taken without checking").locator("span").first().click();
+  await expect(panel).toHaveAttribute("data-detail", "ports-taken-without-checking");
+  await expect(page.locator("[data-row][aria-selected=true]")).toHaveCount(1);
+  await page.keyboard.press("ArrowDown");
+  await expect(panel).toHaveAttribute("data-detail", "config-read-from-memory");
+  await expect(row("Config read from memory")).toBeFocused();
+  await page.keyboard.press("ArrowUp");
+  await expect(panel).toHaveAttribute("data-detail", "ports-taken-without-checking");
+  await page.reload();
+  await expect(panel).toHaveAttribute("data-detail", "ports-taken-without-checking");
+  await page.goto(`${opened.url}#/?m=old-branches-left-open`);
+  await expect(panel).toHaveAttribute("data-detail", "old-branches-left-open");
+  await panel.getByRole("link", { name: "All tracked mistakes" }).click();
+  await expect(page.locator("header h1")).toHaveText("Tracked mistakes");
+  await expect(page.locator("#old-branches-left-open")).toBeInViewport();
+});
+
+test("every block in the overview's left column shares one left and right edge", async ({ page }) => {
   await page.setViewportSize(widths.desktop);
   await openBuilt(page);
-  await page.getByRole("link", { name: /Ports taken without checking/ }).click();
-  await expect(page.locator("header h1")).toHaveText("Tracked mistakes");
-  await expect(page.locator("#ports-taken-without-checking")).toBeInViewport();
+  const edges = await page.$$eval("[data-block]", (blocks) =>
+    blocks.map((b) => [b.getBoundingClientRect().left, b.getBoundingClientRect().right]),
+  );
+  expect(edges.length).toBeGreaterThan(3);
+  for (const [left, right] of edges) {
+    expect(Math.abs(left - edges[0][0])).toBeLessThanOrEqual(0.5);
+    expect(Math.abs(right - edges[0][1])).toBeLessThanOrEqual(0.5);
+  }
+});
+
+test("the panel's chart puts each rule-change marker on its day's point", async ({ page }) => {
+  await page.setViewportSize(widths.desktop);
+  const opened = await openBuilt(page);
+  await page.goto(`${opened.url}#/?m=replies-with-no-summary-line`);
+  const found = await page.$$eval("[data-detail] [data-marker-day]", (markers) =>
+    markers.map((m) => {
+      const day = m.getAttribute("data-marker-day");
+      const point = document.querySelector(`[data-detail] circle[data-day="${day}"]`);
+      const x = (el: Element | null) =>
+        el ? el.getBoundingClientRect().left + el.getBoundingClientRect().width / 2 : null;
+      return { day, marker: x(m.querySelector("line")), point: x(point) };
+    }),
+  );
+  expect(found.map((f) => f.day)).toEqual(["2026-10-08", "2026-10-20"]);
+  for (const { marker, point } of found) expect(Math.abs((marker ?? 0) - (point ?? Number.NaN))).toBeLessThanOrEqual(1);
+});
+
+test("on a phone a tapped row opens the detail in a sheet that closes back to the row", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: widths.phone, hasTouch: true });
+  const page = await context.newPage();
+  await openBuilt(page);
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  const row = page.locator("[data-row]", { hasText: "Ports taken without checking" });
+  await row.locator("span").first().tap();
+  const sheet = page.getByRole("dialog");
+  await expect(sheet.locator("[data-detail]")).toHaveAttribute("data-detail", "ports-taken-without-checking");
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
+  await page.keyboard.press("Escape");
+  await expect(sheet).toHaveCount(0);
+  await expect(row).toBeFocused();
+  await row.locator("span").first().tap();
+  await sheet.getByRole("button", { name: "Close" }).tap();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  await context.close();
 });
 
 test("hovering a marker on a computer says what changed then; the line under the chart stays the rule", async ({
@@ -290,11 +357,11 @@ test("the data's date shows once: in the sidebar on a computer, in the header on
   }
 });
 
-test("a scorecard row's range shows in its strip's tip: on hover with a mouse, on a tap without leaving the page", async ({
+test("a scorecard row's range shows in its strip's tip: on hover with a mouse, on a tap without opening the sheet", async ({
   browser,
 }) => {
   const row = (page: import("@playwright/test").Page) =>
-    page.locator('[data-table="rules"] a', { hasText: "Branch pushed without a pull request" });
+    page.locator('[data-table="rules"] [data-row]', { hasText: "Branch pushed without a pull request" });
   const desktop = await browser.newPage({ viewport: widths.desktop });
   await openBuilt(desktop);
   await row(desktop).locator('[data-track="change"]').hover();
@@ -305,6 +372,6 @@ test("a scorecard row's range shows in its strip's tip: on hover with a mouse, o
   await openBuilt(phone);
   await row(phone).locator('[data-track="change"]').tap();
   await expect(row(phone).locator("[data-strip-tip]")).toHaveText("likely 47% to 82% fewer");
-  await expect(phone.locator("header h1")).toHaveText("Overview");
+  await expect(phone.getByRole("dialog")).toHaveCount(0);
   await context.close();
 });

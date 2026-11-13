@@ -28,12 +28,27 @@ export interface Route {
   page: Page;
   /** What on the page to scroll to, such as one mistake. */
   target: string | null;
+  /** The mistake selected on the page (`?m=<slug>`), so a selection survives a reload and can be linked. */
+  selected: string | null;
 }
 
-/** "#/mistakes/some-name" → the Tracked mistakes page, scrolled to that mistake; anything unknown is the overview. */
+/**
+ * "#/mistakes/some-name" → the Tracked mistakes page, scrolled to that mistake; "#/?m=some-name" → the overview with
+ * that mistake selected; anything unknown is the overview.
+ */
 export function parseHash(hash: string): Route {
-  const [path = "", target] = hash.replace(/^#\/?/, "").split("/");
-  return { page: PAGES.find((p) => p.path === path) ?? PAGES[0], target: target || null };
+  const [location = "", query = ""] = hash.replace(/^#\/?/, "").split("?");
+  const [path = "", target] = location.split("/");
+  return {
+    page: PAGES.find((p) => p.path === path) ?? PAGES[0],
+    target: target || null,
+    selected: new URLSearchParams(query).get("m") || null,
+  };
+}
+
+/** The hash of the overview with `selected` chosen, or with nothing chosen. */
+export function selectHref(selected: string | null): string {
+  return selected ? `#/?m=${encodeURIComponent(selected)}` : "#/";
 }
 
 export function href(id: Page["id"], target?: string): string {

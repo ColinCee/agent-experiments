@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { KeyboardEvent, ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 /**
@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
  * and the result right, then the chart full width. Cells place themselves with the `CELL` classes.
  */
 export const RULE_COLUMNS =
-  "grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-2 md:grid-cols-[minmax(0,13rem)_8.5rem_minmax(0,1fr)_7.5rem] md:items-center md:gap-x-5";
+  "grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-2 md:grid-cols-[minmax(0,10rem)_7rem_minmax(9rem,1fr)_7rem] md:items-center md:gap-x-4 md:px-3";
 
 export const CELL = {
   name: "col-span-2 row-start-1 md:col-span-1",
@@ -25,18 +25,45 @@ export function GridHeader({ children }: { children: ReactNode }) {
   );
 }
 
-/** One row; a link when `href` is given, so the whole row can be clicked. */
-export function GridRow({ href, children }: { href?: string; children: ReactNode }) {
-  const className = cn(
-    RULE_COLUMNS,
-    "rounded-lg border p-4 md:rounded-none md:border-0 md:border-b md:px-0 md:py-2.5",
-    href && "transition-colors hover:bg-muted/50",
-  );
-  return href ? (
-    <a href={href} className={className}>
+/**
+ * One row, picked by click, Enter or Space; Up and Down move the pick (`onMove`). The picked row is tinted with a
+ * neutral bar at its left: blue, green and red already mean with the rule, fewer mistakes and needs attention.
+ */
+export function GridRow({
+  id,
+  selected,
+  onSelect,
+  onMove,
+  children,
+}: {
+  id: string;
+  selected: boolean;
+  onSelect: () => void;
+  onMove: (step: 1 | -1) => void;
+  children: ReactNode;
+}) {
+  const onKeyDown = (e: KeyboardEvent) => {
+    if (e.key === "Enter" || e.key === " ") onSelect();
+    else if (e.key === "ArrowDown") onMove(1);
+    else if (e.key === "ArrowUp") onMove(-1);
+    else return;
+    e.preventDefault();
+  };
+  return (
+    <div
+      role="option"
+      tabIndex={0}
+      aria-selected={selected}
+      data-row={id}
+      onClick={onSelect}
+      onKeyDown={onKeyDown}
+      className={cn(
+        RULE_COLUMNS,
+        "cursor-pointer rounded-lg border p-4 transition-colors outline-none hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring md:rounded-none md:border-0 md:border-b md:py-2.5",
+        selected && "bg-muted shadow-[inset_2px_0_0_var(--foreground)] hover:bg-muted",
+      )}
+    >
       {children}
-    </a>
-  ) : (
-    <div className={className}>{children}</div>
+    </div>
   );
 }

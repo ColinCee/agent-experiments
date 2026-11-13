@@ -8,13 +8,17 @@ const LEAD: Record<Tone, string> = { good: "text-good", bad: "text-bad", unclear
 
 const at = (change: number) => `${stripPosition(change) * 100}%`;
 
-/** Captions over a strip: where fewer and more mistakes lie. */
+/** Captions over a strip: where fewer and more mistakes lie, in one word each when the strip is narrow. */
 export function StripAxis() {
   return (
-    <div data-axis className="relative mx-1.5 h-4 text-xs leading-4 text-muted-foreground">
-      <span className="absolute left-0">fewer mistakes</span>
+    <div data-axis className="@container relative mx-1.5 h-4 text-xs leading-4 text-muted-foreground">
+      <span className="absolute left-0">
+        fewer<span className="hidden @min-[15rem]:inline"> mistakes</span>
+      </span>
       <span className="absolute left-1/2 -translate-x-1/2">no change</span>
-      <span className="absolute right-0">more mistakes</span>
+      <span className="absolute right-0">
+        more<span className="hidden @min-[15rem]:inline"> mistakes</span>
+      </span>
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { type ReactNode, useEffect } from "react";
 import { SidebarInset, SidebarProvider, SidebarTrigger, useSidebar } from "@/components/ui/sidebar";
+import { cn } from "@/lib/utils";
 import type { Page } from "@/routes";
 import { AppSidebar } from "./app-sidebar";
 
@@ -36,7 +37,10 @@ export function AppShell({
           <h1 className="text-lg font-semibold">{page.title}</h1>
           <DataChip>{dataUpTo}</DataChip>
         </header>
-        <main className="mx-auto w-full max-w-6xl px-4 py-6 md:px-8 md:py-8">{children}</main>
+        {/* The overview fills the width with its detail panel; other pages keep a comfortable reading width. */}
+        <main className={cn("mx-auto w-full px-4 py-6 md:px-8 md:py-8", page.id !== "overview" && "max-w-6xl")}>
+          {children}
+        </main>
       </SidebarInset>
     </SidebarProvider>
   );

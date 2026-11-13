@@ -1,5 +1,5 @@
 // Saves whole-page screenshots of every page of the built file, at each width, light and dark, into shots/ as
-// {fixture|report}-{page}-{width}-{theme}.png.
+// {fixture|report}-{page}-{width}-{theme}.png, plus the overview's detail sheet open on a phone.
 // Usage: pnpm shots [--report path/to/report.json]
 import { mkdir, readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
@@ -28,6 +28,16 @@ try {
         await page.setViewportSize({ width: viewport.width, height: Math.max(height, viewport.height) });
         await page.screenshot({ path: file });
         await page.setViewportSize(viewport);
+        console.log(file);
+      }
+      if (width === "phone") {
+        // The overview's detail opens in a sheet on a phone: show it open on the first mistake.
+        await page.goto(`${opened.url}#/`);
+        await page.locator('[data-table="rules"] [data-row], [data-table="no-rule"] [data-row]').first().click();
+        await page.getByRole("dialog").waitFor();
+        await page.waitForTimeout(300);
+        const file = fileURLToPath(new URL(`${source}-overview-sheet-${width}-${colorScheme}.png`, outDir));
+        await page.screenshot({ path: file });
         console.log(file);
       }
       if (opened.errors.length > 0) console.error(`${width} ${colorScheme}: ${opened.errors.join("\n")}`);

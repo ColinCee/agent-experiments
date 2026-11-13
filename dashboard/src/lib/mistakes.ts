@@ -65,22 +65,33 @@ const SHORT_WINDOW = 7;
 /** The longest hint line that still fits its slot under a mistake's name on the overview. */
 const HINT_ROOM = 48;
 
+/** A short window in few words: "6 to 7 Nov" within a month, "30 Oct to 2 Nov" across one, "4 Nov" for one day. */
+function shortSpan(from: Day, to: Day, day: Day): string {
+  if (from === to) return dayLabel(from, day);
+  const sameMonth = from.slice(0, 7) === to.slice(0, 7);
+  return `${sameMonth ? Number(from.slice(8)) : dayLabel(from, day)} to ${dayLabel(to, day)}`;
+}
+
 /**
  * The one muted line under a mistake's name on the overview: how few tasks the rates rest on, and how short the
- * before window is ("before = 2 Nov to 4 Nov") when that still fits the line; null when neither applies.
+ * before window is ("Before: only 6 to 7 Nov"); null when neither applies. Few tasks before and a short window read
+ * as one phrase ("only 6 tasks before, 2 to 4 Nov") when that fits the line; otherwise the few tasks win.
  */
 export function overviewHint(mistake: Mistake, day: Day): string | null {
+  const before = fewTasks([{ tasks: mistake.before?.tasks, label: "before" }]);
   const few = fewTasks([
     { tasks: mistake.before?.tasks, label: "before" },
     { tasks: mistake.after?.tasks, label: "since the rule" },
   ]);
-  const { before, rule } = mistake;
-  const short =
-    before && rule && differenceInCalendarDays(parseISO(rule.day), parseISO(before.from)) < SHORT_WINDOW
-      ? `before = ${span(before.from, beforeEnds(rule), day).replace(/^on /, "")}`
+  const { rule } = mistake;
+  const window =
+    mistake.before && rule && differenceInCalendarDays(parseISO(rule.day), parseISO(mistake.before.from)) < SHORT_WINDOW
+      ? shortSpan(mistake.before.from, beforeEnds(rule), day)
       : null;
-  const both = few && short ? `${few} · ${short}` : null;
-  return both && both.length <= HINT_ROOM ? both : (few ?? short);
+  if (!window) return few;
+  if (!few) return `Before: only ${window}`;
+  const both = few === before ? `${few}, ${window}` : null;
+  return both && both.length <= HINT_ROOM ? both : few;
 }
 
 /** A mistake with no rule: its rate now and what it rests on. */

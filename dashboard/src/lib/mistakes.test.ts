@@ -84,11 +84,14 @@ test("the overview hint names a short before window, with the small-sample words
   const rule = { day: "2026-11-05", what: "Do it" };
   const hint = (before: number, from: string, after: number) =>
     overviewHint(mistake({ rule, before: side(before, from), after: side(after, rule.day) }), "2026-11-12");
-  expect(hint(40, "2026-11-02", 30)).toBe("before = 2 Nov to 4 Nov");
-  expect(hint(40, "2026-11-04", 30)).toBe("before = 4 Nov");
+  expect(hint(40, "2026-11-02", 30)).toBe("Before: only 2 to 4 Nov");
+  expect(hint(40, "2026-11-04", 30)).toBe("Before: only 4 Nov");
+  expect(overviewHint(mistake({ rule, before: side(40, "2026-10-30"), after: side(30, rule.day) }), "2026-11-12")).toBe(
+    "Before: only 30 Oct to 4 Nov",
+  );
   expect(hint(40, "2026-10-01", 30)).toBeNull();
   expect(hint(40, "2026-10-01", 3)).toBe("only 3 tasks since the rule");
-  expect(hint(6, "2026-11-02", 30)).toBe("only 6 tasks before · before = 2 Nov to 4 Nov");
+  expect(hint(6, "2026-11-02", 30)).toBe("only 6 tasks before, 2 to 4 Nov");
   expect(hint(6, "2026-11-02", 3)).toBe("only 6 tasks before and 3 since the rule");
 });
 

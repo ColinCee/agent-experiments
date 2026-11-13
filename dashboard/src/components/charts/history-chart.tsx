@@ -191,7 +191,7 @@ export function HistoryChart({ mistake, day }: { mistake: Mistake; day: Day }) {
   return (
     <div className="relative">
       <ChartContainer className="aspect-auto h-[220px] w-full md:h-[260px]">
-        <LineChart data={rows} margin={{ top: twoRows ? 40 : 24, right: 20, bottom: 0, left: 0 }}>
+        <LineChart data={rows} margin={{ top: twoRows ? 40 : 24, right: 28, bottom: 0, left: 0 }}>
           <CartesianGrid vertical={false} />
           <Bands mistake={mistake} />
           <XAxis

@@ -1,17 +1,22 @@
 import { ChevronRight, CircleCheck } from "lucide-react";
+import { useRef } from "react";
 import { ChangeMarks, StripAxis, StripAxisCell } from "@/components/change-strip";
+import { MistakeDetail } from "@/components/mistake-detail";
 import { RateBar, RateValue, type Side } from "@/components/rate-pair";
 import { CELL, GridHeader, GridRow } from "@/components/rule-grid";
 import { Empty, Section } from "@/components/section";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import type { Day, Mistake, Report, Trial } from "@/data/report";
+import { useMedia } from "@/hooks/use-media";
+import { replaceHash } from "@/hooks/use-route";
 import { type AttentionItem, attentionItems, calmLine } from "@/lib/attention";
 import { percent, plural } from "@/lib/format";
 import { NO_RECENT_TASKS, overviewHint, scoreWords, slug, sortByChange, withoutRule, withRule } from "@/lib/mistakes";
 import { permanentSummary, statusCounts } from "@/lib/permanent";
 import { sortTrials, trialSummary, verdictWords } from "@/lib/trials";
 import { cn } from "@/lib/utils";
-import { href } from "@/routes";
+import { href, selectHref } from "@/routes";
 
 const TINT: Record<AttentionItem["tone"], string> = {
   bad: "border-bad/30 bg-bad/8",
@@ -24,12 +29,12 @@ function NeedsAttention({ report }: { report: Report }) {
   return (
     <Section title="Needs attention">
       {items.length === 0 ? (
-        <p className="flex items-start gap-2 text-muted-foreground">
+        <p data-block className="flex items-start gap-2 text-muted-foreground">
           <CircleCheck className="mt-0.5 size-4 shrink-0 text-good" />
           {calmLine(report.day)}
         </p>
       ) : (
-        <ul className="grid gap-3 md:grid-cols-2">
+        <ul data-block className="grid gap-3 @3xl:grid-cols-2">
           {items.map((item) => (
             <li key={`${item.title} ${item.detail}`} className={cn("rounded-lg border px-4 py-3", TINT[item.tone])}>
               <p className="font-medium">{item.title}</p>
@@ -72,7 +77,7 @@ function RunningNow({ report }: { report: Report }) {
   const trials = sortTrials(report.trials);
   return (
     <Section title="Running now">
-      <div className="grid gap-4 md:grid-cols-2">
+      <div data-block className="grid gap-4 @3xl:grid-cols-2">
         <Card>
           <CardHeader className="grid-cols-[1fr_auto]">
             <CardTitle>Trials</CardTitle>
@@ -136,22 +141,44 @@ function HintLine({ mistake, day }: { mistake: Mistake; day: Day }) {
 
 const LEAD = { good: "text-good", bad: "text-bad", unclear: "text-foreground" } as const;
 
+/** How a table's rows take part in the page's one selection. */
+interface Picking {
+  selected: string | null;
+  onSelect: (id: string) => void;
+  onMove: (id: string, step: 1 | -1) => void;
+}
+
+function rowProps(m: Mistake, picking: Picking) {
+  const id = slug(m.name);
+  return {
+    id,
+    selected: picking.selected === id,
+    onSelect: () => picking.onSelect(id),
+    onMove: (step: 1 | -1) => picking.onMove(id, step),
+  };
+}
+
 /** The overview's scorecard: one row per mistake with a rule, and one chart, the change, in each row. */
-function RulesTable({ mistakes, day }: { mistakes: Mistake[]; day: Day }) {
-  const rows = sortByChange(withRule(mistakes));
+function RulesTable({ rows, day, picking }: { rows: Mistake[]; day: Day; picking: Picking }) {
   if (rows.length === 0) return <Empty>No rule has been tried on a mistake yet</Empty>;
   return (
-    <div data-table="rules" className="space-y-3 md:max-w-[880px] md:space-y-0">
+    <div
+      data-table="rules"
+      data-block
+      role="listbox"
+      aria-label="Rules and their mistakes"
+      className="space-y-3 md:space-y-0"
+    >
       <GridHeader>
         <span>Mistake</span>
-        <span className="text-right whitespace-nowrap">Before → since rule</span>
+        <span className="text-right whitespace-nowrap">Before → since</span>
         <StripAxisCell />
         <span>Result</span>
       </GridHeader>
       {rows.map((m) => {
         const words = scoreWords(m);
         return (
-          <GridRow key={m.name} href={href("mistakes", slug(m.name))}>
+          <GridRow key={m.name} {...rowProps(m, picking)}>
             <div className={CELL.name}>
               <span className="block font-medium">{m.name}</span>
               <HintLine mistake={m} day={day} />
@@ -174,11 +201,16 @@ function RulesTable({ mistakes, day }: { mistakes: Mistake[]; day: Day }) {
 }
 
 /** Mistakes with no rule, on the scorecard's columns so their bars line up with the strips above. */
-function NoRuleTable({ mistakes }: { mistakes: Mistake[] }) {
-  const rows = withoutRule(mistakes);
+function NoRuleTable({ rows, picking }: { rows: Mistake[]; picking: Picking }) {
   if (rows.length === 0) return <Empty>Every tracked mistake has a rule</Empty>;
   return (
-    <div data-table="no-rule" className="space-y-3 md:max-w-[880px] md:space-y-0">
+    <div
+      data-table="no-rule"
+      data-block
+      role="listbox"
+      aria-label="Mistakes with no rule yet"
+      className="space-y-3 md:space-y-0"
+    >
       <GridHeader>
         <span>Mistake</span>
         <span className="text-right">Rate now</span>
@@ -186,7 +218,7 @@ function NoRuleTable({ mistakes }: { mistakes: Mistake[] }) {
         <span>Tasks</span>
       </GridHeader>
       {rows.map((m) => (
-        <GridRow key={m.name} href={href("mistakes", slug(m.name))}>
+        <GridRow key={m.name} {...rowProps(m, picking)}>
           <span className={cn(CELL.name, "font-medium")}>{m.name}</span>
           {m.current ? (
             <>
@@ -211,17 +243,94 @@ function NoRuleTable({ mistakes }: { mistakes: Mistake[] }) {
   );
 }
 
-export function OverviewPage({ report }: { report: Report }) {
+/** The selected mistake in full, with a way to its card among all tracked mistakes. */
+function Detail({ mistake, day }: { mistake: Mistake; day: Day }) {
   return (
-    <div className="space-y-10">
+    <div data-detail={slug(mistake.name)} className="space-y-4">
+      <MistakeDetail mistake={mistake} day={day} />
+      <a
+        href={href("mistakes", slug(mistake.name))}
+        className="inline-flex items-center gap-0.5 text-sm text-muted-foreground hover:text-foreground"
+      >
+        All tracked mistakes
+        <ChevronRight className="size-4" />
+      </a>
+    </div>
+  );
+}
+
+/** Wide enough for the tables and the detail panel side by side. */
+const WIDE = "(min-width: 1360px)";
+
+/**
+ * The overview. On a wide screen the tables sit in a left column and the selected mistake's detail stays in view on the
+ * right (the first rule's mistake until one is picked); narrower, nothing is picked until a row is tapped, and the
+ * detail opens in a sheet from the right. The pick lives in the hash, so it survives a reload and can be linked.
+ */
+export function OverviewPage({ report, selected }: { report: Report; selected: string | null }) {
+  const wide = useMedia(WIDE);
+  const rules = sortByChange(withRule(report.mistakes));
+  const noRule = withoutRule(report.mistakes);
+  const order = [...rules, ...noRule];
+  const picked = order.find((m) => slug(m.name) === selected) ?? (wide ? order[0] : undefined);
+  const pickedId = picked ? slug(picked.name) : null;
+  const lastPicked = useRef<string | null>(null);
+  if (pickedId) lastPicked.current = pickedId;
+  // While the sheet slides shut the pick is already cleared; keep showing the last one until it has gone.
+  const shown = picked ?? order.find((m) => slug(m.name) === lastPicked.current);
+  const row = (id: string | null) => document.querySelector<HTMLElement>(`[data-row="${id}"]`);
+  const picking: Picking = {
+    selected: pickedId,
+    onSelect: (id) => replaceHash(selectHref(id)),
+    onMove: (id, step) => {
+      const at = order.findIndex((m) => slug(m.name) === id);
+      const next = order[at + step];
+      if (!next) return;
+      replaceHash(selectHref(slug(next.name)));
+      row(slug(next.name))?.focus();
+    },
+  };
+  const tables = (
+    <div className="@container min-w-0 space-y-10">
       <NeedsAttention report={report} />
       <RunningNow report={report} />
       <Section title="Rules and their mistakes">
-        <RulesTable mistakes={report.mistakes} day={report.day} />
+        <RulesTable rows={rules} day={report.day} picking={picking} />
       </Section>
       <Section title="Mistakes with no rule yet">
-        <NoRuleTable mistakes={report.mistakes} />
+        <NoRuleTable rows={noRule} picking={picking} />
       </Section>
     </div>
+  );
+  if (order.length === 0) return <div className="max-w-3xl">{tables}</div>;
+  if (wide) {
+    return (
+      <div className="grid grid-cols-[minmax(620px,3fr)_minmax(380px,2fr)] gap-8">
+        {tables}
+        {picked && (
+          <aside
+            aria-label="Selected mistake"
+            className="sticky top-4 max-h-[calc(100svh-2rem)] self-start overflow-y-auto border-l pl-8"
+          >
+            <Detail mistake={picked} day={report.day} />
+          </aside>
+        )}
+      </div>
+    );
+  }
+  return (
+    <>
+      {tables}
+      <Sheet open={picked !== undefined} onOpenChange={(open) => !open && replaceHash(selectHref(null))}>
+        <SheetContent
+          side="right"
+          className="w-full overflow-y-auto p-4 pt-12 data-[side=right]:w-full sm:max-w-lg data-[side=right]:sm:max-w-lg"
+          finalFocus={() => row(lastPicked.current)}
+        >
+          <SheetTitle className="sr-only">{shown?.name ?? "Mistake"}</SheetTitle>
+          {shown && <Detail mistake={shown} day={report.day} />}
+        </SheetContent>
+      </Sheet>
+    </>
   );
 }

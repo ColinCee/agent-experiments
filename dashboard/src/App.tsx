@@ -12,7 +12,10 @@ import { SizesPage } from "@/pages/sizes";
 import { TrialsPage } from "@/pages/trials";
 import type { Page } from "@/routes";
 
-const PAGE: Record<Page["id"], (props: { report: Report; target: string | null }) => ReactNode> = {
+const PAGE: Record<
+  Page["id"],
+  (props: { report: Report; target: string | null; selected: string | null }) => ReactNode
+> = {
   overview: OverviewPage,
   trials: TrialsPage,
   permanent: PermanentPage,
@@ -22,7 +25,7 @@ const PAGE: Record<Page["id"], (props: { report: Report; target: string | null }
 };
 
 export function App({ report }: { report: Report }) {
-  const { page, target } = useRoute();
+  const { page, target, selected } = useRoute();
   // biome-ignore lint/correctness/useExhaustiveDependencies: a new page opens at its top.
   useEffect(() => {
     if (target) document.getElementById(target)?.scrollIntoView();
@@ -36,7 +39,7 @@ export function App({ report }: { report: Report }) {
       dataUpTo={`Data up to ${dayLabel(report.day, report.day)}`}
       updated={`Updated ${timeLabel(report.written)}`}
     >
-      <Content report={report} target={target} />
+      <Content report={report} target={target} selected={selected} />
     </AppShell>
   );
 }
