@@ -2,6 +2,7 @@ import { differenceInCalendarDays, parseISO } from "date-fns";
 import type { Day, Report } from "@/data/report";
 import { changeWords } from "./change";
 import { dayLabel, percent } from "./format";
+import { rowId } from "./rows";
 import { finishedOn, verdictWords } from "./trials";
 
 export interface AttentionItem {
@@ -9,6 +10,8 @@ export interface AttentionItem {
   tone: "bad" | "good" | "neutral";
   title: string;
   detail: string;
+  /** The row the item is about, picked when the item is clicked. */
+  target: string;
 }
 
 /** A trial that finished within this many days is news on the overview. */
@@ -27,6 +30,7 @@ export function attentionItems(report: Report): AttentionItem[] {
       ({ name, today }): AttentionItem => ({
         tone: "bad",
         title: name,
+        target: rowId("mistake", name),
         detail: `${percent(today.rate)} on ${dayLabel(report.day, report.day)} · usually ${percent(today.usual_low)} to ${percent(today.usual_high)}`,
       }),
     );
@@ -36,6 +40,7 @@ export function attentionItems(report: Report): AttentionItem[] {
       (p): AttentionItem => ({
         tone: "bad",
         title: p.name,
+        target: rowId("permanent", p.name),
         detail: `Rule no longer cuts this mistake · ${changeWords(p.change, "slipping").hint ?? "too few tasks to tell"}`,
       }),
     );
@@ -49,14 +54,12 @@ export function attentionItems(report: Report): AttentionItem[] {
       (t): AttentionItem => ({
         tone: t.verdict === "works" ? "good" : "neutral",
         title: t.name,
+        target: rowId("trial", t.name),
         detail: `Trial finished: ${verdictWords(t.verdict).toLowerCase()}`,
       }),
     );
   return [...above, ...slipping, ...finished];
 }
-
-/** How many items need him, for the count beside Overview in the sidebar. */
-export const needsHim = (items: AttentionItem[]) => items.filter((i) => i.tone === "bad").length;
 
 /** The one calm line when nothing needs him. */
 export function calmLine(day: Day): string {

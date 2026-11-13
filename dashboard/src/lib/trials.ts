@@ -105,3 +105,15 @@ export function trialSummary(trial: Trial, day: Day): string {
 /** What a trial's missing change means: too few tasks, or no mistakes without the rule. */
 export const missingTrialChange = (trial: Trial) =>
   missingChange(Math.min(trial.tasks_with, trial.tasks_without), "without the rule");
+
+/**
+ * A trial's row: in the chart cell, why there is no pair to draw yet ("No tasks yet", "Day 2 of 7 · 3 with · 1 without")
+ * or null when there is; in the result cell, its verdict or when it starts, with the tone of its badge.
+ */
+export function trialRow(trial: Trial, day: Day): { reason: string | null; result: string; tone: BadgeTone } {
+  const result = trial.state === "scheduled" ? trialWhen(trial, day, false) : verdictWords(trial.verdict);
+  const tone = trial.state === "finished" ? trialBadge(trial).tone : "waiting";
+  if (hasResult(trial)) return { reason: null, result, tone };
+  const none = trial.tasks_with + trial.tasks_without === 0;
+  return { reason: none ? "No tasks yet" : trialSummary(trial, day), result, tone };
+}

@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import { fixture } from "@/data/fixture";
 import type { Mistake, Report } from "@/data/report";
-import { attentionItems, calmLine, needsHim } from "./attention";
+import { attentionItems, calmLine } from "./attention";
 
 const today = (rate: number, outside: "above" | "below" | null): Mistake["today"] => ({
   rate,
@@ -25,7 +25,12 @@ test("a mistake above its usual range needs attention, furthest above first", ()
     report({ mistakes: [mistake("a bit", today(0.45, "above")), mistake("a lot", today(0.9, "above"))] }),
   );
   expect(items.map((i) => i.title)).toEqual(["a lot", "a bit"]);
-  expect(items[0]).toEqual({ tone: "bad", title: "a lot", detail: "90% on 12 Nov · usually 10% to 40%" });
+  expect(items[0]).toEqual({
+    tone: "bad",
+    title: "a lot",
+    detail: "90% on 12 Nov · usually 10% to 40%",
+    target: "mistake-a-lot",
+  });
 });
 
 test("a mistake below or inside its usual range gets no item", () => {
@@ -63,13 +68,16 @@ test("a trial that finished in the last 7 days is news, green only when it works
     ["good", "Trial finished: works"],
     ["neutral", "Trial finished: can't tell"],
   ]);
-  expect(needsHim(items)).toBe(0);
 });
 
-test("the full fixture lists the mistake above its range, the slipping rule and the finished trial", () => {
+test("the full fixture lists the mistake above its range, the slipping rule and the finished trial, each with its row", () => {
   const items = attentionItems(fixture);
   expect(items.map((i) => i.tone)).toEqual(["bad", "bad", "good"]);
-  expect(needsHim(items)).toBe(2);
+  expect(items.map((i) => i.target)).toEqual([
+    "mistake-tests-skipped-before-a-commit",
+    "permanent-drafts-saved-in-the-wrong-folder",
+    "trial-tests-skipped-before-a-commit",
+  ]);
 });
 
 test("the calm line names the report's day", () => {

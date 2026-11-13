@@ -1,4 +1,3 @@
-import type { ReactNode } from "react";
 import type { Range } from "@/data/report";
 import { type ChangeMode, type ChangeWords, changeWords, isClipped, stripPosition, type Tone } from "@/lib/change";
 import { cn } from "@/lib/utils";
@@ -85,60 +84,29 @@ export function ChangeMarks({ change, tone }: { change: Range | null; tone: Tone
   return <Strip change={change} tone={tone} />;
 }
 
-/** Lays `children` out exactly as a strip is laid out, so a rate track above a strip has the strip's width. */
-export function AlignWithStrip({ children }: { children: ReactNode }) {
-  return (
-    <div className="@container">
-      <div className="grid gap-x-5 @min-[27rem]:grid-cols-[minmax(0,1fr)_9.5rem]">
-        <div className="pr-2.5">{children}</div>
-      </div>
-    </div>
-  );
-}
-
-/** The captions in a table's header row, over the column of strips below it. */
-export function StripAxisCell({ same }: { same: string }) {
-  return (
-    <div className="pr-2.5">
-      <StripAxis same={same} />
-    </div>
-  );
-}
-
 /**
- * A change in the mistake rate with its 90% range, and the words for it. Every strip in a column comes from here so
- * they share one scale. On phones every strip has its captions; on wider screens only an `axis` strip does, and in a
- * table row (`cells`), where the strip and its words become the row's own cells, the header row has them instead.
+ * A change in the mistake rate with its 90% range, its captions over it, and the words for it, as the detail panel
+ * shows one result.
  */
 export function ChangeStrip({
   change,
-  axis = false,
   mode = "plain",
-  cells = false,
   missing,
   same,
 }: {
   change: Range | null;
   /** The centre caption, naming what the change is against: "same as without". */
   same: string;
-  axis?: boolean;
   mode?: ChangeMode;
-  cells?: boolean;
   /** What to say when the report has no change (null); too few tasks unless told otherwise. */
   missing?: string;
 }) {
   const words = changeWords(change, mode, missing);
   return (
     // Words go beside the strip only when that leaves the strip room for its captions; otherwise below it.
-    <div className={cn("@container", cells && "md:contents")}>
-      <div
-        className={cn(
-          "grid items-center gap-x-5 gap-y-1 @min-[27rem]:grid-cols-[minmax(0,1fr)_9.5rem]",
-          cells && "md:contents",
-        )}
-      >
-        {/* Every phone card carries its own captions, since the first scrolls away; wider screens show them once. */}
-        <div className={cn("pr-2.5 @min-[27rem]:col-start-1", (cells || !axis) && "md:hidden")}>
+    <div className="@container">
+      <div className="grid items-center gap-x-5 gap-y-1 @min-[27rem]:grid-cols-[minmax(0,1fr)_9.5rem]">
+        <div className="pr-2.5 @min-[27rem]:col-start-1">
           <StripAxis same={same} />
         </div>
         <div className="pr-2.5 @min-[27rem]:col-start-1">

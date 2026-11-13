@@ -1,33 +1,27 @@
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
-/** A titled part of a page. */
+/** A titled part of the page, which a link can open the page at (`#/<id>`), with an optional one-line note. */
 export function Section({
+  id,
   title,
-  action,
+  note,
   children,
-  className,
 }: {
+  id: string;
   title: string;
-  /** Shown at the right of the title, such as a link to the page with more. */
-  action?: ReactNode;
+  note?: string;
   children: ReactNode;
-  className?: string;
 }) {
   return (
-    <section className={cn("space-y-3", className)}>
-      <div className="flex items-baseline justify-between gap-4">
+    <section id={`section-${id}`} data-section={id} className="scroll-mt-4 space-y-3">
+      <div className="space-y-0.5">
         <h2 className="text-base font-semibold">{title}</h2>
-        {action}
+        {note && <p className="max-w-prose text-sm text-muted-foreground">{note}</p>}
       </div>
       {children}
     </section>
   );
-}
-
-/** The one line under a page's title that says what the page is about. */
-export function PageIntro({ children }: { children: ReactNode }) {
-  return <p className="-mt-2 mb-6 max-w-prose text-muted-foreground">{children}</p>;
 }
 
 /** A short line standing where a number or list would be, saying why there is none. */

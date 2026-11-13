@@ -17,6 +17,9 @@ const at = (rate: number) => `${Math.min(1, Math.max(0, rate)) * 100}%`;
  */
 export const LABEL_GUTTER = "px-[46px]";
 
+/** The same inset for a change strip, whose own padding (a dot's radius) brings its track to the rate tracks' edges. */
+export const STRIP_GUTTER = "px-[40px]";
+
 /**
  * The fixed 0–100% track every rate is drawn on, so rows line up to the pixel. Padded by a dot's radius at each end,
  * so a dot at 0% or 100% draws whole, or by `LABEL_GUTTER` when numbers are written beside the dots.
@@ -42,12 +45,17 @@ function RateTrack({
   );
 }
 
-function Dot({ rate, side }: { rate: number; side: Side }) {
+const RING = { with: "border-with", without: "border-without" } as const;
+
+function Dot({ rate, side, hollow = false }: { rate: number; side: Side; hollow?: boolean }) {
   return (
     <div
       data-rate={rate}
       data-side={side}
-      className={cn("absolute top-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full", DOT[side])}
+      className={cn(
+        "absolute top-1/2 size-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full",
+        hollow ? cn("border-2 bg-card", RING[side]) : DOT[side],
+      )}
       style={{ left: at(rate) }}
     />
   );
@@ -83,10 +91,13 @@ export function RatePair({
   without,
   withRule,
   labelled = false,
+  hollow = false,
 }: {
   without: number | null;
   withRule: number | null;
   labelled?: boolean;
+  /** Hollow dots for a result that cannot be trusted: same sides and colours, visibly weaker. */
+  hollow?: boolean;
 }) {
   const [track, setTrack] = useState<HTMLDivElement | null>(null);
   const width = useWidth(labelled ? track : null);
@@ -102,8 +113,9 @@ export function RatePair({
       {labelled && width > 0 && without !== null && withRule !== null && (
         <Arrow from={without * width} to={withRule * width} />
       )}
-      {without !== null && <Dot rate={without} side="without" />}
-      {withRule !== null && <Dot rate={withRule} side="with" />}
+      {without !== null && <Dot rate={without} side="without" hollow={hollow} />}
+      {/* Drawn last, so since sits on top when the two rates are equal. */}
+      {withRule !== null && <Dot rate={withRule} side="with" hollow={hollow} />}
       {labels.map((label) => (
         <span
           key={label.side}

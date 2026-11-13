@@ -1,21 +1,10 @@
-import { AlignWithStrip, ChangeStrip } from "@/components/change-strip";
+import { ChangeStrip } from "@/components/change-strip";
 import { TrendChart } from "@/components/charts/trend-chart";
 import { PairLegend, RatePair, type Side, Swatch } from "@/components/rate-pair";
-import { Empty } from "@/components/section";
 import { StatusBadge } from "@/components/status-badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import type { Day, Report, Trial } from "@/data/report";
+import type { Day, Trial } from "@/data/report";
 import { fewTasks, number } from "@/lib/format";
-import {
-  hasResult,
-  missingTrialChange,
-  neededWords,
-  sortTrials,
-  taskScale,
-  tasksNote,
-  trialBadge,
-  trialWhen,
-} from "@/lib/trials";
+import { hasResult, missingTrialChange, neededWords, taskScale, tasksNote, trialBadge, trialWhen } from "@/lib/trials";
 import { cn } from "@/lib/utils";
 
 function TaskBar({ side, label, tasks, scale }: { side: Side; label: string; tasks: number; scale: number }) {
@@ -45,11 +34,7 @@ function Tasks({ trial }: { trial: Trial }) {
   return (
     <div className="space-y-2">
       <div className="relative space-y-2 pt-5">
-        <div
-          className="absolute top-0 bottom-0 grid grid-cols-[7.5rem_minmax(0,1fr)] gap-3"
-          style={{ left: 0, right: 0 }}
-          aria-hidden
-        >
+        <div className="absolute inset-0 grid grid-cols-[7.5rem_minmax(0,1fr)] gap-3" aria-hidden>
           <span />
           <div className="relative">
             <div className="absolute top-5 bottom-0 w-px bg-foreground/60" style={{ left: `${needed * 100}%` }} />
@@ -69,64 +54,36 @@ function Tasks({ trial }: { trial: Trial }) {
   );
 }
 
-function FewTasks({ trial }: { trial: Trial }) {
+function Result({ trial }: { trial: Trial }) {
   const few = fewTasks([
     { tasks: trial.tasks_without, label: "without the rule" },
     { tasks: trial.tasks_with, label: "with it" },
   ]);
-  return few && <p className="text-sm text-muted-foreground">{few}</p>;
-}
-
-function Result({ trial, axis }: { trial: Trial; axis: boolean }) {
   return (
     <div className="space-y-3">
-      <h3 className="text-sm font-medium text-muted-foreground">Result so far</h3>
       <PairLegend from="without the rule" to="with the rule" />
-      <FewTasks trial={trial} />
-      <AlignWithStrip>
-        <RatePair without={trial.rate_without} withRule={trial.rate_with} labelled />
-      </AlignWithStrip>
-      <ChangeStrip change={trial.change} axis={axis} same="same as without" missing={missingTrialChange(trial)} />
+      {few && <p className="text-sm text-muted-foreground">{few}</p>}
+      <RatePair without={trial.rate_without} withRule={trial.rate_with} labelled />
+      <ChangeStrip change={trial.change} same="same as without" missing={missingTrialChange(trial)} />
     </div>
   );
 }
 
-function TrialCard({ trial, day, first }: { trial: Trial; day: Day; first: boolean }) {
+/** A trial in full: where it is, its tasks against those needed, its result so far and its rates day by day. */
+export function TrialDetail({ trial, day }: { trial: Trial; day: Day }) {
   const badge = trialBadge(trial);
-  const chart = trial.state !== "scheduled" && trial.trend.length > 0;
   return (
-    <Card>
-      <CardHeader className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-        <CardTitle className="text-lg">{trial.name}</CardTitle>
-        <div className="flex items-center gap-3 text-sm text-muted-foreground">
+    <div className="space-y-6">
+      <div className="space-y-2">
+        <h3 className="text-lg leading-snug font-medium">{trial.name}</h3>
+        <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
           <StatusBadge tone={badge.tone}>{badge.text}</StatusBadge>
           {trialWhen(trial, day, true)}
         </div>
-      </CardHeader>
-      <CardContent className={cn("grid gap-x-10 gap-y-6", chart && "lg:grid-cols-2")}>
-        <div className="min-w-0 space-y-6">
-          <Tasks trial={trial} />
-          {hasResult(trial) && <Result trial={trial} axis={first} />}
-        </div>
-        {chart && (
-          <div className="min-w-0">
-            <TrendChart trial={trial} />
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-export function TrialsPage({ report }: { report: Report }) {
-  const trials = sortTrials(report.trials);
-  if (trials.length === 0) return <Empty>No trials yet. A trial starts when a rule is tried on a mistake.</Empty>;
-  const firstWithResult = trials.find(hasResult);
-  return (
-    <div className="space-y-6">
-      {trials.map((t) => (
-        <TrialCard key={`${t.name} ${t.started}`} trial={t} day={report.day} first={t === firstWithResult} />
-      ))}
+      </div>
+      <Tasks trial={trial} />
+      {hasResult(trial) && <Result trial={trial} />}
+      {trial.state !== "scheduled" && trial.trend.length > 0 && <TrendChart trial={trial} />}
     </div>
   );
 }

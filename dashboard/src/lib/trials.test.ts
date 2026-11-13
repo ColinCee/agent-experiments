@@ -9,6 +9,7 @@ import {
   trendRows,
   trialBadge,
   trialDay,
+  trialRow,
   trialSummary,
   trialWhen,
   verdictWords,
@@ -159,4 +160,24 @@ test("a trial's missing change says no mistakes without the rule only with tasks
     "No mistakes without the rule, so nothing to compare",
   );
   expect(missingTrialChange(trial({ tasks_with: 30, tasks_without: 3 }))).toBe("Too few tasks to tell");
+});
+
+test("a trial's row says why there is no pair yet, and its result or when it starts", () => {
+  expect(
+    trialRow(trial({ state: "scheduled", started: "2026-11-13", tasks_with: 0, tasks_without: 0 }), "2026-11-12"),
+  ).toEqual({
+    reason: "No tasks yet",
+    result: "Starts 13 Nov",
+    tone: "waiting",
+  });
+  expect(trialRow(trial({ tasks_with: 3, tasks_without: 0 }), "2026-11-10")).toEqual({
+    reason: "Day 2 of 7 · 3 with · 0 without",
+    result: "Too early",
+    tone: "waiting",
+  });
+  expect(trialRow(trial({ state: "finished", verdict: "works" }), "2026-11-12")).toEqual({
+    reason: null,
+    result: "Works",
+    tone: "good",
+  });
 });

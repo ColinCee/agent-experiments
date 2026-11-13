@@ -2,12 +2,11 @@ import { expect, test } from "vitest";
 import type { PermanentCheck } from "@/data/report";
 import {
   permanentNote,
+  permanentRowNote,
   permanentStatus,
   permanentSummary,
   STATUS_TONE,
   STATUS_WORDS,
-  sharedModel,
-  statusCounts,
 } from "./permanent";
 
 const check = (over: Partial<PermanentCheck>): PermanentCheck => ({
@@ -37,28 +36,13 @@ test("status is slipping, waiting for tasks, or still working", () => {
   expect(permanentStatus(check({}))).toBe("working");
 });
 
-test("the model is named once only when every row shares it", () => {
-  expect(sharedModel([check({}), check({})])).toBe("model-a");
-  expect(sharedModel([check({}), check({ model: "model-b" })])).toBeNull();
-  expect(sharedModel([check({}), check({ model: null })])).toBeNull();
-  expect(sharedModel([])).toBeNull();
-});
-
-test("the summary gives the start only when all rules share it", () => {
+test("the section's one line gives the start only when all rules share it", () => {
   expect(permanentSummary([check({}), check({})], "2026-11-12")).toBe(
-    "2 proven rules, each left off for 1 task in 10 since 12 Nov",
+    "Proven rules, each left off for 1 task in 10 since 12 Nov",
   );
   expect(permanentSummary([check({}), check({ since: "2026-10-01" })], "2026-11-12")).toBe(
-    "2 proven rules, each left off for 1 task in 10",
+    "Proven rules, each left off for 1 task in 10",
   );
-  expect(permanentSummary([], "2026-11-12")).toBe("No proven rules yet");
-});
-
-test("status counts leave out statuses no rule has", () => {
-  expect(statusCounts([check({}), check({}), check({ slipping: true }), check({ tasks_without: 0 })])).toBe(
-    "2 still working · 1 slipping · 1 waiting for tasks",
-  );
-  expect(statusCounts([check({ tasks_without: 0 })])).toBe("1 waiting for tasks");
 });
 
 test("plenty of tasks but no mistakes without the rule is nothing to compare, not waiting or working", () => {
@@ -67,5 +51,12 @@ test("plenty of tasks but no mistakes without the rule is nothing to compare, no
   expect(permanentStatus(none)).toBe("nothing");
   expect(STATUS_WORDS.nothing).toBe("Nothing to compare");
   expect(STATUS_TONE.nothing).toBe("unclear");
-  expect(statusCounts([none, check({})])).toBe("1 still working · 1 nothing to compare");
+});
+
+test('a row says why there is no strip in a few words, leaving "nothing to compare" to its status', () => {
+  expect(permanentRowNote(check({ tasks_with: 90, tasks_without: 11, change: null }))).toBe(
+    "No mistakes without the rule",
+  );
+  expect(permanentRowNote(check({ tasks_without: 0, change: null }))).toBe("No tasks without the rule yet");
+  expect(permanentRowNote(check({}))).toBeNull();
 });

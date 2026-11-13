@@ -1,6 +1,6 @@
 import type { Day, PermanentCheck } from "@/data/report";
 import { type BadgeTone, FEWEST_TASKS, missingChange } from "./change";
-import { dayLabel, plural } from "./format";
+import { dayLabel } from "./format";
 
 export type PermanentStatus = "working" | "slipping" | "waiting" | "nothing";
 
@@ -32,31 +32,18 @@ export function permanentStatus(check: PermanentCheck): PermanentStatus {
   return permanentNote(check) === null ? "working" : "waiting";
 }
 
-/** The model every row was checked on, or null when they differ or one is unknown. */
-export function sharedModel(checks: PermanentCheck[]): string | null {
-  const models = new Set(checks.map((c) => c.model));
-  const [only] = models;
-  return models.size === 1 && only ? only : null;
-}
-
-/** "5 proven rules, each left off for 1 task in 10 since 12 Nov"; the date only when all share it. */
+/** The permanent check's one line: "Proven rules, each left off for 1 task in 10 since 12 Nov"; the date when shared. */
 export function permanentSummary(checks: PermanentCheck[], day: Day): string {
-  if (checks.length === 0) return "No proven rules yet";
   const since = new Set(checks.map((c) => c.since));
   const [only] = since;
   const when = since.size === 1 ? ` since ${dayLabel(only, day)}` : "";
-  return `${plural(checks.length, "proven rule")}, each left off for 1 task in 10${when}`;
+  return `Proven rules, each left off for 1 task in 10${when}`;
 }
 
-/** "2 still working · 1 slipping · 2 waiting for tasks", leaving out the statuses no rule has. */
-export function statusCounts(checks: PermanentCheck[]): string {
-  const counts = new Map<PermanentStatus, number>();
-  for (const check of checks) {
-    const status = permanentStatus(check);
-    counts.set(status, (counts.get(status) ?? 0) + 1);
-  }
-  return (["working", "slipping", "waiting", "nothing"] as const)
-    .filter((s) => counts.has(s))
-    .map((s) => `${counts.get(s)} ${STATUS_WORDS[s].toLowerCase()}`)
-    .join(" · ");
+/** What slipping means, said once in a slipping rule's detail. */
+export const SLIPPING_LINE = "Slipping: the rule can no longer be shown to cut this mistake by 30% or more.";
+
+/** The reason in a proven rule's row where no strip is drawn: as in its detail, but short where the status says the rest. */
+export function permanentRowNote(check: PermanentCheck): string | null {
+  return permanentStatus(check) === "nothing" ? "No mistakes without the rule" : permanentNote(check);
 }
