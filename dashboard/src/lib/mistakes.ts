@@ -22,10 +22,14 @@ export function sortByChange(mistakes: Mistake[]): Mistake[] {
   return mistakes.toSorted((a, b) => tone(a) - tone(b) || (a.change?.value ?? 0) - (b.change?.value ?? 0));
 }
 
-/** A rule change in words, with its date: "Rule since 8 Nov: …", or "Trial started 8 Nov" for a trial's start. */
-export function ruleLine(change: { day: Day; what: string }, day: Day, latest: boolean): string {
+/**
+ * A rule change in words, with its date: "Rule since 8 Nov: …" for the mistake's latest, "Rule changed 1 Oct: …" for
+ * an earlier one, or "Trial started 8 Nov" for a trial's start.
+ */
+export function ruleLine(change: { day: Day; what: string }, mistake: Mistake, day: Day): string {
   const when = dayLabel(change.day, day);
   if (change.what.startsWith(TRIAL_START)) return `Trial started ${when}`;
+  const latest = change.day === mistake.rule?.day && change.what === mistake.rule.what;
   return `${latest ? "Rule since" : "Rule changed"} ${when}: ${change.what}`;
 }
 

@@ -79,8 +79,8 @@ export function sortTrials(trials: Trial[]): Trial[] {
 /** The trend chart's rows by day of the trial ("Day 1" …), padded with empty days up to the trial's length. */
 export function trendRows(trial: Trial): { label: string; with: number | null; without: number | null }[] {
   const byDay = new Map(trial.trend.map((t) => [days(trial.started, t.day) + 1, t]));
-  const length = Math.max(days(trial.started, trial.ends), ...byDay.keys());
-  return Array.from({ length }, (_, i) => {
+  // The last look's day falls one past the trial's length; like the header's "Day 7 of 7", the chart stops at 7.
+  return Array.from({ length: days(trial.started, trial.ends) }, (_, i) => {
     const point = byDay.get(i + 1);
     return { label: `Day ${i + 1}`, with: point?.with ?? null, without: point?.without ?? null };
   });
@@ -93,4 +93,11 @@ export function trialBadge(trial: Trial): { tone: BadgeTone; text: string } {
   if (trial.state !== "finished") return { tone: "waiting", text: STATE[trial.state] };
   const tone = trial.verdict === "works" ? "good" : changeTone(trial.change) === "bad" ? "bad" : "unclear";
   return { tone, text: verdictWords(trial.verdict) };
+}
+
+/** A trial in one line for the overview: "Day 4 of 7 · 12 with · 11 without", or only when it starts. */
+export function trialSummary(trial: Trial, day: Day): string {
+  const when = trialWhen(trial, day, false);
+  if (trial.state === "scheduled") return when;
+  return `${when} · ${number(trial.tasks_with)} with · ${number(trial.tasks_without)} without`;
 }

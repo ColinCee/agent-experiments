@@ -62,6 +62,11 @@ export function changeInBrief(change: Range | null): string {
   return words.tone === "unclear" ? "could be no change" : words.lead;
 }
 
+/** True when the change or its range goes past +100%, the strip's right edge, so the strip shows a cap there. */
+export function isClipped(change: Range | null): boolean {
+  return Math.max(change?.value ?? 0, change?.high ?? 0) > 1;
+}
+
 /** Where a change sits on a strip from -100% (left, 0) to +100% (right, 1); beyond +100% is held at the edge. */
 export function stripPosition(change: number): number {
   return (Math.min(1, Math.max(-1, change)) + 1) / 2;

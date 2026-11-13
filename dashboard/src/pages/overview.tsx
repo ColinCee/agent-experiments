@@ -5,11 +5,11 @@ import { GridHeader, GridRow } from "@/components/rule-grid";
 import { Empty, Section } from "@/components/section";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Mistake, Report, Trial } from "@/data/report";
-import { type AttentionItem, attentionItems } from "@/lib/attention";
-import { dayLabel, percent, plural } from "@/lib/format";
+import { type AttentionItem, attentionItems, calmLine } from "@/lib/attention";
+import { percent, plural } from "@/lib/format";
 import { NO_RECENT_TASKS, slug, sortByChange, withoutRule, withRule } from "@/lib/mistakes";
 import { permanentSummary, statusCounts } from "@/lib/permanent";
-import { sortTrials, trialWhen, verdictWords } from "@/lib/trials";
+import { sortTrials, trialSummary, verdictWords } from "@/lib/trials";
 import { cn } from "@/lib/utils";
 import { href } from "@/routes";
 
@@ -26,8 +26,7 @@ function NeedsAttention({ report }: { report: Report }) {
       {items.length === 0 ? (
         <p className="flex items-start gap-2 text-muted-foreground">
           <CircleCheck className="mt-0.5 size-4 shrink-0 text-good" />
-          Nothing needs attention. No mistake was above its usual range on {dayLabel(report.day, report.day)} and no
-          proven rule is slipping.
+          {calmLine(report.day)}
         </p>
       ) : (
         <ul className="grid gap-3 md:grid-cols-2">
@@ -57,11 +56,9 @@ function TrialLine({ trial, day }: { trial: Trial; day: string }) {
     <li className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-0.5 py-2.5">
       <span className="font-medium">{trial.name}</span>
       <span className="text-sm text-muted-foreground">
-        {trialWhen(trial, day, false)}
+        {trialSummary(trial, day)}
         {trial.state !== "scheduled" && (
           <>
-            {" · "}
-            {trial.tasks_with} with · {trial.tasks_without} without
             {" · "}
             <span className="text-foreground">{verdictWords(trial.verdict)}</span>
           </>

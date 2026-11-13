@@ -5,7 +5,6 @@ import { cn } from "cn";
 import { PanelLeftIcon } from "lucide-react";
 import * as React from "react";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -309,17 +308,6 @@ function SidebarFooter({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
-function SidebarSeparator({ className, ...props }: React.ComponentProps<typeof Separator>) {
-  return (
-    <Separator
-      data-slot="sidebar-separator"
-      data-sidebar="separator"
-      className={cn("mx-2 w-auto bg-sidebar-border", className)}
-      {...props}
-    />
-  );
-}
-
 function SidebarContent({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -618,7 +606,6 @@ export {
   SidebarMenuSubItem,
   SidebarProvider,
   SidebarRail,
-  SidebarSeparator,
   SidebarTrigger,
   useSidebar,
 };

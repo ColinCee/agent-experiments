@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import type { Range } from "@/data/report";
-import { type ChangeWords, changeWords, stripPosition, type Tone } from "@/lib/change";
+import { type ChangeWords, changeWords, isClipped, stripPosition, type Tone } from "@/lib/change";
 import { cn } from "@/lib/utils";
 
 const MARK: Record<Tone, string> = { good: "bg-good", bad: "bg-bad", unclear: "bg-muted-foreground" };
@@ -22,11 +22,11 @@ function StripAxis() {
 /** The marks only, on the fixed -100%..+100% domain; beyond +100% is held at the edge with a "›" cap. */
 function Strip({ change, tone }: { change: Range | null; tone: Tone }) {
   const range = change?.low != null && change.high != null ? { low: change.low, high: change.high } : null;
-  const clipped = Math.max(change?.value ?? 0, range?.high ?? 0) > 1;
+  const clipped = isClipped(change);
   return (
     <div data-track="change" className="relative h-5 w-full">
       <div className="absolute inset-x-0 top-1/2 h-px bg-border" />
-      <div className="absolute top-0 left-1/2 h-full w-px bg-muted-foreground/50" />
+      <div className="absolute top-0 left-1/2 h-full w-px bg-muted-foreground/70" />
       {range && change && (
         <>
           <div

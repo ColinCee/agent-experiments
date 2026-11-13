@@ -8,6 +8,7 @@ import {
   trendRows,
   trialBadge,
   trialDay,
+  trialSummary,
   trialWhen,
   verdictWords,
 } from "./trials";
@@ -18,12 +19,12 @@ const trial = (over: Partial<Trial>): Trial => ({
   ends: "2026-11-16",
   state: "running",
   verdict: null,
-  tasks_with: 12,
-  tasks_without: 11,
+  tasks_with: 14,
+  tasks_without: 9,
   rate_with: 0.1,
   rate_without: 0.2,
   change: null,
-  needed: 80,
+  needed: 70,
   per_week: 90,
   looks: [],
   trend: [],
@@ -67,14 +68,14 @@ test("verdicts read as plain words, never the word effect", () => {
 
 describe("tasksNote", () => {
   test("warns when a week brings fewer tasks than needed", () => {
-    expect(tasksNote(trial({ per_week: 19 }))).toBe(
-      "A week usually brings about 19 per half, so this trial may end unclear.",
+    expect(tasksNote(trial({ per_week: 23 }))).toBe(
+      "A week usually brings about 23 per half, so this trial may end unclear.",
     );
   });
 
   test("says nothing when a week brings enough, or the trial is over", () => {
     expect(tasksNote(trial({ per_week: 90 }))).toBeNull();
-    expect(tasksNote(trial({ per_week: 19, state: "finished" }))).toBeNull();
+    expect(tasksNote(trial({ per_week: 23, state: "finished" }))).toBeNull();
   });
 
   test("a trial needing over the most the report counts is always short", () => {
@@ -83,17 +84,17 @@ describe("tasksNote", () => {
 
   test("a scheduled trial says it has no tasks yet, without repeating its start", () => {
     expect(tasksNote(trial({ state: "scheduled", tasks_with: 0, tasks_without: 0 }))).toBe("No tasks yet.");
-    expect(tasksNote(trial({ state: "scheduled", per_week: 19 }))).toBe(
-      "No tasks yet. A week usually brings about 19 per half, so this trial may end unclear.",
+    expect(tasksNote(trial({ state: "scheduled", per_week: 23 }))).toBe(
+      "No tasks yet. A week usually brings about 23 per half, so this trial may end unclear.",
     );
   });
 });
 
 test("the task bars span the tasks needed, or the tasks done when more", () => {
-  expect(taskScale(trial({ needed: 80, tasks_with: 12 }))).toBe(80);
-  expect(taskScale(trial({ needed: 80, tasks_with: 95 }))).toBe(95);
+  expect(taskScale(trial({ needed: 70, tasks_with: 14 }))).toBe(70);
+  expect(taskScale(trial({ needed: 70, tasks_with: 95 }))).toBe(95);
   expect(taskScale(trial({ needed: null }))).toBe(320);
-  expect(neededWords(trial({ needed: 80 }))).toBe("about 80 needed");
+  expect(neededWords(trial({ needed: 70 }))).toBe("about 70 needed");
   expect(neededWords(trial({ needed: null }))).toBe("over 320 needed");
 });
 
@@ -123,6 +124,15 @@ test("the trend runs by day of the trial, padded to its length, keeping gaps", (
   expect(rows[6]).toEqual({ label: "Day 7", with: null, without: null });
 });
 
+test("the trend stops at the trial's last day, as its header does", () => {
+  const trend = Array.from({ length: 8 }, (_, i) => ({
+    day: `2026-11-${String(9 + i).padStart(2, "0")}`,
+    with: 0.1,
+    without: 0.2,
+  }));
+  expect(trendRows(trial({ trend })).at(-1)?.label).toBe("Day 7");
+});
+
 test("a trial's badge says where it is, or its verdict once finished", () => {
   expect(trialBadge(trial({ state: "scheduled" }))).toEqual({ tone: "waiting", text: "Scheduled" });
   expect(trialBadge(trial({ state: "running", verdict: "no verdict yet" }))).toEqual({
@@ -136,4 +146,9 @@ test("a trial's badge says where it is, or its verdict once finished", () => {
   });
   const worse = { value: 0.6, low: 0.2, high: 1.1 };
   expect(trialBadge(trial({ state: "finished", verdict: "no useful effect", change: worse })).tone).toBe("bad");
+});
+
+test("the overview's trial line gives its tasks once it has started", () => {
+  expect(trialSummary(trial({}), "2026-11-12")).toBe("Day 4 of 7 · 14 with · 9 without");
+  expect(trialSummary(trial({ state: "scheduled", started: "2026-11-13" }), "2026-11-12")).toBe("Starts 13 Nov");
 });

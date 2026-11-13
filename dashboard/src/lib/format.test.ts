@@ -21,7 +21,7 @@ test("a day shows its year only when it is not the report's year", () => {
 });
 
 test("the written time is shown in the given time zone", () => {
-  expect(timeLabel("2026-11-12T22:39:05+00:00", "UTC")).toBe("12 Nov, 22:39");
-  expect(timeLabel("2026-11-12T22:39:05+00:00", "Asia/Tokyo")).toBe("13 Nov, 07:39");
+  expect(timeLabel("2026-11-12T21:17:05+00:00", "UTC")).toBe("12 Nov, 21:17");
+  expect(timeLabel("2026-11-12T21:17:05+00:00", "Asia/Tokyo")).toBe("13 Nov, 06:17");
   expect(timeLabel("2026-09-03T00:05:00Z", "UTC")).toBe("3 Sep, 00:05");
 });

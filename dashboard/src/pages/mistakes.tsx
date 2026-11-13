@@ -70,7 +70,7 @@ function MistakeCard({ mistake, day, target }: { mistake: Mistake; day: Day; tar
         )}
         {shown && (
           <p data-rule-line className="text-sm">
-            {ruleLine(shown, day, shown.day === mistake.rule?.day && shown.what === mistake.rule.what)}
+            {ruleLine(shown, mistake, day)}
           </p>
         )}
       </CardContent>

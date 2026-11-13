@@ -1,20 +1,20 @@
 import { describe, expect, test } from "vitest";
-import { changeInBrief, changeWords, stripPosition } from "./change";
+import { changeInBrief, changeWords, isClipped, stripPosition } from "./change";
 
 describe("changeWords", () => {
   test("a range wholly below no change reads as fewer mistakes", () => {
-    expect(changeWords({ value: -0.83, low: -0.89, high: -0.74 })).toEqual({
+    expect(changeWords({ value: -0.61, low: -0.7, high: -0.5 })).toEqual({
       tone: "good",
-      lead: "83% fewer",
-      hint: "likely 74% to 89% fewer",
+      lead: "61% fewer",
+      hint: "likely 50% to 70% fewer",
       hasRange: true,
     });
   });
 
   test("a range wholly above no change reads as more mistakes", () => {
-    expect(changeWords({ value: 0.52, low: 0.1, high: 1.4 })).toEqual({
+    expect(changeWords({ value: 0.37, low: 0.1, high: 1.4 })).toEqual({
       tone: "bad",
-      lead: "52% more",
+      lead: "37% more",
       hint: "likely 10% to 140% more",
       hasRange: true,
     });
@@ -47,7 +47,7 @@ describe("changeWords", () => {
 });
 
 test("changeInBrief gives the lead when clear and a hint otherwise", () => {
-  expect(changeInBrief({ value: 0.52, low: 0.1, high: 1 })).toBe("52% more");
+  expect(changeInBrief({ value: 0.37, low: 0.1, high: 1 })).toBe("37% more");
   expect(changeInBrief({ value: 0.05, low: -0.2, high: 0.4 })).toBe("could be no change");
   expect(changeInBrief(null)).toBe("too few tasks to tell");
 });
@@ -60,7 +60,11 @@ describe("stripPosition", () => {
     expect(stripPosition(-0.5)).toBe(0.25);
   });
 
-  test("holds values beyond +100% at the right edge", () => {
+  test("holds values beyond +100% at the right edge, and says so", () => {
     expect(stripPosition(2.1)).toBe(1);
+    expect(isClipped({ value: 0.6, low: 0.2, high: 2.1 })).toBe(true);
+    expect(isClipped({ value: 1.3, low: null, high: null })).toBe(true);
+    expect(isClipped({ value: 0.6, low: 0.2, high: 1 })).toBe(false);
+    expect(isClipped(null)).toBe(false);
   });
 });

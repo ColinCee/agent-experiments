@@ -6,7 +6,16 @@ import { StatusBadge } from "@/components/status-badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Day, Report, Trial } from "@/data/report";
 import { number, percent } from "@/lib/format";
-import { hasResult, neededWords, sortTrials, taskScale, tasksNote, trialBadge, trialWhen } from "@/lib/trials";
+import {
+  hasResult,
+  neededWords,
+  sortTrials,
+  taskScale,
+  tasksNote,
+  trialBadge,
+  trialWhen,
+  verdictWords,
+} from "@/lib/trials";
 import { cn } from "@/lib/utils";
 
 function TaskBar({ side, label, tasks, scale }: { side: Side; label: string; tasks: number; scale: number }) {
@@ -63,7 +72,10 @@ function Tasks({ trial }: { trial: Trial }) {
 function Result({ trial, axis }: { trial: Trial; axis: boolean }) {
   return (
     <div className="space-y-3">
-      <h3 className="text-sm font-medium text-muted-foreground">Result so far</h3>
+      <h3 className="flex items-baseline gap-2">
+        <span className="text-sm font-medium text-muted-foreground">Result so far</span>
+        <span className="font-semibold">{verdictWords(trial.verdict)}</span>
+      </h3>
       <div className="flex flex-wrap gap-x-6 text-sm">
         <Swatch side="without">
           Without <RateValue rate={trial.rate_without === null ? "–" : percent(trial.rate_without)} side="without" />

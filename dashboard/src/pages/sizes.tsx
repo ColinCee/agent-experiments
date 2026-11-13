@@ -47,14 +47,14 @@ function Largest({ files }: { files: Sizes["largest"] }) {
 
 function Months({ months, day }: { months: Sizes["months"]; day: Day }) {
   return (
-    <Table>
+    <Table className="[&_th]:h-auto [&_th]:py-2 [&_th]:align-bottom">
       <TableHeader>
         <TableRow>
-          <TableHead>Month</TableHead>
-          <TableHead>Rules or Skills</TableHead>
-          <TableHead className="text-right">Edits</TableHead>
-          <TableHead className="text-right">Only added text</TableHead>
-          <TableHead className="text-right">Of changed lines, added</TableHead>
+          <TableHead className="whitespace-normal">Month</TableHead>
+          <TableHead className="whitespace-normal">Rules or Skills</TableHead>
+          <TableHead className="text-right whitespace-normal">Edits</TableHead>
+          <TableHead className="text-right whitespace-normal">Only added text</TableHead>
+          <TableHead className="text-right whitespace-normal">Of changed lines, added</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>

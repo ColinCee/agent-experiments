@@ -30,11 +30,10 @@ test("rules sort clearly fewer (largest first), then unclear, then clearly more"
 });
 
 test("a rule line names the rule, and a trial's start as a trial", () => {
-  expect(ruleLine({ day: "2026-11-08", what: "Do it right" }, "2026-11-12", true)).toBe(
-    "Rule since 8 Nov: Do it right",
-  );
-  expect(ruleLine({ day: "2026-10-01", what: "Do it" }, "2026-11-12", false)).toBe("Rule changed 1 Oct: Do it");
-  expect(ruleLine({ day: "2026-11-09", what: "trial started: Do it" }, "2026-11-12", true)).toBe("Trial started 9 Nov");
+  const m = mistake({ rule: { day: "2026-11-08", what: "Do it right" } });
+  expect(ruleLine({ day: "2026-11-08", what: "Do it right" }, m, "2026-11-12")).toBe("Rule since 8 Nov: Do it right");
+  expect(ruleLine({ day: "2026-10-01", what: "Do it" }, m, "2026-11-12")).toBe("Rule changed 1 Oct: Do it");
+  expect(ruleLine({ day: "2026-11-09", what: "trial started: Do it" }, m, "2026-11-12")).toBe("Trial started 9 Nov");
 });
 
 test("the today chip shows only outside the usual range", () => {
@@ -47,15 +46,17 @@ test("the today chip shows only outside the usual range", () => {
 
 test("tasks before and since a rule count missing sides as none", () => {
   const side = { rate: 0.1, low: null, high: null, tasks: 79, from: "2026-10-01" };
-  expect(ruleTasks(mistake({ before: side, after: { ...side, tasks: 103 } }))).toBe("79 tasks before · 103 since");
+  expect(ruleTasks(mistake({ before: { ...side, tasks: 64 }, after: { ...side, tasks: 88 } }))).toBe(
+    "64 tasks before · 88 since",
+  );
   expect(ruleTasks(mistake({ before: { ...side, tasks: 1 } }))).toBe("1 task before · 0 since");
 });
 
 test("a mistake with no rule reads its rate now and since when", () => {
-  const current = { rate: 0.42, low: 0.3, high: 0.5, tasks: 114, from: "2026-10-29" };
+  const current = { rate: 0.33, low: 0.25, high: 0.41, tasks: 96, from: "2026-10-27" };
   expect(currentWords(mistake({ rule: null, current }), "2026-11-12")).toEqual({
-    rate: "42% now",
-    tasks: "114 tasks since 29 Oct",
+    rate: "33% now",
+    tasks: "96 tasks since 27 Oct",
   });
   expect(currentWords(mistake({ rule: null }), "2026-11-12")).toBeNull();
 });

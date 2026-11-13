@@ -11,3 +11,10 @@ export function trustReason(replay: Replay): string {
   if (replay.real_rate === null || replay.replay_rate === null) return "No real rate to compare the replay with.";
   return `Real agents made this mistake ${percent(replay.real_rate)} of the time; the replay ${percent(replay.replay_rate)} under the same rules.`;
 }
+
+/** The trust badge and the heading of the result it vouches for. */
+export function trustWords(replay: Replay): { badge: string; heading: string } {
+  return replay.trusted
+    ? { badge: "Can be trusted", heading: "Result" }
+    : { badge: "Can't be trusted", heading: "Result (not reliable)" };
+}

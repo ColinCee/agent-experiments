@@ -37,7 +37,7 @@ export function RatePair({ without, withRule }: { without: number | null; withRu
     <RateTrack>
       {without !== null && withRule !== null && (
         <div
-          className="absolute top-1/2 h-0.5 -translate-y-1/2 bg-muted-foreground/40"
+          className="absolute top-1/2 h-0.5 -translate-y-1/2 bg-muted-foreground/70"
           style={{ left: at(Math.min(without, withRule)), width: at(Math.abs(without - withRule)) }}
         />
       )}

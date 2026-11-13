@@ -165,3 +165,25 @@ test("a row on the overview opens that mistake on the tracked mistakes page", as
   await expect(page.locator("header h1")).toHaveText("Tracked mistakes");
   await expect(page.locator("#ports-taken-without-checking")).toBeInViewport();
 });
+
+test("hovering a rule-change marker on a computer says what changed then", async ({ page }) => {
+  await page.setViewportSize(widths.desktop);
+  const opened = await openBuilt(page);
+  await page.goto(`${opened.url}#/mistakes`);
+  const card = page.locator("#replies-with-no-summary-line");
+  const line = card.locator("[data-rule-line]");
+  await expect(line).toHaveText("Rule since 20 Oct: Replies end with one line saying what is left");
+  await card.locator('[data-marker-day="2026-10-08"]').hover();
+  await expect(line).toHaveText("Rule changed 8 Oct: Replies open with the answer");
+});
+
+test("tapping a rule-change marker on a phone says what changed then", async ({ browser }) => {
+  const context = await browser.newContext({ viewport: widths.phone, hasTouch: true });
+  const page = await context.newPage();
+  const opened = await openBuilt(page);
+  await page.goto(`${opened.url}#/mistakes`);
+  const card = page.locator("#replies-with-no-summary-line");
+  await card.locator('[data-marker-day="2026-10-08"]').tap();
+  await expect(card.locator("[data-rule-line]")).toHaveText("Rule changed 8 Oct: Replies open with the answer");
+  await context.close();
+});

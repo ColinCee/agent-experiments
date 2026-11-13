@@ -1,7 +1,7 @@
 import { expect, test } from "vitest";
 import { fixture } from "@/data/fixture";
 import type { Mistake, Report } from "@/data/report";
-import { attentionItems, needsHim } from "./attention";
+import { attentionItems, calmLine, needsHim } from "./attention";
 
 const today = (rate: number, outside: "above" | "below" | null): Mistake["today"] => ({
   rate,
@@ -70,4 +70,10 @@ test("the full fixture lists the mistake above its range, the slipping rule and 
   const items = attentionItems(fixture);
   expect(items.map((i) => i.tone)).toEqual(["bad", "bad", "good"]);
   expect(needsHim(items)).toBe(2);
+});
+
+test("the calm line names the report's day", () => {
+  expect(calmLine("2026-11-12")).toBe(
+    "Nothing needs attention. No mistake was above its usual range on 12 Nov and no proven rule is slipping.",
+  );
 });

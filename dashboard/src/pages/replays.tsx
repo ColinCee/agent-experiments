@@ -5,7 +5,7 @@ import { StatusBadge } from "@/components/status-badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Day, Replay, Report } from "@/data/report";
 import { percent } from "@/lib/format";
-import { replayedLine, trustReason } from "@/lib/replays";
+import { replayedLine, trustReason, trustWords } from "@/lib/replays";
 import { verdictWords } from "@/lib/trials";
 import { cn } from "@/lib/utils";
 
@@ -20,9 +20,7 @@ function ReplayCard({ replay, day, axis }: { replay: Replay; day: Day; axis: boo
       </CardHeader>
       <CardContent className="space-y-5">
         <div className="space-y-1.5">
-          <StatusBadge tone={replay.trusted ? "unclear" : "bad"}>
-            {replay.trusted ? "Can be trusted" : "Can't be trusted"}
-          </StatusBadge>
+          <StatusBadge tone={replay.trusted ? "unclear" : "bad"}>{trustWords(replay).badge}</StatusBadge>
           <p className="text-sm text-muted-foreground">{trustReason(replay)}</p>
         </div>
         {/* Dims the marks, not the words, so the text keeps its contrast. */}
@@ -34,9 +32,7 @@ function ReplayCard({ replay, day, axis }: { replay: Replay; day: Day; axis: boo
           )}
         >
           <h3 className="flex items-baseline gap-2">
-            <span className="text-sm font-medium text-muted-foreground">
-              {replay.trusted ? "Result" : "Result (not reliable)"}
-            </span>
+            <span className="text-sm font-medium text-muted-foreground">{trustWords(replay).heading}</span>
             <span className="font-semibold">{verdictWords(replay.verdict)}</span>
           </h3>
           <div className="flex flex-wrap items-baseline gap-x-6 gap-y-1 text-sm">

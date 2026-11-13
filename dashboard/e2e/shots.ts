@@ -1,4 +1,4 @@
-// Saves full-page screenshots of every page of the built file, at each width, light and dark, into shots/ as
+// Saves whole-page screenshots of every page of the built file, at each width, light and dark, into shots/ as
 // {fixture|report}-{page}-{width}-{theme}.png.
 // Usage: pnpm shots [--report path/to/report.json]
 import { mkdir, readFile } from "node:fs/promises";
@@ -23,7 +23,11 @@ try {
       for (const { id, path } of PAGES) {
         await page.goto(`${opened.url}#/${path}`);
         const file = fileURLToPath(new URL(`${source}-${id}-${width}-${colorScheme}.png`, outDir));
-        await page.screenshot({ path: file, fullPage: true });
+        // A viewport as tall as the page, not a full-page shot, so the fixed sidebar runs the whole height.
+        const height = await page.evaluate(() => document.documentElement.scrollHeight);
+        await page.setViewportSize({ width: viewport.width, height: Math.max(height, viewport.height) });
+        await page.screenshot({ path: file });
+        await page.setViewportSize(viewport);
         console.log(file);
       }
       if (opened.errors.length > 0) console.error(`${width} ${colorScheme}: ${opened.errors.join("\n")}`);

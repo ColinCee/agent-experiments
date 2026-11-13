@@ -36,8 +36,8 @@ function Marker({
       onMouseLeave={() => onPick(null)}
       onFocus={() => onPick(change)}
       onBlur={() => onPick(null)}
-      onClick={() => onPick(active ? null : change)}
-      onKeyDown={(e) => e.key === "Enter" && onPick(active ? null : change)}
+      onClick={() => onPick(change)}
+      onKeyDown={(e) => e.key === "Enter" && onPick(change)}
     >
       <line
         x1={x1}

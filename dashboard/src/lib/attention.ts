@@ -1,5 +1,5 @@
 import { differenceInCalendarDays, parseISO } from "date-fns";
-import type { Report } from "@/data/report";
+import type { Day, Report } from "@/data/report";
 import { changeInBrief } from "./change";
 import { dayLabel, percent } from "./format";
 import { finishedOn, verdictWords } from "./trials";
@@ -57,3 +57,8 @@ export function attentionItems(report: Report): AttentionItem[] {
 
 /** How many items need him, for the count beside Overview in the sidebar. */
 export const needsHim = (items: AttentionItem[]) => items.filter((i) => i.tone === "bad").length;
+
+/** The one calm line when nothing needs him. */
+export function calmLine(day: Day): string {
+  return `Nothing needs attention. No mistake was above its usual range on ${dayLabel(day, day)} and no proven rule is slipping.`;
+}
