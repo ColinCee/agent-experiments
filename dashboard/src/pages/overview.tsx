@@ -4,10 +4,18 @@ import { RateBar, RatePair, RateValue, type Side, Swatch } from "@/components/ra
 import { GridHeader, GridRow } from "@/components/rule-grid";
 import { Empty, Section } from "@/components/section";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import type { Mistake, Report, Trial } from "@/data/report";
+import type { Day, Mistake, Report, Trial } from "@/data/report";
 import { type AttentionItem, attentionItems, calmLine } from "@/lib/attention";
-import { fewTasks, percent, plural } from "@/lib/format";
-import { missingMistakeChange, NO_RECENT_TASKS, slug, sortByChange, withoutRule, withRule } from "@/lib/mistakes";
+import { percent, plural } from "@/lib/format";
+import {
+  missingMistakeChange,
+  NO_RECENT_TASKS,
+  overviewHint,
+  slug,
+  sortByChange,
+  withoutRule,
+  withRule,
+} from "@/lib/mistakes";
 import { permanentSummary, statusCounts } from "@/lib/permanent";
 import { sortTrials, trialSummary, verdictWords } from "@/lib/trials";
 import { cn } from "@/lib/utils";
@@ -123,15 +131,12 @@ function RateCell({ rate, side, label }: { rate: number | null | undefined; side
   );
 }
 
-function FewTasksLine({ mistake }: { mistake: Mistake }) {
-  const few = fewTasks([
-    { tasks: mistake.before?.tasks, label: "before" },
-    { tasks: mistake.after?.tasks, label: "since the rule" },
-  ]);
-  return few && <span className="block text-sm text-muted-foreground">{few}</span>;
+function HintLine({ mistake, day }: { mistake: Mistake; day: Day }) {
+  const hint = overviewHint(mistake, day);
+  return hint && <span className="block text-sm text-muted-foreground">{hint}</span>;
 }
 
-function RulesTable({ mistakes }: { mistakes: Mistake[] }) {
+function RulesTable({ mistakes, day }: { mistakes: Mistake[]; day: Day }) {
   const rows = sortByChange(withRule(mistakes));
   if (rows.length === 0) return <Empty>No rule has been tried on a mistake yet</Empty>;
   return (
@@ -153,7 +158,7 @@ function RulesTable({ mistakes }: { mistakes: Mistake[] }) {
         <GridRow key={m.name} href={href("mistakes", slug(m.name))}>
           <div>
             <span className="block font-medium">{m.name}</span>
-            <FewTasksLine mistake={m} />
+            <HintLine mistake={m} day={day} />
           </div>
           <div className="md:contents">
             <RateCell rate={m.before?.rate} side="without" label="Before rule" />
@@ -210,7 +215,7 @@ export function OverviewPage({ report }: { report: Report }) {
       <NeedsAttention report={report} />
       <RunningNow report={report} />
       <Section title="Rules and their mistakes">
-        <RulesTable mistakes={report.mistakes} />
+        <RulesTable mistakes={report.mistakes} day={report.day} />
       </Section>
       <Section title="Mistakes with no rule yet">
         <NoRuleTable mistakes={report.mistakes} />

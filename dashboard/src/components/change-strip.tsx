@@ -32,14 +32,19 @@ function Strip({ change, tone }: { change: Range | null; tone: Tone }) {
           <div
             data-low={range.low}
             data-high={range.high}
-            className={cn("absolute top-1/2 h-1 -translate-y-1/2 rounded-full", MARK[tone])}
+            className={cn(
+              "absolute top-1/2 -translate-y-1/2 rounded-full",
+              tone === "unclear" ? "h-0.5" : "h-1",
+              MARK[tone],
+            )}
             style={{ left: at(range.low), width: `calc(${at(range.high)} - ${at(range.low)})` }}
           />
           <div
             data-value={change.value}
             className={cn(
               "absolute top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full ring-2 ring-card",
-              MARK[tone],
+              // Hollow when unclear, so it never reads as the solid grey dot of "without the rule".
+              tone === "unclear" ? "border-2 border-muted-foreground bg-card" : MARK[tone],
             )}
             style={{ left: at(change.value) }}
           />

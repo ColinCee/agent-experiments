@@ -130,7 +130,7 @@ for (const [width, viewport] of Object.entries(widths)) {
     expect(labels).toBeGreaterThan(8);
   });
 
-  test(`history markers sit on their day and the line turns blue at the latest rule at ${width} width`, async ({
+  test(`history markers sit on their day, grey spans the compared window and blue starts at the latest rule at ${width} width`, async ({
     page,
   }) => {
     await page.setViewportSize(viewport);
@@ -153,6 +153,7 @@ for (const [width, viewport] of Object.entries(widths)) {
       }),
     );
     let markersChecked = 0;
+    let windowsChecked = 0;
     for (const mistake of fixture.mistakes) {
       const chart = charts.find((c) => c.id === mistake.name.toLowerCase().replace(/[^a-z0-9]+/g, "-"));
       if (!chart) throw new Error(`no chart for ${mistake.name}`);
@@ -163,23 +164,34 @@ for (const [width, viewport] of Object.entries(widths)) {
         expect(Math.abs(point.x - marker.x), `${mistake.name} ${marker.day}`).toBeLessThanOrEqual(1);
         markersChecked++;
       }
-      const before = chart.points.filter((p) => p.series === "before").map((p) => p.x);
-      const after = chart.points.filter((p) => p.series === "after").map((p) => p.x);
+      const xs = (series: string) => chart.points.filter((p) => p.series === series).map((p) => p.x);
+      const [faint, grey, blue] = [xs("earlier"), xs("before"), xs("after")];
+      const dayX = (day: string | undefined) => chart.points.find((p) => p.day === day)?.x;
+      // Grey covers exactly the compared window: it starts at the window's first day, where the faint earlier
+      // history ends.
+      const from = mistake.rule ? mistake.before?.from : mistake.current?.from;
+      const fromX = dayX(from);
+      if (fromX !== undefined && grey.length > 0) {
+        expect(Math.abs(Math.min(...grey) - fromX), `${mistake.name} grey start`).toBeLessThanOrEqual(1);
+        expect(Math.abs(Math.max(...faint) - fromX), `${mistake.name} faint end`).toBeLessThanOrEqual(1);
+        windowsChecked++;
+      }
       if (mistake.rule === null) {
-        expect(after).toEqual([]);
+        expect(blue).toEqual([]);
         continue;
       }
-      expect(chart.strokes).toEqual(["var(--without)", "var(--with)"]);
+      expect(chart.strokes).toContain("var(--with)");
       const latest = chart.markers.find((m) => m.day === mistake.rule?.day);
       if (!latest) {
         // The rule is older than the window: the whole line is blue.
-        expect(before).toEqual([]);
+        expect(grey).toEqual([]);
         continue;
       }
-      // Both lines share the change day's point, so the colour switches exactly there.
-      expect(Math.abs(Math.max(...before) - latest.x), mistake.name).toBeLessThanOrEqual(1);
-      expect(Math.abs(Math.min(...after) - latest.x), mistake.name).toBeLessThanOrEqual(1);
+      // Grey and blue share the change day's point, so the colour switches exactly there.
+      expect(Math.abs(Math.max(...grey) - latest.x), mistake.name).toBeLessThanOrEqual(1);
+      expect(Math.abs(Math.min(...blue) - latest.x), mistake.name).toBeLessThanOrEqual(1);
     }
+    expect(windowsChecked).toBeGreaterThan(3);
     expect(markersChecked).toBeGreaterThan(5);
   });
 }

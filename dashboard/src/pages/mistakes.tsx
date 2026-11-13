@@ -19,7 +19,7 @@ import {
 } from "@/lib/mistakes";
 import { cn } from "@/lib/utils";
 
-function RuleNumbers({ mistake }: { mistake: Mistake }) {
+function RuleNumbers({ mistake, day }: { mistake: Mistake; day: Day }) {
   const rate = (r: number | undefined) => (r === undefined ? "–" : percent(r));
   return (
     <div className="space-y-1">
@@ -32,7 +32,7 @@ function RuleNumbers({ mistake }: { mistake: Mistake }) {
         </Swatch>
         <ChangeText change={mistake.change} missing={missingMistakeChange(mistake)} />
       </div>
-      <p className="text-sm text-muted-foreground">{ruleTasks(mistake)}</p>
+      <p className="text-sm text-muted-foreground">{ruleTasks(mistake, day)}</p>
     </div>
   );
 }
@@ -59,7 +59,7 @@ function MistakeCard({ mistake, day, target }: { mistake: Mistake; day: Day; tar
         {chip && <StatusBadge tone={chip.tone}>{chip.text}</StatusBadge>}
       </CardHeader>
       <CardContent className="space-y-4">
-        {mistake.rule ? <RuleNumbers mistake={mistake} /> : <CurrentNumbers mistake={mistake} day={day} />}
+        {mistake.rule ? <RuleNumbers mistake={mistake} day={day} /> : <CurrentNumbers mistake={mistake} day={day} />}
         {hasData ? (
           <HistoryChart mistake={mistake} day={day} />
         ) : (

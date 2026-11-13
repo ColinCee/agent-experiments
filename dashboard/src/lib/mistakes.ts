@@ -1,6 +1,7 @@
+import { differenceInCalendarDays, format, parseISO, subDays } from "date-fns";
 import type { Day, Mistake, MistakeChange } from "@/data/report";
 import { changeTone, missingChange, type Tone } from "./change";
-import { dayLabel, percent, plural } from "./format";
+import { dayLabel, fewTasks, percent, plural } from "./format";
 
 export function slug(name: string): string {
   return name
@@ -41,9 +42,45 @@ export function todayChip(mistake: Mistake): { text: string; tone: "good" | "bad
     : { text: `Below usual today: ${numbers}`, tone: "good" };
 }
 
-/** "79 tasks before · 103 since". */
-export function ruleTasks(mistake: Mistake): string {
-  return `${plural(mistake.before?.tasks ?? 0, "task")} before · ${mistake.after?.tasks ?? 0} since`;
+/** The days a before or since window covers: "2 Nov to 4 Nov", or "on 4 Nov" for a single day. */
+function span(from: Day, to: Day, day: Day): string {
+  return from === to ? `on ${dayLabel(from, day)}` : `${dayLabel(from, day)} to ${dayLabel(to, day)}`;
+}
+
+/** The last day of the before window: the day before the latest rule change. */
+const beforeEnds = (rule: { day: Day }) => format(subDays(parseISO(rule.day), 1), "yyyy-MM-dd");
+
+/** The windows the before and since rates cover: "14 tasks 2 Nov to 4 Nov · 82 since 5 Nov". */
+export function ruleTasks(mistake: Mistake, day: Day): string {
+  if (!mistake.rule) return "";
+  const before = mistake.before
+    ? `${plural(mistake.before.tasks, "task")} ${span(mistake.before.from, beforeEnds(mistake.rule), day)}`
+    : "No tasks before the rule";
+  return `${before} · ${mistake.after?.tasks ?? 0} since ${dayLabel(mistake.rule.day, day)}`;
+}
+
+/** Shorter than this, a before window is named on the overview, since "before" alone suggests far longer. */
+const SHORT_WINDOW = 7;
+
+/** The longest hint line that still fits its slot under a mistake's name on the overview. */
+const HINT_ROOM = 48;
+
+/**
+ * The one muted line under a mistake's name on the overview: how few tasks the rates rest on, and how short the
+ * before window is ("before = 2 Nov to 4 Nov") when that still fits the line; null when neither applies.
+ */
+export function overviewHint(mistake: Mistake, day: Day): string | null {
+  const few = fewTasks([
+    { tasks: mistake.before?.tasks, label: "before" },
+    { tasks: mistake.after?.tasks, label: "since the rule" },
+  ]);
+  const { before, rule } = mistake;
+  const short =
+    before && rule && differenceInCalendarDays(parseISO(rule.day), parseISO(before.from)) < SHORT_WINDOW
+      ? `before = ${span(before.from, beforeEnds(rule), day).replace(/^on /, "")}`
+      : null;
+  const both = few && short ? `${few} · ${short}` : null;
+  return both && both.length <= HINT_ROOM ? both : (few ?? short);
 }
 
 /** A mistake with no rule: its rate now and what it rests on. */
@@ -57,17 +94,34 @@ export function currentWords(mistake: Mistake, day: Day): { rate: string; tasks:
 
 export const NO_RECENT_TASKS = "No tasks in the last 4 weeks";
 
+export interface HistoryRow {
+  day: Day;
+  /** History outside the compared windows: context only. */
+  earlier: number | null;
+  /** The window the before rate (or, with no rule, the rate now) covers. */
+  before: number | null;
+  /** From the latest rule change. */
+  after: number | null;
+}
+
 /**
- * The history chart's rows: the rate split into `before` (up to and including the latest rule change) and `after`
- * (from it), so the two lines meet on the change day and the colour switches exactly there.
+ * The history chart's rows, split so grey means exactly the compared window: `earlier` up to the window's start,
+ * `before` from it to the latest rule change, `after` from that change. Neighbouring parts share their boundary day,
+ * so the line runs on unbroken while its colour switches exactly there.
  */
-export function historyRows(mistake: Mistake): { day: Day; before: number | null; after: number | null }[] {
+export function historyRows(mistake: Mistake): HistoryRow[] {
   const ruleDay = mistake.rule?.day;
-  return mistake.series.map(({ day, rate }) => ({
-    day,
-    before: ruleDay === undefined || day <= ruleDay ? rate : null,
-    after: ruleDay !== undefined && day >= ruleDay ? rate : null,
-  }));
+  const from = mistake.rule ? mistake.before?.from : mistake.current?.from;
+  const end = ruleDay ?? "9999-12-31";
+  return mistake.series.map(({ day, rate }) => {
+    const inWindow = from !== undefined && day >= from && day <= end;
+    return {
+      day,
+      earlier: from === undefined ? (day <= end ? rate : null) : day <= from ? rate : null,
+      before: inWindow ? rate : null,
+      after: ruleDay !== undefined && day >= ruleDay ? rate : null,
+    };
+  });
 }
 
 /** Rule changes and trial starts grouped by day, so changes on one day share one marker. */

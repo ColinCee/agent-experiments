@@ -14,6 +14,16 @@ const LABEL_FONT = 12;
 const ICON = 12;
 const ROW_HEIGHT = 16;
 
+/**
+ * Blue since the latest rule, grey over exactly the window the before rate covers, and earlier history fainter and
+ * thinner (about 3:1 on the card) so it reads as context, not as "before".
+ */
+const SERIES_STYLE = {
+  earlier: { stroke: "var(--muted-foreground)", strokeOpacity: 0.65, strokeWidth: 1.5 },
+  before: { stroke: "var(--without)", strokeWidth: 2 },
+  after: { stroke: "var(--with)", strokeWidth: 2 },
+} as const;
+
 export interface Picked {
   day: Day;
   changes: MistakeChange[];
@@ -179,27 +189,28 @@ export function HistoryChart({ mistake, day }: { mistake: Mistake; day: Day }) {
               const row = active ? payload?.[0]?.payload : undefined;
               const rate = row?.after ?? row?.before;
               if (rate == null || picked) return null;
-              const since = row.after != null && mistake.rule !== null;
+              const part = row.after != null && mistake.rule ? "after" : row.before != null ? "before" : "earlier";
               return (
                 <ChartTip
                   title={dayLabel(String(label), day)}
                   rows={[
                     {
-                      name: since ? "Since rule" : "Share",
+                      name: { after: "Since rule", before: mistake.rule ? "Before rule" : "Share", earlier: "Earlier" }[
+                        part
+                      ],
                       value: percent(rate),
-                      swatch: since ? "bg-with" : "bg-without",
+                      swatch: { after: "bg-with", before: "bg-without", earlier: "bg-muted-foreground" }[part],
                     },
                   ]}
                 />
               );
             }}
           />
-          {(["before", "after"] as const).map((key) => (
+          {(["earlier", "before", "after"] as const).map((key) => (
             <Line
               key={key}
               dataKey={key}
-              stroke={key === "after" ? "var(--with)" : "var(--without)"}
-              strokeWidth={2}
+              {...SERIES_STYLE[key]}
               type="linear"
               connectNulls={false}
               isAnimationActive={false}

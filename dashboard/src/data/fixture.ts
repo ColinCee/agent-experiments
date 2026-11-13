@@ -22,14 +22,22 @@ function random(seed: number) {
 
 /**
  * A noisy daily rate around `before`, stepping to `after` on `ruleDay`: a random walk that drifts back to its level,
- * with about one day in twelve missing. Days in `keep` (where markers sit) always have data.
+ * with about one day in twelve missing. Days in `keep` (where markers sit) always have data. Before `earlier.until`
+ * the level is `earlier.rate` instead.
  */
-function series(before: number, after: number, ruleDay: Day | null, seed: number, keep: Day[] = []) {
+function series(
+  before: number,
+  after: number,
+  ruleDay: Day | null,
+  seed: number,
+  keep: Day[] = [],
+  earlier?: { until: Day; rate: number },
+) {
   const next = random(seed);
   let walk = 0;
   return Array.from({ length: SERIES_DAYS }, (_, i) => {
     const day = shift(seriesStart, i);
-    const base = ruleDay !== null && day >= ruleDay ? after : before;
+    const base = ruleDay !== null && day >= ruleDay ? after : earlier && day < earlier.until ? earlier.rate : before;
     walk = 0.7 * walk + (next() - 0.5) * 0.6;
     const gap = next() < 1 / 12 && !keep.includes(day);
     return { day, rate: gap ? null : round(Math.min(1, base * Math.exp(walk))) };
@@ -53,6 +61,7 @@ function withRule(
   range: { low: number | null; high: number | null } | null,
   today: Mistake["today"],
   phase: number,
+  earlierRate?: number,
 ): Mistake {
   const change: Range | null = range && { value: round(after.rate / before.rate - 1), ...range };
   const sure = change?.low != null && change.high != null && change.low * change.high > 0;
@@ -71,6 +80,7 @@ function withRule(
       rule.day,
       phase * 1000,
       [...earlier, rule].map((c) => c.day),
+      earlierRate === undefined ? undefined : { until: before.from, rate: earlierRate },
     ),
     changes: [...earlier, { ...rule, kind: "rule" as const }].filter((c) => c.day >= seriesStart),
   };
@@ -176,12 +186,14 @@ const mistakes: Mistake[] = [
   withRule(
     "Release notes left unwritten",
     { day: "2026-11-06", what: "Write the release note with the change" },
-    [{ day: "2026-11-04", what: "Name the release in the note", kind: "rule" }],
-    side(0.5, null, null, 6, seriesStart),
+    [{ day: "2026-11-03", what: "Name the release in the note", kind: "rule" }],
+    side(0.5, null, null, 6, "2026-11-03"),
     side(0.333, null, null, 3, "2026-11-06"),
     { low: null, high: null },
     usual(0.33, 0.2, 0.6),
     5.2,
+    // The before window is the 3 days after the earlier change; the weeks before it ran far lower.
+    0.12,
   ),
   noRule("Config read from memory", side(0.18, 0.13, 0.24, 150, usualStart), usual(0.08, 0.03, 0.15), 2.9, [
     { day: shift(DAY, -3), what: "Config read from memory", kind: "trial" },

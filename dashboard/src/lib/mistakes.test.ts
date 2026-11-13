@@ -6,6 +6,7 @@ import {
   historyRows,
   markerWords,
   missingMistakeChange,
+  overviewHint,
   ruleSince,
   ruleTasks,
   slug,
@@ -64,12 +65,29 @@ test("the today chip shows only outside the usual range", () => {
   expect(todayChip(mistake({ today: null }))).toBeNull();
 });
 
-test("tasks before and since a rule count missing sides as none", () => {
-  const side = { rate: 0.1, low: null, high: null, tasks: 79, from: "2026-10-01" };
-  expect(ruleTasks(mistake({ before: { ...side, tasks: 64 }, after: { ...side, tasks: 88 } }))).toBe(
-    "64 tasks before · 88 since",
+test("the task line names the windows the before and since rates cover", () => {
+  const side = { rate: 0.1, low: null, high: null, tasks: 14, from: "2026-11-02" };
+  const rule = { day: "2026-11-05", what: "Do it" };
+  expect(ruleTasks(mistake({ rule, before: side, after: { ...side, tasks: 82 } }), "2026-11-12")).toBe(
+    "14 tasks 2 Nov to 4 Nov · 82 since 5 Nov",
   );
-  expect(ruleTasks(mistake({ before: { ...side, tasks: 1 } }))).toBe("1 task before · 0 since");
+  expect(ruleTasks(mistake({ rule, before: { ...side, tasks: 1, from: "2026-11-04" } }), "2026-11-12")).toBe(
+    "1 task on 4 Nov · 0 since 5 Nov",
+  );
+  expect(ruleTasks(mistake({ rule, after: side }), "2026-11-12")).toBe("No tasks before the rule · 14 since 5 Nov");
+});
+
+test("the overview hint names a short before window, with the small-sample words when both fit", () => {
+  const side = (tasks: number, from: string) => ({ rate: 0.1, low: null, high: null, tasks, from });
+  const rule = { day: "2026-11-05", what: "Do it" };
+  const hint = (before: number, from: string, after: number) =>
+    overviewHint(mistake({ rule, before: side(before, from), after: side(after, rule.day) }), "2026-11-12");
+  expect(hint(40, "2026-11-02", 30)).toBe("before = 2 Nov to 4 Nov");
+  expect(hint(40, "2026-11-04", 30)).toBe("before = 4 Nov");
+  expect(hint(40, "2026-10-01", 30)).toBeNull();
+  expect(hint(40, "2026-10-01", 3)).toBe("only 3 tasks since the rule");
+  expect(hint(6, "2026-11-02", 30)).toBe("only 6 tasks before · before = 2 Nov to 4 Nov");
+  expect(hint(6, "2026-11-02", 3)).toBe("only 6 tasks before and 3 since the rule");
 });
 
 test("a mistake with no rule reads its rate now and since when", () => {
@@ -81,20 +99,40 @@ test("a mistake with no rule reads its rate now and since when", () => {
   expect(currentWords(mistake({ rule: null }), "2026-11-12")).toBeNull();
 });
 
-test("history rows split at the latest rule change, sharing its day, and keep gaps", () => {
+test("history rows are earlier history, the before window, then since the rule, sharing boundary days", () => {
   const series = [
-    { day: "2026-11-07", rate: 0.3 },
-    { day: "2026-11-08", rate: 0.2 },
+    { day: "2026-11-05", rate: 0.9 },
+    { day: "2026-11-06", rate: 0.3 },
+    { day: "2026-11-07", rate: 0.2 },
+    { day: "2026-11-08", rate: 0.25 },
     { day: "2026-11-09", rate: null },
     { day: "2026-11-10", rate: 0.1 },
   ];
-  expect(historyRows(mistake({ series }))).toEqual([
-    { day: "2026-11-07", before: 0.3, after: null },
-    { day: "2026-11-08", before: 0.2, after: 0.2 },
-    { day: "2026-11-09", before: null, after: null },
-    { day: "2026-11-10", before: null, after: 0.1 },
+  const before = { rate: 0.25, low: null, high: null, tasks: 30, from: "2026-11-06" };
+  expect(historyRows(mistake({ series, before }))).toEqual([
+    { day: "2026-11-05", earlier: 0.9, before: null, after: null },
+    { day: "2026-11-06", earlier: 0.3, before: 0.3, after: null },
+    { day: "2026-11-07", earlier: null, before: 0.2, after: null },
+    { day: "2026-11-08", earlier: null, before: 0.25, after: 0.25 },
+    { day: "2026-11-09", earlier: null, before: null, after: null },
+    { day: "2026-11-10", earlier: null, before: null, after: 0.1 },
   ]);
-  expect(historyRows(mistake({ rule: null, series })).map((r) => r.after)).toEqual([null, null, null, null]);
+});
+
+test("with no compared window all history before the rule is earlier; with no rule grey starts at the rate now", () => {
+  const series = [
+    { day: "2026-11-07", rate: 0.3 },
+    { day: "2026-11-08", rate: 0.2 },
+  ];
+  expect(historyRows(mistake({ series })).map((r) => [r.earlier, r.before])).toEqual([
+    [0.3, null],
+    [0.2, null],
+  ]);
+  const current = { rate: 0.2, low: null, high: null, tasks: 30, from: "2026-11-08" };
+  expect(historyRows(mistake({ rule: null, current, series })).map((r) => [r.earlier, r.before, r.after])).toEqual([
+    [0.3, null, null],
+    [0.2, 0.2, null],
+  ]);
 });
 
 test("slugs are lower-case words joined by dashes", () => {
