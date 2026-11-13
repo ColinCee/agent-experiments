@@ -34,7 +34,13 @@ function Row({ check, day, axis }: { check: PermanentCheck; day: string; axis: b
         <span className="md:hidden"> tasks without / with the rule</span>
       </span>
       {note === null ? (
-        <ChangeStrip change={check.change} axis={axis} mode={check.slipping ? "slipping" : "plain"} cells />
+        <ChangeStrip
+          change={check.change}
+          axis={axis}
+          same="same as without"
+          mode={check.slipping ? "slipping" : "plain"}
+          cells
+        />
       ) : (
         <span className="block text-muted-foreground md:col-span-2">{note}</span>
       )}
@@ -63,7 +69,7 @@ export function PermanentPage({ report }: { report: Report }) {
             <span>Rule</span>
             <span>Since</span>
             <span>Tasks without / with</span>
-            <StripAxisCell />
+            <StripAxisCell same="same as without" />
             <span>Result</span>
             <span>Status</span>
           </div>

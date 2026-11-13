@@ -38,7 +38,9 @@ export function AppShell({
           <DataChip>{dataUpTo}</DataChip>
         </header>
         {/* The overview fills the width with its detail panel; other pages keep a comfortable reading width. */}
-        <main className={cn("mx-auto w-full px-4 py-6 md:px-8 md:py-8", page.id !== "overview" && "max-w-6xl")}>
+        <main
+          className={cn("mx-auto w-full px-4 py-6 md:py-8", page.id === "overview" ? "md:px-6" : "max-w-6xl md:px-8")}
+        >
           {children}
         </main>
       </SidebarInset>

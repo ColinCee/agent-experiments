@@ -3,11 +3,12 @@ import type { Mistake, Range } from "@/data/report";
 import {
   changesByDay,
   currentWords,
+  detailChange,
+  fewTasksNote,
   historyBands,
   historyRows,
   markerWords,
   missingMistakeChange,
-  overviewHint,
   ruleSince,
   ruleTasks,
   scoreWords,
@@ -79,20 +80,10 @@ test("the task line names the windows the before and since rates cover", () => {
   expect(ruleTasks(mistake({ rule, after: side }), "2026-11-12")).toBe("No tasks before the rule · 14 since 5 Nov");
 });
 
-test("the overview hint names a short before window, with the small-sample words when both fit", () => {
-  const side = (tasks: number, from: string) => ({ rate: 0.1, low: null, high: null, tasks, from });
-  const rule = { day: "2026-11-05", what: "Do it" };
-  const hint = (before: number, from: string, after: number) =>
-    overviewHint(mistake({ rule, before: side(before, from), after: side(after, rule.day) }), "2026-11-12");
-  expect(hint(40, "2026-11-02", 30)).toBe("Before: only 2 to 4 Nov");
-  expect(hint(40, "2026-11-04", 30)).toBe("Before: only 4 Nov");
-  expect(overviewHint(mistake({ rule, before: side(40, "2026-10-30"), after: side(30, rule.day) }), "2026-11-12")).toBe(
-    "Before: only 30 Oct to 4 Nov",
-  );
-  expect(hint(40, "2026-10-01", 30)).toBeNull();
-  expect(hint(40, "2026-10-01", 3)).toBe("only 3 tasks since the rule");
-  expect(hint(6, "2026-11-02", 30)).toBe("only 6 tasks before, 2 to 4 Nov");
-  expect(hint(6, "2026-11-02", 3)).toBe("only 6 tasks before and 3 since the rule");
+test("a mistake's small samples are said once, and nothing when both sides have enough", () => {
+  const side = (tasks: number) => ({ rate: 0.1, low: null, high: null, tasks, from: "2026-11-02" });
+  expect(fewTasksNote(mistake({ before: side(7), after: side(3) }))).toBe("only 7 tasks before and 3 since the rule");
+  expect(fewTasksNote(mistake({ before: side(40), after: side(30) }))).toBeNull();
 });
 
 test("a mistake with no rule reads its rate now and since when", () => {
@@ -182,20 +173,24 @@ test("history bands shade the before window grey and since the rule blue, held i
   ]);
 });
 
-test("the scorecard keeps the bold words in the row and moves the range into the strip's tip", () => {
+test("the scorecard says the change in short words, and the detail says it against before the rule with its range", () => {
   const side = (tasks: number) => ({ rate: 0.1, low: null, high: null, tasks, from: "2026-10-01" });
-  const scored = (change: Mistake["change"], before = 30, after = 30) =>
-    scoreWords(mistake({ change, before: side(before), after: side(after) }));
-  expect(scored({ value: -0.79, low: -0.9, high: -0.6 })).toMatchObject({
-    lead: "79% fewer",
+  const m = (change: Mistake["change"], before = 30, after = 30) =>
+    mistake({ change, before: side(before), after: side(after) });
+  expect(scoreWords(m({ value: -0.79, low: -0.9, high: -0.6 }))).toMatchObject({ lead: "79% fewer", tone: "good" });
+  expect(detailChange(m({ value: -0.79, low: -0.9, high: -0.6 }))).toEqual({
     tone: "good",
-    tip: "likely 60% to 90% fewer",
+    lead: "79% fewer than before the rule",
+    rest: "likely 60% to 90% fewer",
   });
-  expect(scored({ value: 0.1, low: -0.3, high: 0.5 })).toMatchObject({ lead: "Unclear", tip: "30% fewer to 50% more" });
-  expect(scored(null)).toMatchObject({
-    lead: "Nothing to compare",
-    tip: "No mistakes before the rule, so nothing to compare",
+  expect(detailChange(m({ value: 0.52, low: 0.1, high: 1 })).lead).toBe("52% more than before the rule");
+  expect(detailChange(m({ value: 0.1, low: -0.3, high: 0.5 }))).toEqual({
+    tone: "unclear",
+    lead: "Unclear",
+    rest: "30% fewer to 50% more",
   });
-  expect(scored(null, 3, 30)).toMatchObject({ lead: "Too few tasks", tip: null });
-  expect(scored({ value: -0.4, low: null, high: null })).toMatchObject({ lead: "Too few tasks", tip: null });
+  expect(scoreWords(m(null)).lead).toBe("Nothing to compare");
+  expect(detailChange(m(null)).lead).toBe("No mistakes before the rule, so nothing to compare");
+  expect(scoreWords(m(null, 3, 30)).lead).toBe("Too few tasks");
+  expect(scoreWords(m({ value: -0.4, low: null, high: null })).lead).toBe("Too few tasks");
 });

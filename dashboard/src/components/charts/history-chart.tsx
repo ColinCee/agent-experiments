@@ -7,6 +7,7 @@ import { layoutLabels, rateCeiling, rateTicks } from "@/lib/charts";
 import { dayLabel, percent } from "@/lib/format";
 import { changesByDay, historyBands, historyRows, markerWords } from "@/lib/mistakes";
 import { cn } from "@/lib/utils";
+import { textWidth } from "../measure";
 import { ChartTip } from "./chart-tip";
 import { PointMark } from "./marks";
 
@@ -29,16 +30,6 @@ export interface Picked {
   changes: MistakeChange[];
   x: number;
   anchor: "start" | "middle" | "end";
-}
-
-let measurer: CanvasRenderingContext2D | null | undefined;
-
-/** A label's drawn width, measured in the page's own font so labels are laid out where they really end. */
-function textWidth(text: string): number {
-  measurer ??= document.createElement("canvas").getContext("2d");
-  if (!measurer) return text.length * 7;
-  measurer.font = `${LABEL_FONT}px ${getComputedStyle(document.body).fontFamily}`;
-  return measurer.measureText(text).width;
 }
 
 /**
@@ -65,7 +56,7 @@ function Markers({
     // A day with a rule change is drawn as a rule change; only a day of trial starts alone gets the trial style.
     const trial = group.changes.every((c) => c.kind === "trial");
     const label = dayLabel(group.day, day);
-    const width = textWidth(label) + (trial ? ICON + 2 : 0);
+    const width = textWidth(label, LABEL_FONT) + (trial ? ICON + 2 : 0);
     return [{ group, trial, x, label, width }];
   });
   const slots = layoutLabels(marks, plot.x, plot.x + plot.width);

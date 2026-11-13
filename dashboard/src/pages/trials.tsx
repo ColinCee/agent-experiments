@@ -1,11 +1,11 @@
 import { AlignWithStrip, ChangeStrip } from "@/components/change-strip";
 import { TrendChart } from "@/components/charts/trend-chart";
-import { RatePair, RateValue, type Side, Swatch } from "@/components/rate-pair";
+import { PairLegend, RatePair, type Side, Swatch } from "@/components/rate-pair";
 import { Empty } from "@/components/section";
 import { StatusBadge } from "@/components/status-badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { Day, Report, Trial } from "@/data/report";
-import { fewTasks, number, percent } from "@/lib/format";
+import { fewTasks, number } from "@/lib/format";
 import {
   hasResult,
   missingTrialChange,
@@ -81,19 +81,12 @@ function Result({ trial, axis }: { trial: Trial; axis: boolean }) {
   return (
     <div className="space-y-3">
       <h3 className="text-sm font-medium text-muted-foreground">Result so far</h3>
-      <div className="flex flex-wrap gap-x-6 text-sm">
-        <Swatch side="without">
-          Without <RateValue rate={trial.rate_without === null ? "–" : percent(trial.rate_without)} side="without" />
-        </Swatch>
-        <Swatch side="with">
-          With the rule <RateValue rate={trial.rate_with === null ? "–" : percent(trial.rate_with)} side="with" />
-        </Swatch>
-      </div>
+      <PairLegend from="without the rule" to="with the rule" />
       <FewTasks trial={trial} />
       <AlignWithStrip>
-        <RatePair without={trial.rate_without} withRule={trial.rate_with} />
+        <RatePair without={trial.rate_without} withRule={trial.rate_with} labelled />
       </AlignWithStrip>
-      <ChangeStrip change={trial.change} axis={axis} missing={missingTrialChange(trial)} />
+      <ChangeStrip change={trial.change} axis={axis} same="same as without" missing={missingTrialChange(trial)} />
     </div>
   );
 }

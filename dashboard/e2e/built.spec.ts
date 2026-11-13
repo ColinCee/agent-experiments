@@ -19,7 +19,9 @@ async function measureTracks(page: Page) {
       kind,
       // A strip's captions (in a table's header row or over a card's strip) must line up with the strips too.
       tracks: [
-        ...document.querySelectorAll(kind === "rate" ? '[data-track="rate"]' : '[data-track="change"], [data-axis]'),
+        ...document.querySelectorAll(
+          kind === "rate" ? '[data-track="rate"], [data-scale]' : '[data-track="change"], [data-axis]',
+        ),
       ]
         .filter((track) => box(track).width > 0)
         .map((track) => ({
@@ -90,13 +92,6 @@ for (const [width, viewport] of Object.entries(widths)) {
       }
     }
     expect(checked).toBeGreaterThan(20);
-  });
-
-  test(`a table's rate track and change strip are equally wide at ${width} width`, async ({ page }) => {
-    await page.setViewportSize(viewport);
-    await openBuilt(page);
-    const [rate, change] = await measureTracks(page);
-    expect(Math.abs(rate.tracks[0].width - change.tracks[0].width)).toBeLessThanOrEqual(0.5);
   });
 
   test(`history marker labels neither overlap nor run off the chart at ${width} width`, async ({ page }) => {
@@ -357,21 +352,83 @@ test("the data's date shows once: in the sidebar on a computer, in the header on
   }
 });
 
-test("a scorecard row's range shows in its strip's tip: on hover with a mouse, on a tap without opening the sheet", async ({
-  browser,
-}) => {
-  const row = (page: import("@playwright/test").Page) =>
-    page.locator('[data-table="rules"] [data-row]', { hasText: "Branch pushed without a pull request" });
-  const desktop = await browser.newPage({ viewport: widths.desktop });
-  await openBuilt(desktop);
-  await row(desktop).locator('[data-track="change"]').hover();
-  await expect(row(desktop).locator("[data-strip-tip]")).toHaveText("likely 47% to 82% fewer");
-  await desktop.close();
-  const context = await browser.newContext({ viewport: widths.phone, hasTouch: true });
-  const phone = await context.newPage();
-  await openBuilt(phone);
-  await row(phone).locator('[data-track="change"]').tap();
-  await expect(row(phone).locator("[data-strip-tip]")).toHaveText("likely 47% to 82% fewer");
-  await expect(phone.getByRole("dialog")).toHaveCount(0);
-  await context.close();
+test("the panel reads the change against before the rule with its range, and draws its strip", async ({ page }) => {
+  await page.setViewportSize(widths.desktop);
+  await openBuilt(page);
+  await expect(page.locator("[data-detail] [data-change-line]")).toHaveText(
+    "100% fewer than before the rule · likely 88% to 100% fewer",
+  );
+  await expect(page.locator('[data-detail] [data-track="change"]')).toHaveCount(1);
+});
+
+for (const [width, viewport] of Object.entries(widths)) {
+  test(`no number on a rate chart overlaps a dot, the arrow or another number at ${width} width`, async ({ page }) => {
+    await page.setViewportSize(viewport);
+    const opened = await openBuilt(page);
+    let labels = 0;
+    for (const path of ["", "trials", "replays"]) {
+      await page.goto(`${opened.url}#/${path}`);
+      const tracks = await page.$$eval('[data-track="rate"]', (all) =>
+        all.map((track) => {
+          const box = (el: Element) => {
+            const r = el.getBoundingClientRect();
+            return { left: r.left, right: r.right, top: r.top, bottom: r.bottom };
+          };
+          return {
+            track: box(track),
+            labels: [...track.querySelectorAll("[data-label]")].map(box),
+            dots: [...track.querySelectorAll("[data-rate]")].map(box),
+            lines: [...track.querySelectorAll("[data-line] line, [data-line] polygon")].map(box),
+          };
+        }),
+      );
+      type Box = { left: number; right: number; top: number; bottom: number };
+      const apart = (a: Box, b: Box) =>
+        a.right <= b.left + 0.5 || b.right <= a.left + 0.5 || a.bottom <= b.top + 0.5 || b.bottom <= a.top + 0.5;
+      for (const t of tracks) {
+        t.labels.forEach((label, i) => {
+          expect(label.left).toBeGreaterThanOrEqual(t.track.left - 0.5);
+          expect(label.right).toBeLessThanOrEqual(t.track.right + 0.5);
+          for (const other of [...t.dots, ...t.lines, ...t.labels.slice(i + 1)]) {
+            expect(apart(label, other), `#/${path} ${JSON.stringify([label, other])}`).toBe(true);
+          }
+          labels++;
+        });
+      }
+    }
+    expect(labels).toBeGreaterThan(10);
+  });
+}
+
+test("no mistake name is cut short on a wide screen", async ({ page }) => {
+  await page.setViewportSize(widths.desktop);
+  await openBuilt(page);
+  const cut = await page.$$eval("[data-name]", (names) =>
+    names.filter((n) => n.scrollWidth > n.clientWidth).map((n) => n.textContent),
+  );
+  expect(cut).toEqual([]);
+});
+
+test("scorecard rows on a wide screen are one even line each, with the name in normal weight", async ({ page }) => {
+  await page.setViewportSize(widths.desktop);
+  await openBuilt(page);
+  const rows = await page.$$eval('[data-table="rules"] [data-row]', (all) =>
+    all.map((row) => {
+      const name = row.querySelector("[data-name]") as HTMLElement;
+      return {
+        height: row.getBoundingClientRect().height,
+        weight: Number(getComputedStyle(name).fontWeight),
+        lines: Math.round(name.getBoundingClientRect().height / Number.parseFloat(getComputedStyle(name).lineHeight)),
+        title: name.title,
+        text: name.textContent,
+      };
+    }),
+  );
+  expect(rows.length).toBeGreaterThan(3);
+  for (const row of rows) {
+    expect(Math.abs(row.height - rows[0].height)).toBeLessThanOrEqual(0.5);
+    expect(row.weight).toBeLessThan(500);
+    expect(row.lines).toBe(1);
+    expect(row.title).toBe(row.text);
+  }
 });

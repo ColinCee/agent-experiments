@@ -1,16 +1,46 @@
-import { ChangeText } from "@/components/change-strip";
+import { ChangeMarks, StripAxis } from "@/components/change-strip";
 import { HistoryChart } from "@/components/charts/history-chart";
 import { RateValue, Swatch } from "@/components/rate-pair";
 import { Empty } from "@/components/section";
 import type { Day, Mistake } from "@/data/report";
 import { percent } from "@/lib/format";
-import { currentWords, missingMistakeChange, NO_RECENT_TASKS, ruleSince, ruleTasks, todayChip } from "@/lib/mistakes";
+import {
+  currentWords,
+  detailChange,
+  fewTasksNote,
+  NO_RECENT_TASKS,
+  ruleSince,
+  ruleTasks,
+  todayChip,
+} from "@/lib/mistakes";
 import { cn } from "@/lib/utils";
 
+const LEAD = { good: "text-good", bad: "text-bad", unclear: "text-foreground" } as const;
+
+/** The change against before the rule with its range, read without hovering, and the strip that draws it. */
+function ChangeLine({ mistake }: { mistake: Mistake }) {
+  const change = detailChange(mistake);
+  return (
+    <div className="space-y-1.5">
+      <p data-change-line className="leading-snug">
+        <span className={cn("font-semibold", LEAD[change.tone])}>{change.lead}</span>
+        {change.rest && <span className="text-sm text-muted-foreground"> · {change.rest}</span>}
+      </p>
+      {mistake.change?.low != null && (
+        <div className="max-w-sm space-y-1 pr-2.5">
+          <StripAxis same="same as before" />
+          <ChangeMarks change={mistake.change} tone={change.tone} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 function RuleNumbers({ mistake, day }: { mistake: Mistake; day: Day }) {
+  const few = fewTasksNote(mistake);
   const rate = (r: number | undefined) => (r === undefined ? "–" : percent(r));
   return (
-    <div className="space-y-1">
+    <div className="space-y-2">
       <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1">
         <Swatch side="without">
           Before rule <RateValue rate={rate(mistake.before?.rate)} side="without" className="text-lg" />
@@ -18,9 +48,12 @@ function RuleNumbers({ mistake, day }: { mistake: Mistake; day: Day }) {
         <Swatch side="with">
           Since rule <RateValue rate={rate(mistake.after?.rate)} side="with" className="text-lg" />
         </Swatch>
-        <ChangeText change={mistake.change} missing={missingMistakeChange(mistake)} />
       </div>
-      <p className="text-sm text-muted-foreground">{ruleTasks(mistake, day)}</p>
+      <ChangeLine mistake={mistake} />
+      <p className="text-sm text-muted-foreground">
+        {ruleTasks(mistake, day)}
+        {few && <span className="block">{few}</span>}
+      </p>
     </div>
   );
 }

@@ -1,8 +1,7 @@
 import { ChevronRight, CircleCheck } from "lucide-react";
 import { useRef } from "react";
-import { ChangeMarks, StripAxis, StripAxisCell } from "@/components/change-strip";
 import { MistakeDetail } from "@/components/mistake-detail";
-import { RateBar, RateValue, type Side } from "@/components/rate-pair";
+import { PairLegend, RateBar, RatePair } from "@/components/rate-pair";
 import { CELL, GridHeader, GridRow } from "@/components/rule-grid";
 import { Empty, Section } from "@/components/section";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,8 +10,8 @@ import type { Day, Mistake, Report, Trial } from "@/data/report";
 import { useMedia } from "@/hooks/use-media";
 import { replaceHash } from "@/hooks/use-route";
 import { type AttentionItem, attentionItems, calmLine } from "@/lib/attention";
-import { percent, plural } from "@/lib/format";
-import { NO_RECENT_TASKS, overviewHint, scoreWords, slug, sortByChange, withoutRule, withRule } from "@/lib/mistakes";
+import { plural } from "@/lib/format";
+import { NO_RECENT_TASKS, scoreWords, slug, sortByChange, withoutRule, withRule } from "@/lib/mistakes";
 import { permanentSummary, statusCounts } from "@/lib/permanent";
 import { sortTrials, trialSummary, verdictWords } from "@/lib/trials";
 import { cn } from "@/lib/utils";
@@ -112,34 +111,36 @@ function RunningNow({ report }: { report: Report }) {
   );
 }
 
-/** A rate as text in its side's colour, or a dash when that side had no tasks. */
-function Rate({ rate, side }: { rate: number | null | undefined; side: Side }) {
-  return rate == null ? (
-    <span className="text-muted-foreground">–</span>
-  ) : (
-    <RateValue rate={percent(rate)} side={side} className="font-medium" />
-  );
-}
+const LEAD = { good: "text-good", bad: "text-bad", unclear: "text-foreground" } as const;
 
-/** "31% → 6%", in fixed-width parts so the arrows of every row line up. */
-function BeforeSince({ mistake }: { mistake: Mistake }) {
+/** A row's mistake name: one line, cut short only as a last resort (the panel shows it whole); wraps on a phone card. */
+function Name({ name }: { name: string }) {
   return (
-    <span className="inline-grid grid-cols-[3rem_1.5rem_3rem] items-baseline">
-      <span className="text-right">
-        <Rate rate={mistake.before?.rate} side="without" />
-      </span>
-      <span className="text-center text-muted-foreground">→</span>
-      <Rate rate={mistake.after?.rate} side="with" />
+    <span data-name title={name} className={cn(CELL.name, "min-w-0 text-sm md:truncate")}>
+      {name}
     </span>
   );
 }
 
-function HintLine({ mistake, day }: { mistake: Mistake; day: Day }) {
-  const hint = overviewHint(mistake, day);
-  return hint && <span className="block text-sm text-muted-foreground">{hint}</span>;
+/** The 0% and 100% ends of the chart column, under its legend, lined up with every row's track. */
+function Scale() {
+  return (
+    <div data-scale className="relative h-4 text-xs leading-4 text-muted-foreground">
+      <span className="absolute left-0">0%</span>
+      <span className="absolute right-0">100%</span>
+    </div>
+  );
 }
 
-const LEAD = { good: "text-good", bad: "text-bad", unclear: "text-foreground" } as const;
+/** The chart column's header, which is also its legend: before the rule, then since, on one 0–100% scale. */
+function ChartLegend() {
+  return (
+    <div className="space-y-0.5 px-1.5">
+      <PairLegend from="before the rule" to="since" />
+      <Scale />
+    </div>
+  );
+}
 
 /** How a table's rows take part in the page's one selection. */
 interface Picking {
@@ -158,8 +159,8 @@ function rowProps(m: Mistake, picking: Picking) {
   };
 }
 
-/** The overview's scorecard: one row per mistake with a rule, and one chart, the change, in each row. */
-function RulesTable({ rows, day, picking }: { rows: Mistake[]; day: Day; picking: Picking }) {
+/** The overview's scorecard: one row per mistake with a rule, its before and since rates on one chart, and the change. */
+function RulesTable({ rows, picking }: { rows: Mistake[]; picking: Picking }) {
   if (rows.length === 0) return <Empty>No rule has been tried on a mistake yet</Empty>;
   return (
     <div
@@ -171,28 +172,31 @@ function RulesTable({ rows, day, picking }: { rows: Mistake[]; day: Day; picking
     >
       <GridHeader>
         <span>Mistake</span>
-        <span className="text-right whitespace-nowrap">Before → since</span>
-        <StripAxisCell />
-        <span>Result</span>
+        <ChartLegend />
+        <span>Change</span>
       </GridHeader>
+      {/* Phones have no header row: the legend shows once, above the first card. */}
+      {/* Inset like a card's chart (its padding and border), so the scale lines up with every card's track. */}
+      <div className="border-x border-transparent px-4 md:hidden">
+        <ChartLegend />
+      </div>
       {rows.map((m) => {
         const words = scoreWords(m);
         return (
           <GridRow key={m.name} {...rowProps(m, picking)}>
-            <div className={CELL.name}>
-              <span className="block font-medium">{m.name}</span>
-              <HintLine mistake={m} day={day} />
+            <Name name={m.name} />
+            <div className={CELL.chart}>
+              <RatePair without={m.before?.rate ?? null} withRule={m.after?.rate ?? null} labelled />
             </div>
-            <div className={CELL.rates}>
-              <BeforeSince mistake={m} />
-            </div>
-            <div className={cn(CELL.chart, "space-y-1 pr-2.5")}>
-              <div className="md:hidden">
-                <StripAxis />
-              </div>
-              <ChangeMarks change={m.change} tone={words.tone} tip={words.tip} />
-            </div>
-            <span className={cn(CELL.result, "font-semibold", LEAD[words.tone])}>{words.lead}</span>
+            <span
+              className={cn(
+                CELL.result,
+                "leading-5",
+                words.hasRange ? cn("font-semibold", LEAD[words.tone]) : "text-sm text-muted-foreground",
+              )}
+            >
+              {words.lead}
+            </span>
           </GridRow>
         );
       })}
@@ -200,7 +204,7 @@ function RulesTable({ rows, day, picking }: { rows: Mistake[]; day: Day; picking
   );
 }
 
-/** Mistakes with no rule, on the scorecard's columns so their bars line up with the strips above. */
+/** Mistakes with no rule, on the scorecard's columns so their bars share the charts' scale above. */
 function NoRuleTable({ rows, picking }: { rows: Mistake[]; picking: Picking }) {
   if (rows.length === 0) return <Empty>Every tracked mistake has a rule</Empty>;
   return (
@@ -213,19 +217,18 @@ function NoRuleTable({ rows, picking }: { rows: Mistake[]; picking: Picking }) {
     >
       <GridHeader>
         <span>Mistake</span>
-        <span className="text-right">Rate now</span>
-        <span />
+        <div className="space-y-0.5 px-1.5">
+          <div className="text-sm">rate now</div>
+          <Scale />
+        </div>
         <span>Tasks</span>
       </GridHeader>
       {rows.map((m) => (
         <GridRow key={m.name} {...rowProps(m, picking)}>
-          <span className={cn(CELL.name, "font-medium")}>{m.name}</span>
+          <Name name={m.name} />
           {m.current ? (
             <>
-              <span className={CELL.rates}>
-                <Rate rate={m.current.rate} side="without" />
-              </span>
-              <div className={cn(CELL.chart, "pr-2.5")}>
+              <div className={CELL.chart}>
                 <RateBar rate={m.current.rate} />
               </div>
               <span className={cn(CELL.result, "text-sm text-muted-foreground")}>
@@ -233,9 +236,7 @@ function NoRuleTable({ rows, picking }: { rows: Mistake[]; picking: Picking }) {
               </span>
             </>
           ) : (
-            <span className={cn(CELL.rates, "text-sm text-muted-foreground md:col-span-3 md:justify-self-start")}>
-              {NO_RECENT_TASKS}
-            </span>
+            <span className={cn(CELL.chart, "text-sm text-muted-foreground")}>{NO_RECENT_TASKS}</span>
           )}
         </GridRow>
       ))}
@@ -260,7 +261,7 @@ function Detail({ mistake, day }: { mistake: Mistake; day: Day }) {
 }
 
 /** Wide enough for the tables and the detail panel side by side. */
-const WIDE = "(min-width: 1360px)";
+const WIDE = "(min-width: 1400px)";
 
 /**
  * The overview. On a wide screen the tables sit in a left column and the selected mistake's detail stays in view on the
@@ -295,7 +296,7 @@ export function OverviewPage({ report, selected }: { report: Report; selected: s
       <NeedsAttention report={report} />
       <RunningNow report={report} />
       <Section title="Rules and their mistakes">
-        <RulesTable rows={rules} day={report.day} picking={picking} />
+        <RulesTable rows={rules} picking={picking} />
       </Section>
       <Section title="Mistakes with no rule yet">
         <NoRuleTable rows={noRule} picking={picking} />
@@ -305,12 +306,12 @@ export function OverviewPage({ report, selected }: { report: Report; selected: s
   if (order.length === 0) return <div className="max-w-3xl">{tables}</div>;
   if (wide) {
     return (
-      <div className="grid grid-cols-[minmax(620px,3fr)_minmax(380px,2fr)] gap-8">
+      <div className="grid grid-cols-[minmax(0,1fr)_400px] gap-6">
         {tables}
         {picked && (
           <aside
             aria-label="Selected mistake"
-            className="sticky top-4 max-h-[calc(100svh-2rem)] self-start overflow-y-auto border-l pl-8"
+            className="sticky top-4 max-h-[calc(100svh-2rem)] self-start overflow-y-auto border-l pl-6"
           >
             <Detail mistake={picked} day={report.day} />
           </aside>

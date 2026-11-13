@@ -1,4 +1,4 @@
-import { differenceInCalendarDays, format, parseISO, subDays } from "date-fns";
+import { format, parseISO, subDays } from "date-fns";
 import type { Day, Mistake, MistakeChange } from "@/data/report";
 import { type ChangeWords, changeTone, changeWords, FEWEST_TASKS, missingChange, type Tone } from "./change";
 import { dayLabel, fewTasks, percent, plural } from "./format";
@@ -59,39 +59,15 @@ export function ruleTasks(mistake: Mistake, day: Day): string {
   return `${before} · ${mistake.after?.tasks ?? 0} since ${dayLabel(mistake.rule.day, day)}`;
 }
 
-/** Shorter than this, a before window is named on the overview, since "before" alone suggests far longer. */
-const SHORT_WINDOW = 7;
-
-/** The longest hint line that still fits its slot under a mistake's name on the overview. */
-const HINT_ROOM = 48;
-
-/** A short window in few words: "6 to 7 Nov" within a month, "30 Oct to 2 Nov" across one, "4 Nov" for one day. */
-function shortSpan(from: Day, to: Day, day: Day): string {
-  if (from === to) return dayLabel(from, day);
-  const sameMonth = from.slice(0, 7) === to.slice(0, 7);
-  return `${sameMonth ? Number(from.slice(8)) : dayLabel(from, day)} to ${dayLabel(to, day)}`;
-}
-
 /**
- * The one muted line under a mistake's name on the overview: how few tasks the rates rest on, and how short the
- * before window is ("Before: only 6 to 7 Nov"); null when neither applies. Few tasks before and a short window read
- * as one phrase ("only 6 tasks before, 2 to 4 Nov") when that fits the line; otherwise the few tasks win.
+ * How few tasks a mistake's before and since rates rest on ("only 7 tasks before and 3 since the rule"), or null when
+ * both sides have enough. The windows' dates are in the task line already.
  */
-export function overviewHint(mistake: Mistake, day: Day): string | null {
-  const before = fewTasks([{ tasks: mistake.before?.tasks, label: "before" }]);
-  const few = fewTasks([
+export function fewTasksNote(mistake: Mistake): string | null {
+  return fewTasks([
     { tasks: mistake.before?.tasks, label: "before" },
     { tasks: mistake.after?.tasks, label: "since the rule" },
   ]);
-  const { rule } = mistake;
-  const window =
-    mistake.before && rule && differenceInCalendarDays(parseISO(rule.day), parseISO(mistake.before.from)) < SHORT_WINDOW
-      ? shortSpan(mistake.before.from, beforeEnds(rule), day)
-      : null;
-  if (!window) return few;
-  if (!few) return `Before: only ${window}`;
-  const both = few === before ? `${few}, ${window}` : null;
-  return both && both.length <= HINT_ROOM ? both : few;
 }
 
 /** A mistake with no rule: its rate now and what it rests on. */
@@ -166,14 +142,20 @@ export function historyBands(mistake: Mistake): { kind: "before" | "after"; from
   return bands;
 }
 
-/**
- * A mistake's result in the overview's scorecard: short words for the row (the bold lead, or a two-word reason when
- * there is no change) and the longer sentence its strip shows on hover or tap; `tip` is null when the row says it all.
- */
-export function scoreWords(mistake: Mistake): ChangeWords & { tip: string | null } {
+/** A mistake's change in the overview's scorecard: the bold words, or a short reason when there is no change. */
+export function scoreWords(mistake: Mistake): ChangeWords {
   const words = changeWords(mistake.change, "plain", missingMistakeChange(mistake));
-  if (words.hasRange) return { ...words, tip: words.hint };
+  if (words.hasRange) return words;
   const enough = Math.min(mistake.before?.tasks ?? 0, mistake.after?.tasks ?? 0) >= FEWEST_TASKS;
-  const nothing = mistake.change === null && enough;
-  return { ...words, lead: nothing ? "Nothing to compare" : "Too few tasks", tip: nothing ? words.lead : null };
+  return { ...words, lead: mistake.change === null && enough ? "Nothing to compare" : "Too few tasks" };
+}
+
+/**
+ * The change line of a mistake's detail, read without hovering: "89% fewer than before the rule" in its colour, then
+ * the range ("likely 57% to 100% fewer"); "Unclear" with its range; or why there is no change.
+ */
+export function detailChange(mistake: Mistake): { tone: Tone; lead: string; rest: string | null } {
+  const words = changeWords(mistake.change, "plain", missingMistakeChange(mistake));
+  const lead = words.hasRange && words.tone !== "unclear" ? `${words.lead} than before the rule` : words.lead;
+  return { tone: words.tone, lead, rest: words.hint };
 }

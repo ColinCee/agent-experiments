@@ -1,4 +1,4 @@
-import { type ReactNode, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import type { Range } from "@/data/report";
 import { type ChangeMode, type ChangeWords, changeWords, isClipped, stripPosition, type Tone } from "@/lib/change";
 import { cn } from "@/lib/utils";
@@ -8,17 +8,13 @@ const LEAD: Record<Tone, string> = { good: "text-good", bad: "text-bad", unclear
 
 const at = (change: number) => `${stripPosition(change) * 100}%`;
 
-/** Captions over a strip: where fewer and more mistakes lie, in one word each when the strip is narrow. */
-export function StripAxis() {
+/** Captions over a strip: fewer and more mistakes either side of the centre, which names what is compared against. */
+export function StripAxis({ same }: { same: string }) {
   return (
-    <div data-axis className="@container relative mx-1.5 h-4 text-xs leading-4 text-muted-foreground">
-      <span className="absolute left-0">
-        fewer<span className="hidden @min-[15rem]:inline"> mistakes</span>
-      </span>
-      <span className="absolute left-1/2 -translate-x-1/2">no change</span>
-      <span className="absolute right-0">
-        more<span className="hidden @min-[15rem]:inline"> mistakes</span>
-      </span>
+    <div data-axis className="relative mx-1.5 h-4 text-xs leading-4 text-muted-foreground">
+      <span className="absolute left-0">fewer</span>
+      <span className="absolute left-1/2 -translate-x-1/2 whitespace-nowrap">{same}</span>
+      <span className="absolute right-0">more</span>
     </div>
   );
 }
@@ -84,47 +80,9 @@ function Words({ words, inline = false }: { words: ChangeWords; inline?: boolean
   );
 }
 
-/**
- * A strip whose longer words (`tip`) show on hover with a mouse or on a tap. A tap on the strip opens the tip instead of
- * following the row's link; a mouse click still follows it.
- */
-export function ChangeMarks({ change, tone, tip }: { change: Range | null; tone: Tone; tip: string | null }) {
-  const [open, setOpen] = useState(false);
-  const touch = useRef(false);
-  return (
-    // biome-ignore lint/a11y/noStaticElementInteractions: the tip only repeats the range; the row's link stays the control.
-    // biome-ignore lint/a11y/useKeyWithClickEvents: the click only opens the tip after a tap; keyboards use the row's link.
-    <div
-      className="relative"
-      onPointerEnter={(e) => e.pointerType === "mouse" && setOpen(true)}
-      onPointerLeave={(e) => e.pointerType === "mouse" && setOpen(false)}
-      onPointerDown={(e) => {
-        touch.current = e.pointerType !== "mouse";
-      }}
-      onClick={(e) => {
-        if (!tip || !touch.current) return;
-        e.preventDefault();
-        e.stopPropagation();
-        setOpen((was) => !was);
-      }}
-    >
-      <Strip change={change} tone={tone} />
-      {open && tip && (
-        <div
-          data-strip-tip
-          role="tooltip"
-          className="absolute bottom-full left-1/2 z-10 mb-1 -translate-x-1/2 rounded-md border bg-popover px-2.5 py-1.5 text-xs whitespace-nowrap text-popover-foreground"
-        >
-          {tip}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/** The words for a change without its strip, on one line. */
-export function ChangeText({ change, missing }: { change: Range | null; missing?: string }) {
-  return <Words words={changeWords(change, "plain", missing)} inline />;
+/** A strip's marks alone, for a page that writes the change's words itself. */
+export function ChangeMarks({ change, tone }: { change: Range | null; tone: Tone }) {
+  return <Strip change={change} tone={tone} />;
 }
 
 /** Lays `children` out exactly as a strip is laid out, so a rate track above a strip has the strip's width. */
@@ -139,10 +97,10 @@ export function AlignWithStrip({ children }: { children: ReactNode }) {
 }
 
 /** The captions in a table's header row, over the column of strips below it. */
-export function StripAxisCell() {
+export function StripAxisCell({ same }: { same: string }) {
   return (
     <div className="pr-2.5">
-      <StripAxis />
+      <StripAxis same={same} />
     </div>
   );
 }
@@ -158,8 +116,11 @@ export function ChangeStrip({
   mode = "plain",
   cells = false,
   missing,
+  same,
 }: {
   change: Range | null;
+  /** The centre caption, naming what the change is against: "same as without". */
+  same: string;
   axis?: boolean;
   mode?: ChangeMode;
   cells?: boolean;
@@ -178,7 +139,7 @@ export function ChangeStrip({
       >
         {/* Every phone card carries its own captions, since the first scrolls away; wider screens show them once. */}
         <div className={cn("pr-2.5 @min-[27rem]:col-start-1", (cells || !axis) && "md:hidden")}>
-          <StripAxis />
+          <StripAxis same={same} />
         </div>
         <div className="pr-2.5 @min-[27rem]:col-start-1">
           <Strip change={change} tone={words.tone} />
