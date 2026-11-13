@@ -1,6 +1,6 @@
 // Opens the built single-file page from disk, the way people open the overview, optionally with a report injected
 // the way `agent-experiments daily` does it. Run by both Playwright tests and `pnpm shots`, so plain Node must load it.
-import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
@@ -17,7 +17,8 @@ export const widths = {
 export async function injectReport(report: unknown): Promise<string> {
   const html = await readFile(builtPage, "utf8");
   const json = JSON.stringify(report).replaceAll("</", "<\\/");
-  const dir = await mkdtemp(join(tmpdir(), "dashboard-"));
+  const dir = join(tmpdir(), "agent-experiments-dashboard");
+  await mkdir(dir, { recursive: true });
   const file = join(dir, "overview.html");
   await writeFile(
     file,
