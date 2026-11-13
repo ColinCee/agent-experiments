@@ -1,7 +1,7 @@
 import numpy as np
 
 from agent_experiments.looks import LOOK_SIZES, verdict
-from agent_experiments.stats import compare, compare_paired
+from agent_experiments.stats import compare, compare_paired, rate_range
 
 RESAMPLES = 10_000  # fewer than a real look's, but fine enough to place p against the first limit of 0.0003
 
@@ -41,3 +41,14 @@ def test_a_replay_sees_a_drop_in_the_same_moments():
     assert effect.drop > 0.4
     assert effect.p < 0.05
     assert effect.low > 0
+
+
+def test_a_rate_range_holds_the_rate_and_narrows_with_more_tasks():
+    rng = np.random.default_rng(10)
+    few, many = tasks(rng, 10, 0.4), tasks(rng, 200, 0.4)
+    rate, low, high = rate_range(few, rng)
+    assert rate == few[:, 1].sum() / few[:, 0].sum()
+    assert low <= rate <= high
+    _, low_many, high_many = rate_range(many, rng)
+    assert high_many - low_many < high - low
+    assert np.isnan(rate_range(few[:1], rng)[1])

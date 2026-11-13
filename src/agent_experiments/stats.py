@@ -40,6 +40,35 @@ def compare_paired(old, new, rng: np.random.Generator, resamples: int = RESAMPLE
     return _effect(old, new, rng, resamples, paired=True)
 
 
+def rate_range(tasks, rng: np.random.Generator) -> tuple[float, float, float]:
+    """One group's miss rate and its 90% range, resampling its tasks (rows of chances, misses); NaN with no tasks, and
+    no range under two."""
+    tasks = np.asarray(tasks, dtype=float).reshape(-1, 2)
+    if not len(tasks):
+        return np.nan, np.nan, np.nan
+
+    def rate(idx, axis=-1):
+        picked = tasks[idx.astype(np.intp)]
+        return picked[..., 1].sum(axis=-1) / picked[..., 0].sum(axis=-1)
+
+    whole = float(rate(np.arange(len(tasks))))
+    if len(tasks) < 2:
+        return whole, np.nan, np.nan
+    with warnings.catch_warnings():  # tasks all alike give a one-point range, which SciPy warns about
+        warnings.simplefilter("ignore", stats.DegenerateDataWarning)
+        low, high = stats.bootstrap(
+            (np.arange(len(tasks)),),
+            rate,
+            vectorized=True,
+            n_resamples=BOOTSTRAPS,
+            batch=BATCH,
+            confidence_level=0.9,
+            method="percentile",
+            rng=rng,
+        ).confidence_interval
+    return whole, float(low), float(high)
+
+
 def tasks_needed(recent, limit: float, rng: np.random.Generator) -> int | None:
     """Tasks per group at which one look at `limit` finds a true halving 80% of the time, simulated from a measure's
     recent tasks (rows of chances, misses); None when even the largest size tried falls short."""
