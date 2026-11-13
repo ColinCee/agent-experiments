@@ -3,12 +3,13 @@ import { cn } from "@/lib/utils";
 
 /**
  * The scorecard's column template, shared by the overview's tables of mistakes so their charts line up: the name (as
- * wide as the longest name needs, `--name-w`) · one chart on a fixed 0–100% track (up to 360px) · the change in
- * words. Spare width goes to the chart first, then to the name. On phones a row is a card: the name
+ * wide as the longest name needs, `--name-w`, measured in the font the page really gets) · one chart on a fixed
+ * 0–100% track · the change in words. The name has priority: the chart gives way down to 13rem before any name is cut,
+ * and spare width goes to the chart (up to 24rem), then to the name. On phones a row is a card: the name
  * with the change at its right, then the chart full width. Cells place themselves with the `CELL` classes.
  */
 export const RULE_COLUMNS =
-  "grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-2 md:grid-cols-[minmax(min(var(--name-w,16rem),calc(100%_-_23.5rem)),1fr)_minmax(15.5rem,24rem)_7rem] md:items-center md:gap-x-2 md:px-2";
+  "grid grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-2 md:grid-cols-[minmax(min(var(--name-w,16rem),calc(100%_-_21rem)),1fr)_minmax(13rem,24rem)_7rem] md:items-center md:gap-x-2 md:px-2";
 
 export const CELL = {
   name: "col-start-1 row-start-1",
