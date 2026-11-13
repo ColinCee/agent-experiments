@@ -32,3 +32,25 @@ jobs:
       - uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  dashboard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: dashboard
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/setup@731dfb6463bbd11c11fd0ee11fe00ed0e36d48a1 # v3.2.0
+        with:
+          runtime: node@26
+          cache: true
+          working-directory: dashboard
+          require-lockfile: true
+      - run: pnpm check
+      - run: pnpm test
+      - run: pnpm build
+      # The Python package ships the committed build, so it must match the sources.
+      - run: git diff --exit-code -- ../src/agent_experiments/dashboard.html
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm e2e
