@@ -295,6 +295,12 @@ def score(measures: Path, measure: str, picks: list[dict], replies: list[dict]) 
     return {tuple(s.split(" ")): bool(miss) for s, miss in found}  # type: ignore[misc]
 
 
+def stands(real: float, replayed: float) -> bool:
+    """Whether the replay missed about as often as the real agents under the rules they had, so it can stand for them."""
+    # Rates a few points apart agree even when their ratio is large, as when both are near zero.
+    return bool(abs(replayed - real) <= 0.05 or (real > 0 and 1 / GATE <= replayed / real <= GATE))
+
+
 def judge(
     folder: str, measure: str, picks: list[dict], scored: dict, in_force: str, rng: np.random.Generator
 ) -> Replay:
@@ -313,11 +319,9 @@ def judge(
     had = [m for m in picks if (m["uuid"], in_force) in scored]
     real = sum(m["miss"] for m in had) / len(had) if had else np.nan
     replayed = sum(scored[(m["uuid"], in_force)] for m in had) / len(had) if had else np.nan
-    # Rates a few points apart agree even when their ratio is large, as when both are near zero.
-    stands = bool(abs(replayed - real) <= 0.05 or (real > 0 and 1 / GATE <= replayed / real <= GATE))
     if len(both) < MIN_PAIRED:
         verdict = "can't tell"
-    elif not stands:
+    elif not stands(real, replayed):
         verdict = "replay can't test this"
     elif effect.p < WORKS_P and effect.drop > 0:
         verdict = "works"

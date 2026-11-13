@@ -3,3 +3,5 @@ __pycache__/
 *.duckdb
 *.duckdb.wal
 *.html
+!dashboard/index.html
+!src/agent_experiments/dashboard.html

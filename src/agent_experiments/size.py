@@ -10,6 +10,7 @@ from agent_experiments.counting import SCHEMA
 
 # The agents repo's every-turn rules files and its skills.
 PATHS = ("home/*.md", "skills/*/SKILL.md")
+LABELS = dict(zip(PATHS, ("Rules", "Skills"), strict=True))
 
 
 def _git(repo: Path, *args: str, stdin: bytes | None = None) -> bytes:
@@ -83,8 +84,8 @@ def measure(repo: Path, globs: tuple[str, ...], db: Path) -> int:
 
 
 def report(con) -> dict:
-    """What the overview page shows: each pattern's words by day, the largest files now, and per month and pattern
-    how often a change only added lines and the share of changed lines that were added."""
+    """The report's `sizes`: each pattern's words by day and now, the largest files now, and per month and pattern how
+    often a change only added lines and the share of changed lines that were added."""
     words_by_day = con.execute("""
         WITH days AS (SELECT DISTINCT "day" FROM sizes),
         latest AS (
@@ -98,4 +99,17 @@ def report(con) -> dict:
         SELECT left("day", 7) AS month, pattern, count(*) AS changes, avg((deleted = 0)::INT) AS only_added,
                sum(added) / sum(added + deleted) AS added_share
         FROM sizes WHERE added + deleted > 0 GROUP BY ALL ORDER BY month, pattern""").fetchall()
-    return {"words": words_by_day, "largest": largest, "months": months}
+    series = []
+    for pattern, label in LABELS.items():
+        points = [{"day": d, "words": w} for d, p, w in words_by_day if p == pattern]
+        if points:
+            series.append({"label": label, "now": points[-1]["words"], "points": points})
+    return {
+        "series": series,
+        "largest": [{"file": f, "words": w} for f, w in largest],
+        "months": [
+            {"month": m, "label": LABELS[p], "changes": n, "only_added": o, "added_share": a}
+            for m, p, n, o, a in months
+            if p in LABELS
+        ],
+    }

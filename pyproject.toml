@@ -27,7 +27,7 @@ line-length = 120
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "RUF"]
-ignore = ["E501"]  # the formatter sets line length; long SQL and HTML strings stay whole
+ignore = ["E501"]  # the formatter sets line length; long SQL strings stay whole
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
