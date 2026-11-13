@@ -69,7 +69,7 @@ A continued session copies its parent's entries; each counts once, for the root 
 
 ## Overview page
 
-`daily` writes `report.json`, the facts the page shows (its shape: [`report.ts`](../dashboard/src/data/report.ts)), and beside it `overview.html`: the dashboard built from `dashboard/` into [`dashboard.html`](../src/agent_experiments/dashboard.html), with the report put in its `<script id="report">` by [`overview.py`](../src/agent_experiments/overview.py). Neither replaces the last one until both are ready, so a failed run leaves yesterday's page. A change there is `with / without - 1` (or `after / before - 1`), the drop's opposite, so below 0 is fewer misses.
+`daily` writes `report.json`, the facts the page shows (its shape: [`report.ts`](../dashboard/src/data/report.ts)), and beside it `overview.html`: the dashboard built from `dashboard/` into [`dashboard.html`](../src/agent_experiments/dashboard.html), with the report put in its `<script id="report">` by [`overview.py`](../src/agent_experiments/overview.py). Both are written in full before either replaces the last one, so a failed run leaves yesterday's page. A change there is `with / without - 1` (or `after / before - 1`), the drop's opposite, so below 0 is fewer misses.
 
 - **Trials.** Per trial and measure: each half's tasks and miss rate, the change with its 90% range, tasks needed (Method), its looks, and each half's rate over 3 days since the start.
 - **Permanent checks.** Each settled rule against its holdout (Looks).

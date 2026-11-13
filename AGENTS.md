@@ -2,7 +2,7 @@
 
 Tests agent rules from session transcripts: counting, then looks and verdicts, then one overview page ([docs/architecture.md](docs/architecture.md)).
 
-Checks: `uv run ruff format --check && uv run ruff check && uv run ty check && uv run pytest`
+Checks: `uv run ruff format --check && uv run ruff check && uv run ty check && uv run pytest`; in `dashboard/`: `pnpm check && pnpm test && pnpm build && pnpm e2e`
 
 | Where | What |
 |---|---|
@@ -12,6 +12,7 @@ Checks: `uv run ruff format --check && uv run ruff check && uv run ty check && u
 | `src/agent_experiments/replay.py` | Past moments answered again under old and new rules |
 | `src/agent_experiments/size.py` | Words of rule and skill files at each commit, from git |
 | `src/agent_experiments/overview.py` | The overview page: the report put into the built dashboard |
+| `dashboard/` | The React dashboard; `pnpm build` writes `src/agent_experiments/dashboard.html`, committed, and CI fails when it is stale |
 | `src/agent_experiments/cli.py` | `agent-experiments daily`, which runs them in order, `replay` and `size` |
 
 - **No private data in this repo.** It is public; transcripts, the measures file and the outputs are the user's own. No home-folder paths, project or host names, measure ids or transcript text in code, tests, docs or commit messages; tests build made-up data. The CI secret scan fails on home-folder paths.

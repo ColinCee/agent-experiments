@@ -96,7 +96,7 @@ def _plain(name: str) -> str:
 
 def build(db: Path, trials: list[looks.Trial], day: str, errors: list[str]) -> tuple[dict, list[looks.Look]]:
     """Takes the looks due as of `day`, and returns the report the overview page shows (its shape:
-    docs/architecture.md#overview-page) with the looks just taken. A trial that fails is left out and added to
+    dashboard/src/data/report.ts) with the looks just taken. A trial that fails is left out and added to
     `errors`, so the others still show."""
     rng = np.random.default_rng(1)
     con = looks.open_store(db)
