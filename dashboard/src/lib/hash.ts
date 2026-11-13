@@ -10,7 +10,7 @@ export interface Place {
 }
 
 /**
- * Addresses the page used to have still open it at the matching section, so old links keep working:
+ * Page addresses that open the one page at the matching section, so links saved from a paged layout keep working:
  * "#/trials", "#/permanent", "#/mistakes" (with "#/mistakes/<name>" picking that mistake), "#/replays" and "#/size".
  */
 const OLD_PAGES: Record<string, SectionId> = {

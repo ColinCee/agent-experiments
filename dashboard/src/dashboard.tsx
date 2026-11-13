@@ -26,7 +26,7 @@ function replaceHash(hash: string) {
  * The one page: every section's rows on the left, and the picked row in full in a panel that stays in view on the
  * right (on load, the first attention item's row, else the first mistake with a rule). Narrower, nothing is picked
  * until a row is tapped, and the detail opens in a sheet. The pick lives in the hash, so it survives a reload and can
- * be linked; an old page's address opens the page at its section.
+ * be linked; a page address (see `OLD_PAGES` in `lib/hash.ts`) opens the page at its section.
  */
 export function Dashboard({ report }: { report: Report }) {
   const place = useHash();

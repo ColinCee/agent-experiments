@@ -4,7 +4,7 @@ import { afterEach } from "vitest";
 
 afterEach(cleanup);
 
-// jsdom has no matchMedia; the sidebar asks it whether the screen is phone-sized.
+// jsdom has no matchMedia; the dashboard asks it whether the screen is wide.
 window.matchMedia ??= (query: string) =>
   ({
     matches: false,
