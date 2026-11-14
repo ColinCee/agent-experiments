@@ -40,6 +40,8 @@
 }
 
 :root {
+  /* Scrollbars and other browser-drawn parts follow the theme too. */
+  color-scheme: light dark;
   /* The only hues on the page, each with one meaning: with the rule, without it, clearly fewer mistakes, needs
      attention. Text in them passes 4.5:1 on the cards and their tints in both themes. */
   --with: #2160e0;
