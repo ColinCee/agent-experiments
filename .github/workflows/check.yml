@@ -50,6 +50,8 @@ jobs:
       - run: pnpm check
       # Fails on web platform patterns the modern-web-guidance guides replace; the findings print before the failure.
       - run: pnpm exec modern-web-guidance legacy-scan . --json | tee /dev/stderr | jq -e '.totalFindings == 0' > /dev/null
+        # With pipefail, a scanner that fails also fails the step.
+        shell: bash
         env:
           DISABLE_TELEMETRY: "1"
       - run: pnpm test
