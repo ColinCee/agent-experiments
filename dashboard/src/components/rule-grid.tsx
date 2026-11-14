@@ -60,7 +60,7 @@ export function GridRow({
       onKeyDown={onKeyDown}
       className={cn(
         RULE_COLUMNS,
-        "cursor-pointer rounded-lg border p-4 transition-colors outline-none hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring md:rounded-none md:border-0 md:border-b md:py-2",
+        "cursor-pointer rounded-lg border p-4 transition-colors outline-hidden hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring md:rounded-none md:border-0 md:border-b md:py-2",
         selected && "bg-muted shadow-[inset_2px_0_0_var(--foreground)] hover:bg-muted",
       )}
     >

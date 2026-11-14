@@ -48,6 +48,10 @@ jobs:
           working-directory: dashboard
           require-lockfile: true
       - run: pnpm check
+      # Fails on web platform patterns the modern-web-guidance guides replace; the findings print before the failure.
+      - run: pnpm exec modern-web-guidance legacy-scan . --json | tee /dev/stderr | jq -e '.totalFindings == 0' > /dev/null
+        env:
+          DISABLE_TELEMETRY: "1"
       - run: pnpm test
       - run: pnpm build
       # The Python package ships the committed build, so it must match the sources.

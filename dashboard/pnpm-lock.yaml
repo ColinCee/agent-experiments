@@ -233,6 +233,9 @@ importers:
       jsdom:
         specifier: ^31.0.0
         version: 31.0.0
+      modern-web-guidance:
+        specifier: 1.0.0
+        version: 1.0.0
       typescript:
         specifier: ^7.0.2
         version: 7.0.2
@@ -1740,6 +1743,11 @@ packages:
 
   minimist@1.2.8:
     resolution: {integrity: sha512-2yyAR8qBkN3YuheJanUpWC5U3bb5osDywNB8RzDVlDwDHbocAJveqqj1u8+SVD7jkWT4yvsHCpWqqWqAxb0zCA==}
+
+  modern-web-guidance@1.0.0:
+    resolution: {integrity: sha512-vafIZwC8AS6QjM2yyoflZbnc7n3/TVOMLbEMRdPTwcFy0f9/Tq8s5rJQ8UIqRt2KPl9ixravyaMR4nTGuUrcmg==}
+    engines: {node: '>=22.0.0', vscode: ^1.90.0}
+    hasBin: true
 
   ms@2.1.3:
     resolution: {integrity: sha512-6FlzubTLZG3J2a/NVCAleEhjzq5oxgHyaCU9yYXvcLsvoVaHJq/s5xXI6/XXP6tz7R9xAOtHnSO/tXtF3WRTlA==}
@@ -3578,6 +3586,8 @@ snapshots:
       brace-expansion: 5.0.13
 
   minimist@1.2.8: {}
+
+  modern-web-guidance@1.0.0: {}
 
   ms@2.1.3: {}
 

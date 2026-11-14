@@ -82,7 +82,7 @@ export function Dashboard({ report }: { report: Report }) {
       <Sheet open={picked !== undefined} onOpenChange={(open) => !open && replaceHash(selectHref(null))}>
         <SheetContent
           side="right"
-          className="w-full overflow-y-auto p-4 pt-12 data-[side=right]:w-full sm:max-w-lg data-[side=right]:sm:max-w-lg"
+          className="w-full overflow-y-auto p-4 pt-12 data-[side=right]:w-full sm:max-w-lg data-[side=right]:sm:max-w-lg motion-reduce:data-[side=right]:data-ending-style:translate-x-0 motion-reduce:data-[side=right]:data-starting-style:translate-x-0"
           finalFocus={() => rowElement(lastPicked.current)}
         >
           <SheetTitle className="sr-only">{shown?.name ?? "Detail"}</SheetTitle>
