@@ -11,7 +11,7 @@ import { STATUSES, type Status } from "@/lib/status";
 import { cn } from "@/lib/utils";
 
 /** Wide enough for the table and the card side by side; narrower, the card is its own screen. */
-const WIDE = "(min-width: 900px)";
+const WIDE = "(min-width: 1100px)";
 
 // Long enough that crossing rows on the way to the card does not flicker through each of them.
 const PREVIEW_AFTER = 70;
@@ -40,10 +40,6 @@ export function Dashboard({ report }: { report: Report }) {
   };
   useEffect(() => () => window.clearTimeout(timer.current), []);
 
-  useEffect(() => {
-    if (pinned && !wide) window.scrollTo(0, 0);
-  }, [pinned, wide]);
-
   const shownId = (wide ? previewed : null) ?? pinned;
   const shown = rows.find((row) => row.id === shownId);
   const counts = Object.fromEntries(
@@ -62,10 +58,23 @@ export function Dashboard({ report }: { report: Report }) {
   };
 
   const alone = !wide && pinned !== null;
+  const card = useRef<HTMLElement>(null);
+  const cameFrom = useRef<string | null>(null);
+  // Swapping the table for the card, and back, removes whatever had focus; put it on what replaced it.
+  useEffect(() => {
+    if (alone) {
+      cameFrom.current = pinned;
+      window.scrollTo(0, 0);
+      card.current?.focus();
+    } else if (cameFrom.current) {
+      document.querySelector<HTMLElement>(`[data-row="${cameFrom.current}"]`)?.focus();
+      cameFrom.current = null;
+    }
+  }, [alone, pinned]);
   return (
     <div className="grid gap-4">
       {!alone && <Pills counts={counts} filter={filter} onLight={setLit} onFilter={toggleFilter} />}
-      <div className="grid items-start gap-6 min-[900px]:grid-cols-[minmax(0,1fr)_22.5rem]">
+      <div className="grid items-start gap-6 min-[1100px]:grid-cols-[minmax(0,1fr)_22.5rem]">
         {!alone && (
           <RuleTable
             rows={filter ? rows.filter((row) => row.status === filter) : rows}
@@ -80,12 +89,18 @@ export function Dashboard({ report }: { report: Report }) {
               },
             }}
             onLeave={() => preview(null, LET_GO_AFTER)}
+            onFocusOut={() => preview(null, 0)}
           />
         )}
         {(wide || alone) && (
           <aside
             aria-label={shown ? "Rule in full" : "About this page"}
-            className={cn("rounded-lg border", wide && "sticky top-4")}
+            ref={card}
+            tabIndex={-1}
+            className={cn(
+              "rounded-lg border outline-none",
+              wide && "sticky top-4 max-h-[calc(100dvh-2rem)] overflow-y-auto",
+            )}
             onPointerEnter={() => window.clearTimeout(timer.current)}
             onPointerLeave={() => preview(null, LET_GO_AFTER)}
           >

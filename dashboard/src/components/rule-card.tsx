@@ -91,7 +91,7 @@ function Change({ change, status }: { change: Drawn; status: Status }) {
   return (
     <div className={STATUS_TONE[status]}>
       {/* Beside the table the row already gives the number; alone on a phone the card has to. */}
-      <p data-estimate className="mb-1 font-medium font-mono text-base min-[900px]:hidden">
+      <p data-estimate className="mb-1 font-medium font-mono text-base min-[1100px]:hidden">
         {signedPercent(change.value)}
       </p>
       <Band change={change} status={status} large />
@@ -114,7 +114,7 @@ export function RuleCard({ row, day }: { row: Row; day: Day }) {
     >
       <a
         href={rowHref(null)}
-        className="-my-1 flex min-h-8 items-center gap-1 text-muted-foreground text-xs min-[900px]:hidden"
+        className="-my-1 flex min-h-8 items-center gap-1 text-muted-foreground text-xs min-[1100px]:hidden"
       >
         <ChevronLeft aria-hidden className="size-3.5" />
         All rules

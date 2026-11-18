@@ -140,6 +140,8 @@ test("moving focus to a row with the keyboard shows its card", async ({ page }) 
   }
   expect(focused).toBe(RUNNING);
   await expect(card(page, RUNNING)).toBeVisible();
+  await page.keyboard.press("Shift+Tab");
+  await expect(card(page, "page")).toBeVisible();
 });
 
 test("an agent's link to a rule opens its card, in today's form and in every earlier one", async ({ page }) => {
@@ -166,8 +168,11 @@ test("on a phone a linked rule's card is the whole screen, with a way back to th
   await expect(card(page, WORKS)).toBeVisible();
   await expect(page.locator("[data-table]")).toHaveCount(0);
   await expect(card(page, WORKS).locator("[data-estimate]")).toHaveText("−60%");
+  // The swap removes what had focus, so it moves to the card, and back to the row on return.
+  expect(await page.evaluate(() => document.activeElement?.tagName)).toBe("ASIDE");
   await page.getByRole("link", { name: "All rules" }).click();
   await expect(page.locator("[data-table]")).toBeVisible();
+  expect(await page.evaluate(() => document.activeElement?.getAttribute("data-row"))).toBe(WORKS);
   await row(page, RULE).click();
   await expect(card(page, RULE)).toBeVisible();
 });

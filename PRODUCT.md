@@ -26,7 +26,7 @@ Each line has an end-to-end test in `dashboard/e2e`, except "Copy for an agent",
 | A row shows | Its status is one of the four below, each with its own icon. |
 | A row's status is "not enough tasks" | It draws no band and shows a dash, so a running experiment never shows a lead. |
 | He points at a row, or moves focus to it | Its card shows beside the table. A click keeps it open; leaving the table returns to the kept one. |
-| He opens an agent's link to a rule | That rule's card is open. On a phone the card is the whole screen, with a way back. |
+| He opens an agent's link to a rule | That rule's card is open. Below 1100px the card is the whole screen, with a way back. |
 | He points at a status pill | Rows of other statuses dim. A click keeps only its rows. |
 | Any card shows | Its sections come in one order: verdict, can it be trusted, change in mistakes, mistake rate over time, hand to an agent. A rule with not enough tasks stops after the second. |
 | No rule is picked | The card says how the numbers are made and what each mark means. |
@@ -46,7 +46,7 @@ Each line has an end-to-end test in `dashboard/e2e`, except "Copy for an agent",
 - A result is a thin band across its 90% range with a small dot at the estimate and a tick at no change, fewer mistakes to the left. The column header is the scale, each number over its place.
 - One number format: the signed change in mistakes, in percent.
 - Words only for names and verdicts. What a mark means is said once, never under each chart.
-- The card never repeats what its row shows.
+- The card adds to its row and never restates it: beside the table it leaves out the row's number, and the band returns only at full width with its range's own numbers.
 - No dot or other mark as a separator between two facts: each fact gets its own labelled place.
 - Every chart has labelled axes with units.
 - Every change of state moves, briefly and slightly; nothing moves for people who ask for reduced motion.

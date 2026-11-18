@@ -1,7 +1,7 @@
 import { signedPercent } from "@/lib/format";
 import { rowHref } from "@/lib/hash";
 import { GROUP_WORDS, GROUPS, type Row } from "@/lib/rows";
-import type { Status } from "@/lib/status";
+import { STATUS_WORDS, type Status } from "@/lib/status";
 import { cn } from "@/lib/utils";
 import { Band, Scale } from "./band";
 import { STATUS_TONE, StatusIcon } from "./status-icon";
@@ -24,6 +24,7 @@ export function RuleTable({
   lit,
   events,
   onLeave,
+  onFocusOut,
 }: {
   rows: Row[];
   pinned: string | null;
@@ -31,6 +32,7 @@ export function RuleTable({
   lit: Status | null;
   events: RowEvents;
   onLeave: () => void;
+  onFocusOut: () => void;
 }) {
   if (rows.length === 0) {
     return <p className="rounded-lg border px-3.5 py-6 text-muted-foreground">No experiments or active rules yet.</p>;
@@ -59,6 +61,7 @@ export function RuleTable({
                 href={rowHref(row.id)}
                 data-row={row.id}
                 data-status={row.status}
+                aria-label={`${row.name}, ${row.change ? `${signedPercent(row.change.value)}, ` : ""}${STATUS_WORDS[row.status]}`}
                 aria-current={pinned === row.id ? "true" : undefined}
                 className={cn(
                   GRID,
@@ -72,6 +75,9 @@ export function RuleTable({
                 style={{ viewTransitionName: `row-${row.id}` }}
                 onPointerEnter={(event) => event.pointerType === "mouse" && events.onPreview(row.id)}
                 onFocus={(event) => event.currentTarget.matches(":focus-visible") && events.onFocusRow(row.id)}
+                onBlur={(event) =>
+                  !event.currentTarget.closest("[data-table]")?.contains(event.relatedTarget) && onFocusOut()
+                }
                 onClick={(event) => {
                   // A second click on the kept row lets go of it; any other click follows the link.
                   if (pinned !== row.id || event.metaKey || event.ctrlKey) return;
