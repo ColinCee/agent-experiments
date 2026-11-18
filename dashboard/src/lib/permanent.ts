@@ -1,54 +1,11 @@
-import type { Day, PermanentCheck } from "@/data/report";
-import { type BadgeTone, FEWEST_TASKS, missingChange } from "./change";
-import { dayLabel } from "./format";
+import type { PermanentCheck } from "@/data/report";
+import { FEWEST_TASKS } from "./change";
 
+/** `nothing`: enough tasks, but no mistakes without the rule, so there is nothing to compare against. */
 export type PermanentStatus = "working" | "slipping" | "waiting" | "nothing";
-
-export const STATUS_WORDS: Record<PermanentStatus, string> = {
-  working: "Still working",
-  slipping: "Slipping",
-  waiting: "Waiting for tasks",
-  nothing: "Nothing to compare",
-};
-
-export const STATUS_TONE: Record<PermanentStatus, BadgeTone> = {
-  working: "good",
-  slipping: "bad",
-  waiting: "waiting",
-  nothing: "unclear",
-};
-
-/** The text that stands in a permanent check's result cell instead of a strip, or null when a strip is drawn. */
-export function permanentNote(check: PermanentCheck): string | null {
-  if (check.tasks_without === 0) return "No tasks without the rule yet";
-  const smaller = Math.min(check.tasks_with, check.tasks_without);
-  if (smaller < FEWEST_TASKS) return `Too few tasks to tell (needs ${FEWEST_TASKS})`;
-  return check.change === null ? missingChange(smaller, "without the rule") : null;
-}
 
 export function permanentStatus(check: PermanentCheck): PermanentStatus {
   if (check.slipping) return "slipping";
-  if (check.change === null && Math.min(check.tasks_with, check.tasks_without) >= FEWEST_TASKS) return "nothing";
-  return permanentNote(check) === null ? "working" : "waiting";
-}
-
-/** The permanent check's one line: "Proven rules, each left off for 1 task in 10 since 12 Nov"; the date when shared. */
-export function permanentSummary(checks: PermanentCheck[], day: Day): string {
-  const since = new Set(checks.map((c) => c.since));
-  const [only] = since;
-  const when = since.size === 1 ? ` since ${dayLabel(only, day)}` : "";
-  return `Proven rules, each left off for 1 task in 10${when}`;
-}
-
-const tasks = (n: number) => `${n} ${n === 1 ? "task" : "tasks"}`;
-
-/**
- * What a proven rule's row shows where no strip is drawn: while it waits, how many tasks ran with and without it, so the
- * wait shows; with nothing to compare, why, leaving the rest to its status.
- */
-export function permanentRowNote(check: PermanentCheck): string | null {
-  const status = permanentStatus(check);
-  if (status === "nothing") return "No mistakes without the rule";
-  if (status === "waiting") return `${tasks(check.tasks_with)} with · ${check.tasks_without} without`;
-  return permanentNote(check);
+  if (Math.min(check.tasks_with, check.tasks_without) < FEWEST_TASKS) return "waiting";
+  return check.change === null ? "nothing" : "working";
 }

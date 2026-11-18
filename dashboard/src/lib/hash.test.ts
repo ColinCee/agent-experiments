@@ -1,25 +1,19 @@
 import { expect, test } from "vitest";
-import { parseHash, selectHref } from "./hash";
+import { pickedRow, rowHref } from "./hash";
 
-test("the old pages' addresses open the page at their section", () => {
-  expect(parseHash("#/trials")).toEqual({ section: "trials", selected: null });
-  expect(parseHash("#/mistakes")).toEqual({ section: "rules", selected: null });
-  expect(parseHash("#/size")).toEqual({ section: "size", selected: null });
-  expect(parseHash("#/sizes").section).toBe("size");
-  expect(parseHash("#/replays").section).toBe("replays");
-  expect(parseHash("#/permanent").section).toBe("permanent");
+test("a link names a row as a plain hash, and every older form of link still opens its row", () => {
+  const ids = ["trial-a-trial", "permanent-a-rule"];
+  expect(rowHref("permanent-a-rule")).toBe("#permanent-a-rule");
+  expect(pickedRow("#permanent-a-rule", ids)).toBe("permanent-a-rule");
+  expect(pickedRow("#/?m=trial-a-trial", ids)).toBe("trial-a-trial");
+  expect(pickedRow("#/mistakes/a-rule", ids)).toBe("permanent-a-rule");
+  expect(pickedRow("#/?m=mistake-a-rule", ids)).toBe("permanent-a-rule");
+  expect(pickedRow("#/?m=replay-a-trial", ids)).toBe("trial-a-trial");
 });
 
-test("an old link to one mistake picks it", () => {
-  expect(parseHash("#/mistakes/ports-taken")).toEqual({ section: "rules", selected: "mistake-ports-taken" });
-});
-
-test("no hash or an unknown one is the top of the page", () => {
-  expect(parseHash("")).toEqual({ section: null, selected: null });
-  expect(parseHash("#/nowhere")).toEqual({ section: null, selected: null });
-});
-
-test("a pick rides in the hash and round-trips", () => {
-  expect(parseHash(selectHref("trial-a-b"))).toEqual({ section: null, selected: "trial-a-b" });
-  expect(selectHref(null)).toBe("#/");
+test("a link to nothing, or to a section that is gone, opens the page with no row picked", () => {
+  const ids = ["trial-a-trial"];
+  for (const hash of ["", "#", "#/", "#/trials", "#/size", "#/?m=size-rules", "#unknown"]) {
+    expect(pickedRow(hash, ids), hash).toBeNull();
+  }
 });

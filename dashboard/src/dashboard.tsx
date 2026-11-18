@@ -1,94 +1,113 @@
-import { type CSSProperties, useEffect, useRef } from "react";
-import { Detail } from "@/components/detail/detail";
-import { textWidth } from "@/components/measure";
-import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
+import { Pills } from "@/components/pills";
+import { PageFacts, RuleCard } from "@/components/rule-card";
+import { RuleTable } from "@/components/rule-table";
 import type { Report } from "@/data/report";
 import { useHash, useMedia } from "@/hooks/use-place";
-import { attentionItems } from "@/lib/attention";
-import { selectHref } from "@/lib/hash";
-import { firstPick, pageRows } from "@/lib/rows";
-import type { Picking } from "@/sections/rows-section";
-import { Sections } from "@/sections/sections";
+import { pickedRow } from "@/lib/hash";
+import { pageRows } from "@/lib/rows";
+import { STATUSES, type Status } from "@/lib/status";
+import { cn } from "@/lib/utils";
 
-/** The widest a name column gets; a longer name is cut short with its full text in a tooltip. */
-const NAME_CAP = 380;
+/** Wide enough for the table and the card side by side; narrower, the card is its own screen. */
+const WIDE = "(min-width: 1100px)";
 
-/** Wide enough for the sections and the detail panel side by side. */
-const WIDE = "(min-width: 1200px)";
-
-/** Moves to `hash` without a new history entry, as picking a row should not fill the back button. */
-function replaceHash(hash: string) {
-  window.history.replaceState(null, "", hash);
-  window.dispatchEvent(new HashChangeEvent("hashchange"));
-}
+// Long enough that crossing rows on the way to the card does not flicker through each of them.
+const PREVIEW_AFTER = 70;
+// Long enough to cross the gap between the table and the card.
+const LET_GO_AFTER = 220;
 
 /**
- * The one page: every section's rows on the left, and the picked row in full in a panel that stays in view on the
- * right (on load, the first attention item's row, else the first mistake with a rule). Narrower, nothing is picked
- * until a row is tapped, and the detail opens in a sheet. The pick lives in the hash, so it survives a reload and can
- * be linked; a page address (see `OLD_PAGES` in `lib/hash.ts`) opens the page at its section.
+ * The one page (PRODUCT.md, Behaviour): a table of every experiment and active rule, and beside it a card for the
+ * row under the pointer or focus. A click keeps a row's card and puts it in the address, so a link opens it.
  */
 export function Dashboard({ report }: { report: Report }) {
-  const place = useHash();
-  const wide = useMedia(WIDE);
-  const rows = pageRows(report);
-  const targets = attentionItems(report).map((i) => i.target);
-  const picked = rows.find((r) => r.id === place.selected) ?? (wide ? firstPick(rows, targets) : undefined);
-  const lastPicked = useRef<string | null>(null);
-  if (picked) lastPicked.current = picked.id;
-  // While the sheet slides shut the pick is already cleared; keep showing the last one until it has gone.
-  const shown = picked ?? rows.find((r) => r.id === lastPicked.current);
-  const rowElement = (id: string | null) => document.querySelector<HTMLElement>(`[data-row="${id}"]`);
-
-  useEffect(() => {
-    if (place.section) document.getElementById(`section-${place.section}`)?.scrollIntoView();
-  }, [place.section]);
-
-  const picking: Picking = {
-    selected: picked?.id ?? null,
-    onSelect: (id) => replaceHash(selectHref(id)),
-    onMove: (id, step) => {
-      const next = rows[rows.findIndex((r) => r.id === id) + step];
-      if (!next) return;
-      replaceHash(selectHref(next.id));
-      rowElement(next.id)?.focus();
-    },
-  };
-  // Every section's name column is as wide as the longest name needs, so the charts get the rest (up to their cap).
-  const nameWidth = Math.ceil(Math.min(NAME_CAP, Math.max(0, ...rows.map((r) => textWidth(r.name, 14) * 1.04 + 4))));
-  const sections = (
-    <div className="@container min-w-0 space-y-10" style={{ "--name-w": `${nameWidth}px` } as CSSProperties}>
-      <Sections report={report} rows={rows} picking={picking} />
-    </div>
+  const rows = useMemo(() => pageRows(report), [report]);
+  const pinned = pickedRow(
+    useHash(),
+    rows.map((row) => row.id),
   );
-  if (wide && picked) {
-    return (
-      <div className="grid grid-cols-[minmax(0,840px)_minmax(384px,1fr)] gap-6">
-        {sections}
-        <aside
-          aria-label="Picked row"
-          className="sticky top-4 max-h-[calc(100svh-2rem)] self-start overflow-y-auto border-l pl-6"
-        >
-          {/* Keyed by row, so a chart's hover state never carries over to the next row picked. */}
-          <Detail key={picked.id} row={picked} report={report} />
-        </aside>
-      </div>
-    );
-  }
-  if (wide) return <div className="max-w-[840px]">{sections}</div>;
+  const wide = useMedia(WIDE);
+  const [previewed, setPreviewed] = useState<string | null>(null);
+  const [filter, setFilter] = useState<Status | null>(null);
+  const [lit, setLit] = useState<Status | null>(null);
+  const timer = useRef<number | undefined>(undefined);
+
+  const preview = (id: string | null, after: number) => {
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => setPreviewed(id), after);
+  };
+  useEffect(() => () => window.clearTimeout(timer.current), []);
+
+  const shownId = (wide ? previewed : null) ?? pinned;
+  const shown = rows.find((row) => row.id === shownId);
+  const counts = Object.fromEntries(
+    STATUSES.map((status) => [status, rows.filter((row) => row.status === status).length]),
+  ) as Record<Status, number>;
+
+  const toggleFilter = (status: Status) => {
+    const apply = () => flushSync(() => setFilter((now) => (now === status ? null : status)));
+    setLit(null);
+    // Rows slide to their new places where the browser can; elsewhere, and for reduced motion, they just change.
+    if (document.startViewTransition && !window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      document.startViewTransition(apply);
+    } else {
+      apply();
+    }
+  };
+
+  const alone = !wide && pinned !== null;
+  const card = useRef<HTMLElement>(null);
+  const cameFrom = useRef<string | null>(null);
+  // Swapping the table for the card, and back, removes whatever had focus; put it on what replaced it.
+  useEffect(() => {
+    if (alone) {
+      cameFrom.current = pinned;
+      window.scrollTo(0, 0);
+      card.current?.focus();
+    } else if (cameFrom.current) {
+      document.querySelector<HTMLElement>(`[data-row="${cameFrom.current}"]`)?.focus();
+      cameFrom.current = null;
+    }
+  }, [alone, pinned]);
   return (
-    <>
-      {sections}
-      <Sheet open={picked !== undefined} onOpenChange={(open) => !open && replaceHash(selectHref(null))}>
-        <SheetContent
-          side="right"
-          className="w-full overflow-y-auto p-4 pt-12 data-[side=right]:w-full sm:max-w-lg data-[side=right]:sm:max-w-lg motion-reduce:data-[side=right]:data-ending-style:translate-x-0 motion-reduce:data-[side=right]:data-starting-style:translate-x-0"
-          finalFocus={() => rowElement(lastPicked.current)}
-        >
-          <SheetTitle className="sr-only">{shown?.name ?? "Detail"}</SheetTitle>
-          {shown && <Detail key={shown.id} row={shown} report={report} />}
-        </SheetContent>
-      </Sheet>
-    </>
+    <div className="grid gap-4">
+      {!alone && <Pills counts={counts} filter={filter} onLight={setLit} onFilter={toggleFilter} />}
+      <div className="grid items-start gap-6 min-[1100px]:grid-cols-[minmax(0,1fr)_22.5rem]">
+        {!alone && (
+          <RuleTable
+            rows={filter ? rows.filter((row) => row.status === filter) : rows}
+            pinned={pinned}
+            shown={shownId}
+            lit={lit}
+            events={{
+              onPreview: (id) => preview(id, PREVIEW_AFTER),
+              onFocusRow: (id) => preview(id, 0),
+              onToggle: () => {
+                window.location.hash = "";
+              },
+            }}
+            onLeave={() => preview(null, LET_GO_AFTER)}
+            onFocusOut={() => preview(null, 0)}
+          />
+        )}
+        {(wide || alone) && (
+          <aside
+            aria-label={shown ? "Rule in full" : "About this page"}
+            ref={card}
+            tabIndex={-1}
+            className={cn(
+              "rounded-lg border outline-none",
+              wide && "sticky top-4 max-h-[calc(100dvh-2rem)] overflow-y-auto",
+            )}
+            onPointerEnter={() => window.clearTimeout(timer.current)}
+            onPointerLeave={() => preview(null, LET_GO_AFTER)}
+          >
+            {shown ? <RuleCard key={shown.id} row={shown} day={report.day} /> : <PageFacts report={report} />}
+          </aside>
+        )}
+      </div>
+    </div>
   );
 }
