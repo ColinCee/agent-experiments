@@ -61,4 +61,4 @@ Each line has an end-to-end test in `dashboard/e2e`, except "Copy for an agent",
 
 ## Checks
 
-Before a dashboard change is shown to him, `agent-experiments daily --agents-repo` is run on the real store and the real agents repo, and the page is checked with that data.
+Before a dashboard change is shown to him, `agent-experiments daily --agents-repo` is run on the real store and the real agents repo, and the page is checked with that data. The dev server is then left open on the change's branch (`dashboard` in `.claude/launch.json`), so he sees the change itself before it merges.
