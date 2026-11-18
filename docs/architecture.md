@@ -60,8 +60,8 @@ A continued session copies its parent's entries; each counts once, for the root 
 
 [`skills.py`](../src/agent_experiments/skills.py) shows, for each measure in `skill_measures`, how often a task that needed the skill went without it, so a skill that is never loaded, or loaded less after an edit, shows.
 
-- **Version.** Each load's text is in the transcript, so its hash names the version agents read, with no tracking in the skills repo. A chance counts for the version first loaded at or before it.
-- **Birth.** Tasks before the skill's first load count for nothing, since it may not have existed yet.
+- **Version.** Each load's text is in the transcript, so its hash names the version agents read, with no tracking in the skills repo. A chance counts for the version its session last loaded before it, or, missed with no load, the newest version loaded anywhere by then.
+- **Birth.** Tasks before the skill existed count for nothing: before its file's first commit in the agents repo (Rule and skill size) or its first load, whichever is earlier.
 - **By version.** A version gets a rate only from 10 tasks: skills change several times a week, so most versions never get one, and those that do are compared by their ranges, not tested. Before and after is not a test (Method).
 - **Not covered.** Whether an agent followed a skill once loaded; and whether a new description triggers on the right prompts before it ships, which `claude plugin eval` with a `tool_used: Skill` grader does.
 

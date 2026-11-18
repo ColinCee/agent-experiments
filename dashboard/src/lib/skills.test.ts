@@ -18,7 +18,7 @@ test("skills missed most come first, and one no task needed yet comes last", () 
   expect(rows[0].id).toBe("skill-high");
 });
 
-test("a version first loaded before the chart starts gets no mark; one inside it does", () => {
+test("a version first loaded before the chart starts gets no mark; a day with new versions gets one", () => {
   const day = "2026-11-12";
   const s: Skill = {
     ...skill("A", 0.2),
@@ -28,6 +28,7 @@ test("a version first loaded before the chart starts gets no mark; one inside it
       { day: "2026-11-12", rate: 0.1 },
     ],
     versions: [
+      { version: "c", skill: "a", since: "2026-11-11", tasks: 0, rate: null, low: null, high: null },
       { version: "b", skill: "a", since: "2026-11-11", tasks: 1, rate: null, low: null, high: null },
       { version: "a", skill: "a", since: "2026-09-01", tasks: 12, rate: 0.3, low: 0.1, high: 0.5 },
     ],

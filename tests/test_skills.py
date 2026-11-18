@@ -37,6 +37,9 @@ def test_a_skill_version_is_its_text_and_each_chance_counts_for_the_version_load
     b2 = load("b-2", "b2", "2026-01-16T09:00:01.000Z", "D:/wt/.claude/skills/tidying", "Do Y.\n\nARGUMENTS: two")
     session(folder, "b1", "2026-01-15", [b1])
     session(folder, "b2", "2026-01-16", [b2])
+    # An older copy loaded after the newer version exists: its task counts for the version it read.
+    c = load("c-1", "c", "2026-01-17T09:00:01.000Z", "C:/other/skills/tidy", "Do X.")
+    session(folder, "c", "2026-01-17", [c])
     (tmp_path / "measures.sql").write_text(MEASURES)
     db = tmp_path / "x.duckdb"
 
@@ -52,10 +55,27 @@ def test_a_skill_version_is_its_text_and_each_chance_counts_for_the_version_load
     assert row["name"] == "Tidied without the tidy skill" and row["skills"] == ["tidy", "tidying"]
     newer, older = row["versions"]
     assert (newer["skill"], newer["since"], newer["tasks"], newer["rate"]) == ("tidying", "2026-01-15", 2, None)
-    assert (older["skill"], older["since"], older["tasks"]) == ("tidy", "2026-01-01", 12)
-    assert older["rate"] == 11 / 12 and older["low"] is not None
+    assert (older["skill"], older["since"], older["tasks"]) == ("tidy", "2026-01-01", 13)
+    assert older["rate"] == 11 / 13 and older["low"] is not None
     assert all(s["rate"] is None for s in row["series"] if s["day"] < "2026-01-01")
-    assert row["now"]["tasks"] == 14 and [m["session"] for m in row["misses"]] == ["t10", "t9", "t8", "t7", "t6"]
+    assert row["now"]["tasks"] == 15 and [m["session"] for m in row["misses"]] == ["t10", "t9", "t8", "t7", "t6"]
+
+
+def test_a_skill_committed_before_its_first_load_counts_the_tasks_since_its_commit(tmp_path: Path):
+    folder = tmp_path / "projects" / "one"
+    session(folder, "before", "2025-12-31")
+    session(folder, "a", "2026-01-01", [load("a-1", "a", "2026-01-01T09:00:01.000Z", "C:/s/tidy", "Do X.")])
+    (tmp_path / "measures.sql").write_text(MEASURES)
+    db = tmp_path / "x.duckdb"
+    count(str(tmp_path / "projects" / "*" / "*.jsonl"), tmp_path / "measures.sql", db)
+    con = looks.open_store(db)
+    con.execute(
+        "INSERT INTO sizes VALUES (1, 'abc', '2025-12-30', 'skills/*/SKILL.md', 'skills/tidying/SKILL.md', 9, 9, 0)"
+    )
+
+    [row] = skills.report(con, {}, "2026-01-02", np.random.default_rng(0))
+
+    assert row["now"]["tasks"] == 2 and [m["session"] for m in row["misses"]] == ["before"]
 
 
 def test_a_store_counted_with_no_skill_measures_reports_no_skills(tmp_path: Path):

@@ -15,16 +15,25 @@ SERIES_DAYS = 7  # a skill's moment comes a few times a day at most, so its rate
 # would rank versions by luck.
 MIN_VERSION_TASKS = 10
 
-# Each chance goes to the version first loaded at or before it, since a missed chance has no load of its own.
+# A chance goes to the version its own session last loaded before it; a missed chance has no load of its own, so it
+# goes to the version first loaded anywhere before it, the newest an agent could have read.
 VERSION_TASKS = """
-WITH v AS (
-  SELECT version, min(ts)::TIMESTAMP AS since FROM skill_loads
-  WHERE skill IN (SELECT skill FROM skill_measures WHERE measure = $measure) GROUP BY version),
+WITH k AS (
+  SELECT session, ts::TIMESTAMP AS ts, version FROM skill_loads
+  WHERE skill IN (SELECT skill FROM skill_measures WHERE measure = $measure)),
+v AS (SELECT version, min(ts) AS since FROM k GROUP BY version),
 c AS (
-  SELECT c.ts::TIMESTAMP AS ts, c.miss, t.task FROM chances c JOIN tasks t USING (session)
-  WHERE c.measure = $measure AND c."day" BETWEEN $first AND $last)
-SELECT v.version, c.task, count(*) AS chances, sum(c.miss::INT) AS misses
-FROM c ASOF JOIN v ON c.ts >= v.since GROUP BY ALL
+  SELECT c.session, c.ts::TIMESTAMP AS ts, c.miss, t.task FROM chances c JOIN tasks t USING (session)
+  WHERE c.measure = $measure AND c."day" BETWEEN $first AND $last),
+own AS (SELECT c.*, k.version FROM c ASOF LEFT JOIN k ON c.session = k.session AND c.ts >= k.ts)
+SELECT coalesce(own.version, v.version) AS version, own.task, count(*) AS chances, sum(own.miss::INT) AS misses
+FROM own ASOF JOIN v ON own.ts >= v.since GROUP BY ALL
+"""
+
+# The day the skill's file was first committed under any of its names, from the sizes table.
+COMMITTED = """
+SELECT min("day") FROM sizes WHERE file IN (
+  SELECT 'skills/' || skill || '/SKILL.md' FROM skill_measures WHERE measure = $measure)
 """
 
 VERSIONS = """
@@ -74,9 +83,11 @@ def _row(con, measure: str, skills: list[str], name: str | None, day: str, rng: 
                 "high": high,
             }
         )
-    # Before any agent loaded the skill it may not have existed, so a task then could not miss it; a skill never
-    # loaded keeps every task.
-    born = found[0][2] if found else ""
+    # A task before the skill existed could not miss it. It existed by its first commit or its first load, whichever
+    # came first; a skill with neither keeps every task.
+    committed = con.execute(COMMITTED, {"measure": measure}).fetchone()
+    known = [d for d in (committed[0] if committed else None, found[0][2] if found else None) if d]
+    born = min(known, default="")
     recent = max(recent, born)
     counts = looks.by_day(con, measure, max(shift(first, 1 - SERIES_DAYS), born), day)
     args = {"measure": measure, "first": recent, "last": day, "n": looks.LATEST_MISSES}

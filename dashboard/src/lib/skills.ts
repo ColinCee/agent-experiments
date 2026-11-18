@@ -23,7 +23,7 @@ export function skillChart(skill: Skill, reportDay: Day): { rows: TrendRow[]; ti
   return {
     rows,
     ticks: rows.filter((_, i) => (rows.length - 1 - i) % 14 === 0).map((r) => r.label),
-    marks: skill.versions.map((v) => dayLabel(v.since, reportDay)).filter((label) => labels.has(label)),
+    marks: [...new Set(skill.versions.map((v) => dayLabel(v.since, reportDay)))].filter((label) => labels.has(label)),
   };
 }
 
