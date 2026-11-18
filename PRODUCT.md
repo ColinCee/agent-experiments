@@ -29,6 +29,11 @@ Show which rule experiments are running and which rules are active, so he can tr
 - Words he uses: "experiment" for a trial, "active rule" for a proven rule.
 - Undecided: whether the content left off the main screens stays behind a link or is removed.
 
+## Brand Commitments
+
+- Look: modern, minimal and technical, built from the shadcn components the dashboard already has. Clean layout, small type, hairlines; no themed or decorative styles.
+- A result is drawn as a thin band across its range with a small dot at the estimate, fewer mistakes to the left of a no-change tick.
+
 ## Product Principles
 
 - A link from an agent lands on the one thing it is about, readable on a phone.
