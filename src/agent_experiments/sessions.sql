@@ -4,6 +4,7 @@
 --   calls(s, day, ts, uuid, tool, arg, bg)   each tool call: its command, file path or skill; bg = run in the background
 --   typed(s, day, ts, uuid, body)            each message the user typed
 --   stamps(s, ts, stamp)                     each stamp the trial hook gave a session, and when
+--   skill_loads(s, day, ts, skill, version)  each skill an agent loaded, and a hash of the text it read
 --   sessions(s, day, ...)                    one row per session and day (UTC): project, model, effort, tokens, stamps
 -- A measures file then makes chances(measure, s, day, ts, uuid, miss): one row per moment a rule could be broken.
 CREATE TEMP TABLE raw AS
@@ -54,6 +55,16 @@ SELECT * FROM (
          trim(regexp_replace(body, '(?s)<system-reminder>.*?</system-reminder>', '', 'g')) AS body
   FROM e WHERE NOT note AND body IS NOT NULL AND (queued OR origin = 'human'))
 WHERE body <> '' AND body NOT LIKE '<%';
+
+-- A loaded skill's text starts with its folder, whose last part is the skill's name. Its version hashes the text
+-- without that folder, which differs between installs, or the arguments the agent passed, which differ every load.
+CREATE TEMP TABLE skill_loads AS
+WITH k AS (
+  SELECT s, ts, body, regexp_extract(body, '^Base directory for this skill: ([^\n]*)', 1) AS dir
+  FROM e WHERE note AND body LIKE 'Base directory for this skill:%')
+SELECT s, left(ts, 10) AS "day", ts, regexp_extract(replace(dir, '\', '/'), '([^/]+)/?$', 1) AS skill,
+       left(md5(regexp_replace(replace(body, dir, ''), '(?s)\nARGUMENTS:.*$', '')), 7) AS version
+FROM k;
 
 -- From raw, not e: a continuation holds a copy of its parent's stamp, which is when its groups were first given.
 CREATE TEMP TABLE stamps AS SELECT DISTINCT s, ts, stamp FROM raw WHERE stamp IS NOT NULL;

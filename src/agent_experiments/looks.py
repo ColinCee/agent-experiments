@@ -12,7 +12,7 @@ from pathlib import Path
 import duckdb
 import numpy as np
 
-from agent_experiments.stats import USEFUL_DROP, Effect, compare
+from agent_experiments.stats import USEFUL_DROP, Effect, compare, rate_range
 
 LOOK_SIZES = (10, 20, 40)  # a look is due when the smaller group reaches each
 # O'Brien-Fleming-style one-sided limits for the three looks (docs/architecture.md#method).
@@ -256,6 +256,15 @@ def measure_tasks(con, measure: str, first: str, last: str) -> np.ndarray:
         [measure, first, last],
     ).fetchall()
     return np.array(rows, dtype=float).reshape(-1, 2)
+
+
+def side(con, measure: str, first: str, last: str, rng: np.random.Generator) -> tuple[dict | None, np.ndarray]:
+    """A measure's misses over some days with their 90% range, and its tasks; no side with no tasks."""
+    tasks = measure_tasks(con, measure, first, last)
+    if not len(tasks):
+        return None, tasks
+    rate, low, high = rate_range(tasks, rng)
+    return {"rate": rate, "low": low, "high": high, "tasks": len(tasks), "from": first}, tasks
 
 
 def by_day(con, measure: str, first: str, last: str) -> dict[str, tuple[int, int]]:

@@ -3,10 +3,13 @@ import { flushSync } from "react-dom";
 import { Pills } from "@/components/pills";
 import { PageFacts, RuleCard } from "@/components/rule-card";
 import { RuleTable } from "@/components/rule-table";
+import { SkillCard } from "@/components/skill-card";
+import { SkillTable } from "@/components/skill-table";
 import type { Report } from "@/data/report";
 import { useHash, useMedia } from "@/hooks/use-place";
 import { pickedRow } from "@/lib/hash";
 import { pageRows } from "@/lib/rows";
+import { skillRows } from "@/lib/skills";
 import { STATUSES, type Status } from "@/lib/status";
 import { cn } from "@/lib/utils";
 
@@ -24,10 +27,8 @@ const LET_GO_AFTER = 220;
  */
 export function Dashboard({ report }: { report: Report }) {
   const rows = useMemo(() => pageRows(report), [report]);
-  const pinned = pickedRow(
-    useHash(),
-    rows.map((row) => row.id),
-  );
+  const skills = useMemo(() => skillRows(report), [report]);
+  const pinned = pickedRow(useHash(), [...rows.map((row) => row.id), ...skills.map((row) => row.id)]);
   const wide = useMedia(WIDE);
   const [previewed, setPreviewed] = useState<string | null>(null);
   const [filter, setFilter] = useState<Status | null>(null);
@@ -42,6 +43,7 @@ export function Dashboard({ report }: { report: Report }) {
 
   const shownId = (wide ? previewed : null) ?? pinned;
   const shown = rows.find((row) => row.id === shownId);
+  const shownSkill = skills.find((row) => row.id === shownId);
   const counts = Object.fromEntries(
     STATUSES.map((status) => [status, rows.filter((row) => row.status === status).length]),
   ) as Record<Status, number>;
@@ -55,6 +57,14 @@ export function Dashboard({ report }: { report: Report }) {
     } else {
       apply();
     }
+  };
+
+  const events = {
+    onPreview: (id: string) => preview(id, PREVIEW_AFTER),
+    onFocusRow: (id: string) => preview(id, 0),
+    onToggle: () => {
+      window.location.hash = "";
+    },
   };
 
   const alone = !wide && pinned !== null;
@@ -76,25 +86,29 @@ export function Dashboard({ report }: { report: Report }) {
       {!alone && <Pills counts={counts} filter={filter} onLight={setLit} onFilter={toggleFilter} />}
       <div className="grid items-start gap-6 min-[1100px]:grid-cols-[minmax(0,1fr)_22.5rem]">
         {!alone && (
-          <RuleTable
-            rows={filter ? rows.filter((row) => row.status === filter) : rows}
-            pinned={pinned}
-            shown={shownId}
-            lit={lit}
-            events={{
-              onPreview: (id) => preview(id, PREVIEW_AFTER),
-              onFocusRow: (id) => preview(id, 0),
-              onToggle: () => {
-                window.location.hash = "";
-              },
-            }}
-            onLeave={() => preview(null, LET_GO_AFTER)}
-            onFocusOut={() => preview(null, 0)}
-          />
+          <div className="grid gap-6">
+            <RuleTable
+              rows={filter ? rows.filter((row) => row.status === filter) : rows}
+              pinned={pinned}
+              shown={shownId}
+              lit={lit}
+              events={events}
+              onLeave={() => preview(null, LET_GO_AFTER)}
+              onFocusOut={() => preview(null, 0)}
+            />
+            <SkillTable
+              rows={filter ? [] : skills}
+              pinned={pinned}
+              shown={shownId}
+              events={events}
+              onLeave={() => preview(null, LET_GO_AFTER)}
+              onFocusOut={() => preview(null, 0)}
+            />
+          </div>
         )}
         {(wide || alone) && (
           <aside
-            aria-label={shown ? "Rule in full" : "About this page"}
+            aria-label={shown ? "Rule in full" : shownSkill ? "Skill in full" : "About this page"}
             ref={card}
             tabIndex={-1}
             className={cn(
@@ -104,7 +118,13 @@ export function Dashboard({ report }: { report: Report }) {
             onPointerEnter={() => window.clearTimeout(timer.current)}
             onPointerLeave={() => preview(null, LET_GO_AFTER)}
           >
-            {shown ? <RuleCard key={shown.id} row={shown} day={report.day} /> : <PageFacts report={report} />}
+            {shown ? (
+              <RuleCard key={shown.id} row={shown} day={report.day} />
+            ) : shownSkill ? (
+              <SkillCard key={shownSkill.id} row={shownSkill} day={report.day} />
+            ) : (
+              <PageFacts report={report} />
+            )}
           </aside>
         )}
       </div>
