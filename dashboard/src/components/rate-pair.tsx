@@ -175,13 +175,16 @@ export function Swatch({ side, children }: { side: Side; children: ReactNode }) 
   );
 }
 
-/** The legend of a labelled pair, said once: which side is grey, which is blue, and which way the arrow runs. */
+/**
+ * The legend of a labelled pair, said once: which side is grey, which is blue, and which way the arrow runs. Blue comes
+ * first, since a rule that works moves its dot left, so the legend reads in the order most rows draw.
+ */
 export function PairLegend({ from, to }: { from: string; to: string }) {
   return (
     <div className="flex flex-wrap items-center gap-x-1.5 text-sm">
-      <Swatch side="without">{from}</Swatch>
-      <span aria-hidden>→</span>
       <Swatch side="with">{to}</Swatch>
+      <span aria-hidden>←</span>
+      <Swatch side="without">{from}</Swatch>
     </div>
   );
 }

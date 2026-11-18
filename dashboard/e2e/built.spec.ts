@@ -417,7 +417,9 @@ test("every kind's detail has the one shape: kind, title, one headline, one line
       };
     }, id);
     expect(found, id).toMatchObject({ kinds: 1, headlines: 1, lines: 1, repeated: [] });
-    expect(found.captions, id).toBeGreaterThan(0);
+    // A proven rule still waiting for tasks has no chart to draw: its status and counts say it all.
+    if (id !== "permanent-branch-pushed-without-a-pull-request") expect(found.captions, id).toBeGreaterThan(0);
+    else expect(found.captions, id).toBe(0);
   }
   await pick(page, opened.url, "mistake-branch-pushed-without-a-pull-request");
   await expect(page.locator("[data-detail] [data-headline]")).toHaveText("100% fewer than before the rule");
