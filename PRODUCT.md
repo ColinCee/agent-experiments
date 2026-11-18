@@ -42,15 +42,12 @@ Each line has an end-to-end test in `dashboard/e2e`, except "Copy for an agent",
 
 ## Look
 
-- Minimal and technical, on the shadcn components the dashboard has: neutral colours, hairlines, 13px type, monospace numbers. Colour only for a result.
+The general rules are the [`designing-interfaces`](https://github.com/ColinCee/agents/blob/main/skills/designing-interfaces/SKILL.md) skill, which holds for every page; this one adds:
+
+- The shadcn components the dashboard has, 13px type.
 - A result is a thin band across its 90% range with a small dot at the estimate and a tick at no change, fewer mistakes to the left. The column header is the scale, each number over its place.
-- One number format: the signed change in mistakes, in percent.
-- Words only for names and verdicts. What a mark means is said once, never under each chart.
-- The card adds to its row and never restates it: beside the table it leaves out the row's number, and the band returns only at full width with its range's own numbers.
-- No dot or other mark as a separator between two facts: each fact gets its own labelled place.
-- Every chart has labelled axes with units.
-- Every change of state moves, briefly and slightly; nothing moves for people who ask for reduced motion.
-- The table and the card start at the same top edge.
+- The one number format is the signed change in mistakes, in percent.
+- Beside the table the card leaves out the row's number; the band returns only at full width, with its range's own numbers.
 
 ## Constraints
 
