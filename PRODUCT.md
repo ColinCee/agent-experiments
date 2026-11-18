@@ -34,6 +34,9 @@ Show which rule experiments are running and which rules are active, so he can tr
 - Look: modern, minimal and technical, built from the shadcn components the dashboard already has. Clean layout, small type, hairlines; no themed or decorative styles.
 - A result is drawn as a thin band across its range with a small dot at the estimate, fewer mistakes to the left of a no-change tick.
 
+- Layout: one table of every rule with the picked rule in a card beside it, top edges level. The card never repeats what its row shows.
+- No dot or other mark as a separator between two facts: each fact gets its own labelled place.
+
 ## Product Principles
 
 - A link from an agent lands on the one thing it is about, readable on a phone.
