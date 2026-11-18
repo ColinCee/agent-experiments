@@ -7,12 +7,15 @@ function legacyCopy(text: string): boolean {
   const field = Object.assign(document.createElement("textarea"), { value: text });
   field.setAttribute("readonly", "");
   field.style.cssText = "position:fixed;inset-block-start:0;opacity:0";
+  // Selecting the field takes focus from the button; a keyboard user gets it back.
+  const focused = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   document.body.append(field);
   field.select();
   try {
     return document.execCommand("copy");
   } finally {
     field.remove();
+    focused?.focus();
   }
 }
 

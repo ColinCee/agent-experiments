@@ -43,7 +43,8 @@ const CHECK_DAYS = 28;
 export function ruleTrust(check: PermanentCheck, day: Day): Trust {
   const needed = check.needed ?? MOST_NEEDED;
   const fewer = Math.min(check.tasks_with, check.tasks_without);
-  const age = differenceInCalendarDays(parseISO(day), parseISO(check.since)) + 1;
+  // Its sides count at most the last 28 days, so its pace is over those, however old it is.
+  const age = Math.min(CHECK_DAYS, differenceInCalendarDays(parseISO(day), parseISO(check.since)) + 1);
   const atFull = (fewer / age) * CHECK_DAYS;
   const weeks = Math.ceil((needed - fewer) / (fewer / age) / 7);
   const enough =
