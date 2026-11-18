@@ -28,6 +28,8 @@ export interface Report {
   mistakes: Mistake[];
   replays: Replay[];
   sizes: Sizes;
+  /** One per mistake the measures file ties to a skill: the skill not loaded when its moment came. */
+  skills: Skill[];
 }
 
 export interface Trial {
@@ -132,4 +134,34 @@ export interface Sizes {
   largest: { file: string; words: number }[];
   /** Per month (YYYY-MM): edits, the share of them that only added lines, and the share of changed lines added. */
   months: { month: string; label: "Rules" | "Skills"; changes: number; only_added: number; added_share: number }[];
+}
+
+/** A version of a skill's text, from the first day an agent loaded it. */
+export interface SkillVersion {
+  /** 7 hex characters of a hash of the text. */
+  version: string;
+  /** The skill's name when this version was first loaded; a renamed skill keeps its earlier versions. */
+  skill: string;
+  since: Day;
+  /** Tasks whose moment came while this was the latest version loaded, over the timeline. */
+  tasks: number;
+  /** Null under 10 tasks, too few to rank versions by. */
+  rate: number | null;
+  low: number | null;
+  high: number | null;
+}
+
+export interface Skill {
+  /** The mistake, in plain words. */
+  name: string;
+  /** Every name the skill has had. */
+  skills: string[];
+  /** Over the last 28 days; null with no tasks. */
+  now: Side | null;
+  /** 6 weeks, 7-day rolling. */
+  series: { day: Day; rate: number | null }[];
+  /** The version in force when the series starts and every one after, newest first. */
+  versions: SkillVersion[];
+  /** Up to 5, latest first, over the last 28 days. */
+  misses: { day: Day; session: string }[];
 }

@@ -18,15 +18,16 @@ The group comes from a hash of the trial's name and the task, so a task keeps it
 
 ## Counting
 
-`counting.py` runs [`sessions.sql`](../src/agent_experiments/sessions.sql) over every transcript, then the measures file, and replaces three tables in the DuckDB file:
+`counting.py` runs [`sessions.sql`](../src/agent_experiments/sessions.sql) over every transcript, then the measures file, and replaces these tables in the DuckDB file:
 
 | Table | One row per |
 |---|---|
 | `sessions` | session and day: project, entrypoint, model, effort, replies, typed messages, tokens, root session, stamps |
 | `stamps` | stamp the hook gave a session, with its time |
 | `chances` | moment a rule could be broken (`measure, session, day, ts, uuid, miss`), as the measures file defines them |
+| `skill_loads` | skill an agent loaded, with its version: a hash of the text it read, without its folder or arguments |
 
-A continued session copies its parent's entries; each counts once, for the root session. A measures file is SQL that creates a temp table `chances` from the temp tables `texts`, `calls` and `typed`; `sessions.sql` names their columns. It may also create `measure_names(measure, name)`, names the page shows in place of measure ids, and `changes(measure, day, what)`, the days a rule for a measure changed. A full rebuild takes about 8 s on 2 GB of transcripts.
+A continued session copies its parent's entries; each counts once, for the root session. A measures file is SQL that creates a temp table `chances` from the temp tables `texts`, `calls` and `typed`; `sessions.sql` names their columns. It may also create `measure_names(measure, name)`, names the page shows in place of measure ids, `changes(measure, day, what)`, the days a rule for a measure changed, and `skill_measures(measure, skill)`, the measures that count a skill not loaded when needed, under each name the skill has had. A full rebuild takes about 8 s on 2 GB of transcripts.
 
 `looks` and `replays` are never rebuilt: a look is written once, and a replay's row changes only when that replay is rerun.
 
@@ -55,6 +56,15 @@ A continued session copies its parent's entries; each counts once, for the root 
 
 [`size.py`](../src/agent_experiments/size.py) shows whether agents only append to rules and skills. From the agents repo's whole `git log --numstat -M` (so a file moved into a pattern from anywhere is not new) and each file's text at each commit, it fills `sizes`: one row per file a commit changed, with its words after the commit and the lines added and deleted. A file renamed away or deleted drops to 0 words. `daily --agents-repo` refreshes it for `home/*.md`, the every-turn rules, and `skills/*/SKILL.md`. The figures are on the overview page, not here, since they move with every commit.
 
+## Skills
+
+[`skills.py`](../src/agent_experiments/skills.py) shows, for each measure in `skill_measures`, how often a task that needed the skill went without it, so a skill that is never loaded, or loaded less after an edit, shows.
+
+- **Version.** Each load's text is in the transcript, so its hash names the version agents read, with no tracking in the skills repo. A chance counts for the version first loaded at or before it.
+- **Birth.** Tasks before the skill's first load count for nothing, since it may not have existed yet.
+- **By version.** A version gets a rate only from 10 tasks: skills change several times a week, so most versions never get one, and those that do are compared by their ranges, not tested. Before and after is not a test (Method).
+- **Not covered.** Whether an agent followed a skill once loaded; and whether a new description triggers on the right prompts before it ships, which `claude plugin eval` with a `tool_used: Skill` grader does.
+
 ## Method
 
 [`stats.py`](../src/agent_experiments/stats.py) uses SciPy for both tests.
@@ -69,7 +79,7 @@ A continued session copies its parent's entries; each counts once, for the root 
 
 ## Overview page
 
-`daily` writes `report.json`, the facts (its shape: [`report.ts`](../dashboard/src/data/report.ts)), beside it `overview.html`: the dashboard built from `dashboard/` into [`dashboard.html`](../src/agent_experiments/dashboard.html), with the report put in its `<script id="report">` by [`overview.py`](../src/agent_experiments/overview.py). Both are written in full before either replaces the last one, so a failed run leaves yesterday's page. A change there is `with / without - 1` (or `after / before - 1`), the drop's opposite, so below 0 is fewer misses. The page shows the trials and the permanent checks, one row each ([PRODUCT.md](../PRODUCT.md)); the report also carries the mistakes, replays and sizes below, which the page does not show.
+`daily` writes `report.json`, the facts (its shape: [`report.ts`](../dashboard/src/data/report.ts)), beside it `overview.html`: the dashboard built from `dashboard/` into [`dashboard.html`](../src/agent_experiments/dashboard.html), with the report put in its `<script id="report">` by [`overview.py`](../src/agent_experiments/overview.py). Both are written in full before either replaces the last one, so a failed run leaves yesterday's page. A change there is `with / without - 1` (or `after / before - 1`), the drop's opposite, so below 0 is fewer misses. The page shows the trials and the permanent checks, one row each ([PRODUCT.md](../PRODUCT.md)); below them, the skills (Skills). The report also carries the mistakes, replays and sizes below, which the page does not show.
 
 - **Trials.** Per trial and measure: each half's tasks and miss rate, the change with its 90% range, tasks needed (Method), its looks, each half's rate over 3 days since the start, and the 5 sessions with its latest misses (their ids and days, never their text), which the page copies for an agent to read.
 - **Permanent checks.** Each settled rule against its holdout (Looks), over the same tasks: each side's miss rate, and its rate over 7 days for each of the last 28, since the holdout gets about 1 task in 10; tasks needed for a true halving to put the range clear of no change (p < 0.05), as if both sides were the same size; and the 5 sessions with its latest misses. Numbers only the page uses draw from their own random generator, so adding one never moves a look.

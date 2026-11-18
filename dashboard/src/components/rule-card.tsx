@@ -16,7 +16,7 @@ import { TrendChart } from "./charts/trend-chart";
 import { CopyButton } from "./copy-button";
 import { STATUS_TONE } from "./status-icon";
 
-function Section({ id, title, children }: { id: string; title: string; children: ReactNode }) {
+export function Section({ id, title, children }: { id: string; title: string; children: ReactNode }) {
   return (
     <section data-section={id} className="grid gap-2.5">
       <h3 className="font-medium text-muted-foreground text-xs">{title}</h3>
@@ -26,7 +26,7 @@ function Section({ id, title, children }: { id: string; title: string; children:
 }
 
 /** Labelled values, one a line; a third item is the key when labels repeat. */
-function Facts({ facts }: { facts: [string, string, string?][] }) {
+export function Facts({ facts }: { facts: [string, string, string?][] }) {
   return (
     <dl className="grid grid-cols-[1fr_auto] text-xs">
       {facts.map(([label, value, key]) => (
@@ -211,6 +211,8 @@ export function PageFacts({ report }: { report: Report }) {
           ["Dashed lines on a chart", "Days it was checked"],
           ["Tasks needed", "To find a halving 4 times in 5"],
           ["A do-nothing rule passes", "Under 7% of the time"],
+          ["A skill missed", "A task needed it and never loaded it"],
+          ["Dashed lines on a skill's chart", "A new version first loaded"],
         ]}
       />
     </div>

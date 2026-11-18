@@ -61,7 +61,7 @@ test("the page opens with one row per experiment and active rule, finished exper
   page,
 }) => {
   await openWide(page);
-  await expect(page.locator("[data-row]")).toHaveCount(fixture.trials.length + fixture.permanent.length);
+  await expect(page.locator("[data-group] [data-row]")).toHaveCount(fixture.trials.length + fixture.permanent.length);
   expect(await page.locator("[data-group]").evaluateAll((all) => all.map((g) => g.getAttribute("data-group")))).toEqual(
     ["running", "active", "finished"],
   );
@@ -73,6 +73,29 @@ test("the page opens with one row per experiment and active rule, finished exper
   await expect(cells.locator('[data-track="change"]')).toBeVisible();
   await expect(cells.locator("[data-change]")).toHaveText("−60%");
   await expect(cells.getByRole("img", { name: "Works" })).toBeVisible();
+});
+
+test("each skill is a row below, most missed first, and its card shows its rate over time and by version", async ({
+  page,
+}) => {
+  await openWide(page);
+  const skills = page.getByRole("region", { name: "Skills" }).locator("[data-row]");
+  await expect(skills).toHaveCount(fixture.skills.length);
+  expect(await skills.locator("[data-name]").allTextContents()).toEqual([
+    "Reviews done without the review skill",
+    "Releases cut without the release skill",
+    "Exports run without the export skill",
+  ]);
+  await expect(skills.nth(0).locator("[data-rate]")).toHaveText("60%");
+  await expect(skills.nth(2).locator("[data-rate]")).toHaveText("–");
+  await expect(skills.nth(2).locator('[data-track="rate"]')).toHaveCount(0);
+  const id = "skill-releases-cut-without-the-release-skill";
+  await row(page, id).hover();
+  await expect(card(page, id).locator("[data-version]")).toHaveCount(3);
+  await expect(card(page, id).locator('[data-version="c41d9e2"]')).toContainText("too few");
+  expect(await sections(page)).toEqual(["verdict", "rate-now", "rate", "versions", "hand"]);
+  await row(page, id).click();
+  await expect(page).toHaveURL(new RegExp(`#${id}$`));
 });
 
 test("each row's status is one of four, from the verdict or the rule's check, each with its own icon", async ({
@@ -171,7 +194,7 @@ test("on a phone a linked rule's card is the whole screen, with a way back to th
   // The swap removes what had focus, so it moves to the card, and back to the row on return.
   expect(await page.evaluate(() => document.activeElement?.tagName)).toBe("ASIDE");
   await page.getByRole("link", { name: "All rules" }).click();
-  await expect(page.locator("[data-table]")).toBeVisible();
+  await expect(page.locator("[data-table]").first()).toBeVisible();
   expect(await page.evaluate(() => document.activeElement?.getAttribute("data-row"))).toBe(WORKS);
   await row(page, RULE).click();
   await expect(card(page, RULE)).toBeVisible();
@@ -191,7 +214,7 @@ test("pointing at a status pill dims the other rows, and a click keeps only its 
   await expect(page.locator('[data-group="running"]')).toHaveCount(0);
   await expect(page.locator('[data-pill="works"]')).toHaveAttribute("aria-pressed", "true");
   await page.locator('[data-pill="works"]').click();
-  await expect(page.locator("[data-row]")).toHaveCount(fixture.trials.length + fixture.permanent.length);
+  await expect(page.locator("[data-group] [data-row]")).toHaveCount(fixture.trials.length + fixture.permanent.length);
 });
 
 test("every card has its sections in one order, and a rule with not enough tasks stops after the second", async ({

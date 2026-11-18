@@ -27,7 +27,9 @@ Each line has an end-to-end test in `dashboard/e2e`.
 | A row's status is "not enough tasks" | It draws no band and shows a dash, so a running experiment never shows a lead. |
 | He points at a row, or moves focus to it | Its card shows beside the table. A click keeps it open; leaving the table returns to the kept one. |
 | He opens an agent's link to a rule | That rule's card is open. Below 1100px the card is the whole screen, with a way back. |
-| He points at a status pill | Rows of other statuses dim. A click keeps only its rows. |
+| He points at a status pill | Rows of other statuses dim. A click keeps only its rows, and hides the skills. |
+| The page opens | Below the rules, each tracked skill is one row, most missed first: name, its rate over 28 days with its range, no status, since a rate alone is no verdict. |
+| A skill's card shows | How often it is missed, its rate over time with a dashed line where each version was first loaded, each version's rate (none under 10 tasks), and its latest misses to hand to an agent. |
 | Any card shows | Its sections come in one order: verdict, can it be trusted, change in mistakes, mistake rate over time, hand to an agent. A rule with not enough tasks stops after the second. |
 | No rule is picked | The card says how the numbers are made and what each mark means. |
 | He clicks "Copy for an agent" | The result and the sessions behind its latest misses are copied, worded as a request. |

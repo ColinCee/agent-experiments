@@ -10,10 +10,10 @@ from pathlib import Path
 
 import numpy as np
 
-from agent_experiments import looks, overview, replay, size
+from agent_experiments import looks, overview, replay, size, skills
 from agent_experiments.counting import count
 from agent_experiments.looks import LIMITS, TRIAL_DAYS, shift
-from agent_experiments.stats import Effect, compare, rate_range, tasks_needed
+from agent_experiments.stats import Effect, compare, tasks_needed
 
 DATA = Path.home() / ".claude" / "keep-going"
 PROJECTS = Path.home() / ".claude" / "projects"
@@ -160,6 +160,7 @@ def build(db: Path, trials: list[looks.Trial], day: str, errors: list[str]) -> t
     columns = [d[0] for d in found.description]
     replays = [_replay(dict(zip(columns, r, strict=True)), names) for r in found.fetchall()]
     sizes = size.report(con)
+    skill_rows = skills.report(con, names, day, shown)
     con.close()
     report = {
         "day": day,
@@ -174,6 +175,7 @@ def build(db: Path, trials: list[looks.Trial], day: str, errors: list[str]) -> t
         "mistakes": mistakes,
         "replays": replays,
         "sizes": sizes,
+        "skills": skill_rows,
     }
     return report, new_looks
 
@@ -207,15 +209,6 @@ def _check_detail(con, trial: looks.Trial, measure: str, model: str | None, day:
     }
 
 
-def _side(con, measure: str, first: str, last: str, rng: np.random.Generator) -> tuple[dict | None, np.ndarray]:
-    """A measure's misses over some days with their 90% range, and its tasks; no side with no tasks."""
-    tasks = looks.measure_tasks(con, measure, first, last)
-    if not len(tasks):
-        return None, tasks
-    rate, low, high = rate_range(tasks, rng)
-    return {"rate": rate, "low": low, "high": high, "tasks": len(tasks), "from": first}, tasks
-
-
 def _mistake(con, measure: str, name: str, changes: list, day: str, rng: np.random.Generator) -> dict:
     """A tracked measure's day against its usual range, its timeline with the rule changes and trial starts on it, and
     its misses before and after the latest rule change, the before side starting at the rule change before it; with no
@@ -245,13 +238,13 @@ def _mistake(con, measure: str, name: str, changes: list, day: str, rng: np.rand
         "changes": [{"day": d, "what": w, "kind": k} for d, w, k in marks if d >= first],
     }
     if not days:
-        row["current"] = _side(con, measure, shift(day, 1 - looks.USUAL_DAYS), day, rng)[0]
+        row["current"] = looks.side(con, measure, shift(day, 1 - looks.USUAL_DAYS), day, rng)[0]
         return row
     latest = days[-1][0]
     earlier = [d for d, _ in days if d < latest]
     start = max(earlier[-1] if earlier else "", shift(latest, -TIMELINE_DAYS))
-    row["before"], before = _side(con, measure, start, shift(latest, -1), rng)
-    row["after"], after = _side(con, measure, latest, day, rng)
+    row["before"], before = looks.side(con, measure, start, shift(latest, -1), rng)
+    row["after"], after = looks.side(con, measure, latest, day, rng)
     if min(len(before), len(after)) > 1:
         # After against before as one number and its range; p is not used, so few shuffles.
         change = _change(compare(before, after, rng, resamples=99))

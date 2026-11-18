@@ -29,7 +29,7 @@ TEMPLATE = (
 PACKAGED = overview.template
 SIDE = {"rate", "low", "high", "tasks", "from"}
 KEYS = {
-    "report": {"day", "written", "sessions", "trials", "permanent", "mistakes", "replays", "sizes"},
+    "report": {"day", "written", "sessions", "trials", "permanent", "mistakes", "replays", "sizes", "skills"},
     "sessions": {"total", "in_group", "split_since"},
     "trial": {"name", "started", "ends", "state", "verdict", "tasks_with", "tasks_without", "rate_with"}
     | {"rate_without", "change", "needed", "per_week", "looks", "trend", "misses"},

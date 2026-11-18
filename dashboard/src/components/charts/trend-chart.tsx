@@ -5,22 +5,31 @@ import { percent } from "@/lib/format";
 import { ChartTip } from "./chart-tip";
 import { PointMark } from "./marks";
 
-const SERIES = [
+type Series = { key: "with" | "without"; name: string; stroke: string; fill: string; swatch: string };
+
+const SIDES: Series[] = [
   { key: "without", name: "Without", stroke: "var(--without)", fill: "fill-without", swatch: "bg-without" },
   { key: "with", name: "With rule", stroke: "var(--with)", fill: "fill-with", swatch: "bg-with" },
-] as const;
+];
+
+/** A skill's one line: a rate with nothing to compare it with, so no result colour. */
+export const MISSED: Series[] = [
+  { key: "with", name: "Missed", stroke: "var(--foreground)", fill: "fill-foreground", swatch: "bg-foreground" },
+];
 
 /**
- * A mistake rate by day, with and without the rule, each line named at its end and each day in `marks` drawn as a
- * dashed line. `ticks` are the labels the day axis names; every label when left out.
+ * A mistake rate by day, with and without the rule (or the lines in `series`), each line named at its end and each
+ * day in `marks` drawn as a dashed line. `ticks` are the labels the day axis names; every label when left out.
  */
 export function TrendChart({
   rows,
   marks = [],
   ticks,
   tickFormatter,
+  series = SIDES,
 }: {
   rows: TrendRow[];
+  series?: Series[];
   marks?: string[];
   ticks?: string[];
   tickFormatter?: (label: string, index: number) => string;
@@ -58,7 +67,7 @@ export function TrendChart({
               title={String(label)}
               rows={
                 active
-                  ? SERIES.flatMap((s) => {
+                  ? series.flatMap((s) => {
                       const rate = payload?.[0]?.payload?.[s.key];
                       return rate == null ? [] : [{ name: s.name, value: percent(rate), swatch: s.swatch }];
                     })
@@ -67,7 +76,7 @@ export function TrendChart({
             />
           )}
         />
-        {SERIES.map((s) => {
+        {series.map((s) => {
           const last = rows.findLastIndex((r) => r[s.key] !== null);
           return (
             <Line

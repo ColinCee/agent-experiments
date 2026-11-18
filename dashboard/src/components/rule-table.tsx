@@ -1,3 +1,4 @@
+import type { FocusEvent, MouseEvent, PointerEvent } from "react";
 import { signedPercent } from "@/lib/format";
 import { rowHref } from "@/lib/hash";
 import { GROUP_WORDS, GROUPS, type Row } from "@/lib/rows";
@@ -7,13 +8,29 @@ import { Band, Scale } from "./band";
 import { STATUS_TONE, StatusIcon } from "./status-icon";
 
 // One grid for the header and every row, so each band sits under the scale. On a phone the band takes a second line.
-const GRID =
+export const GRID =
   "grid grid-cols-[minmax(0,1fr)_3.5rem_1rem] items-center gap-x-4 px-3.5 sm:grid-cols-[minmax(0,1fr)_17rem_3.5rem_1rem]";
 
 export interface RowEvents {
   onPreview: (id: string) => void;
   onFocusRow: (id: string) => void;
   onToggle: (id: string) => void;
+}
+
+/** A table row's pointer, focus and click handling, alike in every table on the page. */
+export function rowHandlers(id: string, pinned: string | null, events: RowEvents, onFocusOut: () => void) {
+  return {
+    onPointerEnter: (event: PointerEvent<HTMLElement>) => event.pointerType === "mouse" && events.onPreview(id),
+    onFocus: (event: FocusEvent<HTMLElement>) => event.currentTarget.matches(":focus-visible") && events.onFocusRow(id),
+    onBlur: (event: FocusEvent<HTMLElement>) =>
+      !event.currentTarget.closest("[data-table]")?.contains(event.relatedTarget) && onFocusOut(),
+    onClick: (event: MouseEvent<HTMLElement>) => {
+      // A second click on the kept row lets go of it; any other click follows the link.
+      if (pinned !== id || event.metaKey || event.ctrlKey) return;
+      event.preventDefault();
+      events.onToggle(id);
+    },
+  };
 }
 
 /** Every experiment and active rule, one row each, group by group. */
@@ -73,17 +90,7 @@ export function RuleTable({
                   lit !== null && lit !== row.status && "opacity-30",
                 )}
                 style={{ viewTransitionName: `row-${row.id}` }}
-                onPointerEnter={(event) => event.pointerType === "mouse" && events.onPreview(row.id)}
-                onFocus={(event) => event.currentTarget.matches(":focus-visible") && events.onFocusRow(row.id)}
-                onBlur={(event) =>
-                  !event.currentTarget.closest("[data-table]")?.contains(event.relatedTarget) && onFocusOut()
-                }
-                onClick={(event) => {
-                  // A second click on the kept row lets go of it; any other click follows the link.
-                  if (pinned !== row.id || event.metaKey || event.ctrlKey) return;
-                  event.preventDefault();
-                  events.onToggle(row.id);
-                }}
+                {...rowHandlers(row.id, pinned, events, onFocusOut)}
               >
                 <span data-name className="font-medium">
                   {row.name}
