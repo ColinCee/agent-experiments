@@ -36,6 +36,10 @@ Show which rule experiments are running and which rules are active, so he can tr
 
 - Layout: one table of every rule with the picked rule in a card beside it, top edges level. The card never repeats what its row shows.
 - No dot or other mark as a separator between two facts: each fact gets its own labelled place.
+- Pointing at a row shows its card; a click keeps it open. Pointing at a status pill highlights its rows; a click keeps only those.
+- Motion on every change of state, short and small, and none for people who ask for reduced motion.
+- Every chart has labelled axes with units.
+- The card must let him check a result: how far the experiment has run, whether it has enough tasks, and the sessions behind it.
 
 ## Product Principles
 
