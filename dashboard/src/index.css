@@ -7,7 +7,9 @@
 
 @theme inline {
   --font-heading: var(--font-sans);
-  --font-sans: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-sans: "Segoe UI Variable Text", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Mono", "SF Mono", Consolas, Menlo, monospace;
+  --color-unsure: var(--unsure);
   --color-with: var(--with);
   --color-without: var(--without);
   --color-good: var(--good);
@@ -42,12 +44,13 @@
 :root {
   /* Scrollbars and other browser-drawn parts follow the theme too. */
   color-scheme: light dark;
-  /* The only hues on the page, each with one meaning: with the rule, without it, clearly fewer mistakes, needs
-     attention. Text in them passes 4.5:1 on the cards and their tints in both themes. */
+  /* The only hues on the page, each with one meaning: with the rule, without it, works, not working, can't tell.
+     Text in them passes 4.5:1 on the page and its muted rows in both themes. */
   --with: #2160e0;
   --without: #696969;
-  --good: #16793a;
+  --good: #15803d;
   --bad: #c62828;
+  --unsure: #8a5a00;
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -73,8 +76,9 @@
   :root {
     --with: #6ea8fe;
     --without: #a8a8a8;
-    --good: #4fd17f;
-    --bad: #f47272;
+    --good: #4ade80;
+    --bad: #f87171;
+    --unsure: #facc15;
     --background: oklch(0.145 0 0);
     --foreground: oklch(0.985 0 0);
     --card: oklch(0.205 0 0);
@@ -113,6 +117,6 @@ body {
   color: var(--foreground);
   /* Longhands: the `font` shorthand would reset the tabular figures the columns rely on. */
   font-family: var(--font-sans);
-  font-size: 0.9375rem;
+  font-size: 0.8125rem;
   line-height: 1.5;
 }

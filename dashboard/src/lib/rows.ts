@@ -1,87 +1,85 @@
-import type { Mistake, PermanentCheck, Replay, Report, Sizes, Trial } from "@/data/report";
-import type { SectionId } from "./hash";
-import { slug, sortByChange, withoutRule, withRule } from "./mistakes";
+import type { PermanentCheck, Range, Report, Trial } from "@/data/report";
+import { ruleStatus, STATUSES, type Status, trialStatus } from "./status";
 import { sortTrials } from "./trials";
 
-/** One row of the page: a thing that can be picked and shown in full in the detail panel. */
-export type Row = { id: string; name: string; section: SectionId } & (
-  | { kind: "trial"; trial: Trial }
-  | { kind: "permanent"; check: PermanentCheck }
-  | { kind: "mistake"; mistake: Mistake }
-  | { kind: "replay"; replay: Replay }
-  | { kind: "size"; series: Sizes["series"][number] }
-);
+/** The table's groups, in page order. */
+export const GROUPS = ["running", "active", "finished"] as const;
 
-export type RowKind = Row["kind"];
+export type Group = (typeof GROUPS)[number];
 
-/** A row's id, unique on the page and stable across reports, so a picked row can live in the hash. */
-export const rowId = (kind: RowKind, name: string) => `${kind}-${slug(name)}`;
+export const GROUP_WORDS: Record<Group, string> = {
+  running: "Running experiments",
+  active: "Active rules",
+  finished: "Finished experiments",
+};
+
+/** A change whose range is known, so a band can be drawn. */
+export type Drawn = { value: number; low: number; high: number };
+
+/** One row of the table: an experiment or an active rule, with the answer it gives. */
+export type Row = {
+  id: string;
+  name: string;
+  group: Group;
+  status: Status;
+  /** Null with no answer yet: a row without an answer shows no numbers, so a running experiment never shows a lead. */
+  change: Drawn | null;
+} & ({ kind: "trial"; trial: Trial } | { kind: "permanent"; check: PermanentCheck });
+
+/** A name as it appears in a row's id: lower case, with a hyphen for each run of anything else. */
+export function slug(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+}
+
+function drawn(status: Status, change: Range | null): Drawn | null {
+  if (status === "not-enough" || change?.low == null || change.high == null) return null;
+  return { value: change.value, low: change.low, high: change.high };
+}
 
 /**
- * Every row on the page, section by section in page order: trials (running first), proven rules, mistakes with a rule
- * (clearly fewer first), mistakes with no rule yet, replays and the two sizes. Up and Down walk this order.
+ * Every row in page order: experiments not yet finished (running first), active rules (not working first), then
+ * finished experiments (latest first). Ids are unique and stable across reports, so a link can name a row.
  */
 export function pageRows(report: Report): Row[] {
+  const trials = sortTrials(report.trials).map((trial): Row => {
+    const status = trialStatus(trial);
+    return {
+      kind: "trial",
+      id: `trial-${slug(trial.name)}`,
+      name: trial.name,
+      group: trial.state === "finished" ? "finished" : "running",
+      status,
+      change: drawn(status, trial.change),
+      trial,
+    };
+  });
+  const rules = report.permanent
+    .map((check): Row => {
+      const status = ruleStatus(check);
+      return {
+        kind: "permanent",
+        id: `permanent-${slug(check.name)}`,
+        name: check.name,
+        group: "active",
+        status,
+        change: drawn(status, check.change),
+        check,
+      };
+    })
+    .toSorted((a, b) => STATUSES.indexOf(a.status) - STATUSES.indexOf(b.status));
   const seen = new Set<string>();
-  // Two rows can share a name (a trial run twice); the later ones get a number so every id stays unique.
+  // Two rows can share a name (an experiment run twice); the later ones get a number so every id stays unique.
   const unique = (id: string) => {
     let candidate = id;
     for (let n = 2; seen.has(candidate); n++) candidate = `${id}-${n}`;
     seen.add(candidate);
     return candidate;
   };
-  const rows: Row[] = [
-    ...sortTrials(report.trials).map((trial) => ({
-      kind: "trial" as const,
-      id: rowId("trial", trial.name),
-      name: trial.name,
-      section: "trials" as const,
-      trial,
-    })),
-    ...report.permanent.map((check) => ({
-      kind: "permanent" as const,
-      id: rowId("permanent", check.name),
-      name: check.name,
-      section: "permanent" as const,
-      check,
-    })),
-    ...sortByChange(withRule(report.mistakes)).map((mistake) => ({
-      kind: "mistake" as const,
-      id: rowId("mistake", mistake.name),
-      name: mistake.name,
-      section: "rules" as const,
-      mistake,
-    })),
-    ...withoutRule(report.mistakes).map((mistake) => ({
-      kind: "mistake" as const,
-      id: rowId("mistake", mistake.name),
-      name: mistake.name,
-      section: "no-rule" as const,
-      mistake,
-    })),
-    ...report.replays.map((replay) => ({
-      kind: "replay" as const,
-      id: rowId("replay", replay.name),
-      name: replay.name,
-      section: "replays" as const,
-      replay,
-    })),
-    ...report.sizes.series.map((series) => ({
-      kind: "size" as const,
-      id: rowId("size", series.label),
-      name: series.label,
-      section: "size" as const,
-      series,
-    })),
-  ];
-  return rows.map((row) => ({ ...row, id: unique(row.id) }));
-}
-
-/**
- * The row picked when nothing is: the one the first attention item is about, else the first mistake with a rule,
- * else the first row of all.
- */
-export function firstPick(rows: Row[], attentionTargets: string[]): Row | undefined {
-  const byId = (id: string) => rows.find((r) => r.id === id);
-  return attentionTargets.map(byId).find(Boolean) ?? rows.find((r) => r.section === "rules") ?? rows[0];
+  return GROUPS.flatMap((group) => [...trials, ...rules].filter((row) => row.group === group)).map((row) => ({
+    ...row,
+    id: unique(row.id),
+  }));
 }
