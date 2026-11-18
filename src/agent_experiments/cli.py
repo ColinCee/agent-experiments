@@ -18,6 +18,9 @@ from agent_experiments.stats import Effect, compare, rate_range, tasks_needed
 DATA = Path.home() / ".claude" / "keep-going"
 PROJECTS = Path.home() / ".claude" / "projects"
 TIMELINE_DAYS = 42  # each measure's timeline: long enough to hold a few rule changes and the weeks around them
+# An active rule's holdout gets about 1 task in 10, so its rate is drawn over a week where a trial's halves take 3 days.
+CHECK_DAYS = 7
+CHECK_LIMIT = 0.05  # a one-sided p under this puts the 90% range of a change clear of no change
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -99,6 +102,8 @@ def build(db: Path, trials: list[looks.Trial], day: str, errors: list[str]) -> t
     dashboard/src/data/report.ts) with the looks just taken. A trial that fails is left out and added to
     `errors`, so the others still show."""
     rng = np.random.default_rng(1)
+    # Numbers only the page uses draw from their own generator, so adding one never moves a look's p or range.
+    shown = np.random.default_rng(2)
     con = looks.open_store(db)
     names = dict(con.execute("SELECT measure, name FROM measure_names").fetchall())
 
@@ -125,12 +130,14 @@ def build(db: Path, trials: list[looks.Trial], day: str, errors: list[str]) -> t
                         "tasks_without": s["tasks_off"],
                         "change": _change(s["effect"]),
                         "slipping": s["off_course"],
+                        **_check_detail(con, trial, s["measure"], s["model"], day, shown),
                     }
                     for s in looks.settled(con, [trial], day, rng)
                 ]
             else:
                 for measure in trial.measures:
                     row, new = _trial_row(con, trial, measure, day, rng)
+                    row["misses"] = looks.latest_misses(con, trial.name, measure, trial.started, day)
                     rows.append({"name": name(trial, measure), **row})
                     new_looks += [new] if new else []
         except Exception:
@@ -183,6 +190,21 @@ def _change(effect: Effect | None) -> dict | None:
 def _rate(tasks: np.ndarray) -> float | None:
     chances = tasks[:, 0].sum()
     return tasks[:, 1].sum() / chances if chances else None
+
+
+def _check_detail(con, trial: looks.Trial, measure: str, model: str | None, day: str, rng: np.random.Generator):
+    """What an active rule's card adds to its row, over the same tasks as its check (looks.settled): each side's rate
+    and its history, the tasks a side needs to find a true halving, and the sessions behind its latest misses."""
+    first = shift(day, 1 - looks.USUAL_DAYS)
+    g = looks.units(con, trial.name, measure, first, day, model)
+    history = looks.daily_rates(con, trial.name, measure, shift(first, 1 - CHECK_DAYS), day, model, CHECK_DAYS)
+    return {
+        "rate_with": _rate(g["on"]),
+        "rate_without": _rate(g["off"]),
+        "needed": tasks_needed(looks.measure_tasks(con, measure, first, day), CHECK_LIMIT, rng),
+        "trend": [point for point in history if point["day"] >= first],
+        "misses": looks.latest_misses(con, trial.name, measure, first, day, model),
+    }
 
 
 def _side(con, measure: str, first: str, last: str, rng: np.random.Generator) -> tuple[dict | None, np.ndarray]:
@@ -271,14 +293,7 @@ def _trial_row(con, trial: looks.Trial, measure: str, day: str, rng: np.random.G
         ).fetchall()
     ]
     recent = looks.measure_tasks(con, measure, shift(day, 1 - looks.USUAL_DAYS), day)
-    per_day: dict[str, dict[str, tuple[int, int]]] = {"off": {}, "on": {}}
-    for grp, _, d, c, m in looks.group_rows(con, trial.name, measure, trial.started, day):
-        was = per_day[grp].get(d, (0, 0))
-        per_day[grp][d] = (was[0] + c, was[1] + m)
-    trend = []
-    if day >= trial.started:
-        without, with_ = (looks.rolling(per_day[g], trial.started, day) for g in ("off", "on"))
-        trend = [{"day": d, "with": w, "without": o} for (d, o), (_, w) in zip(without, with_, strict=True)]
+    trend = looks.daily_rates(con, trial.name, measure, trial.started, day) if day >= trial.started else []
     final = taken and (taken[-1].verdict == "works" or taken[-1].look == len(looks.LOOK_SIZES))
     row = {
         "started": trial.started,

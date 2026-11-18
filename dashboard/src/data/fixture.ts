@@ -1,6 +1,6 @@
 // A made-up report about a fictional team's agents, for the dev server and tests. It covers every state the page shows.
 import { addDays, format, parseISO } from "date-fns";
-import type { Day, Mistake, MistakeChange, Range, Report, Side } from "./report";
+import type { Day, Miss, Mistake, MistakeChange, PermanentCheck, Range, RatePoint, Report, Side } from "./report";
 
 const DAY = "2026-11-12";
 const SERIES_DAYS = 42;
@@ -206,6 +206,40 @@ const mistakes: Mistake[] = [
   ]),
 ].sort((a, b) => a.name.localeCompare(b.name));
 
+/** The latest misses, a day apart back from `last`, under made-up session ids. */
+const misses = (last: Day, sides: Miss["side"][], seed: number): Miss[] =>
+  sides.map((side, i) => ({
+    day: shift(last, -i),
+    side,
+    session: `00000000-0000-4000-8000-${String(seed * 100 + i).padStart(12, "0")}`,
+  }));
+
+const CHECK_DAYS = 28;
+
+/** An active rule's rates over its last 28 days: the side without it is 1 task in 10, so it has gaps and swings. */
+function checkTrend(rateWith: number, rateWithout: number, seed: number): RatePoint[] {
+  const next = random(seed);
+  return Array.from({ length: CHECK_DAYS }, (_, i) => ({
+    day: shift(DAY, i + 1 - CHECK_DAYS),
+    with: round(rateWith * (0.8 + next() * 0.4)),
+    without: i < 3 || next() < 0.15 ? null : round(Math.min(1, rateWithout * (0.5 + next()))),
+  }));
+}
+
+const detail = (
+  rateWith: number | null,
+  rateWithout: number | null,
+  needed: number | null,
+  seed: number,
+  sides: Miss["side"][],
+): Pick<PermanentCheck, "rate_with" | "rate_without" | "needed" | "trend" | "misses"> => ({
+  rate_with: rateWith,
+  rate_without: rateWithout,
+  needed,
+  trend: rateWith === null || rateWithout === null ? [] : checkTrend(rateWith, rateWithout, seed),
+  misses: misses(DAY, sides, seed),
+});
+
 const sizePoints = (first: number, last: number) =>
   Array.from({ length: 20 }, (_, i) => ({
     day: shift("2026-10-05", i * 2),
@@ -236,6 +270,7 @@ export const fixture: Report = {
       per_week: 60,
       looks: [],
       trend: [],
+      misses: [],
     },
     {
       name: "Config read from memory",
@@ -257,6 +292,7 @@ export const fixture: Report = {
         { day: shift(DAY, -1), with: 0.09, without: 0.18 },
         { day: DAY, with: 0.088, without: 0.194 },
       ],
+      misses: misses(DAY, ["without", "with", "without"], 1),
     },
     {
       name: "Tests skipped before a commit",
@@ -280,6 +316,7 @@ export const fixture: Report = {
         with: i === 0 ? null : round(0.13 - i * 0.005),
         without: round(0.23 + (i % 2) * 0.03),
       })),
+      misses: misses("2026-11-06", ["with", "without", "without", "with", "without"], 2),
     },
     {
       name: "Commit messages with no reason",
@@ -300,6 +337,7 @@ export const fixture: Report = {
         with: round(0.25 - i * 0.005),
         without: round(0.26 + (i % 2) * 0.02),
       })),
+      misses: misses("2026-10-23", ["with", "without"], 3),
     },
     {
       name: "Ports taken without checking",
@@ -323,6 +361,7 @@ export const fixture: Report = {
         with: round(0.09 + i * 0.008),
         without: round(0.07 - (i % 2) * 0.01),
       })),
+      misses: misses("2026-11-01", ["with", "with", "without"], 4),
     },
   ],
   permanent: [
@@ -334,6 +373,7 @@ export const fixture: Report = {
       tasks_without: 15,
       change: { value: -0.55, low: -0.8, high: -0.1 },
       slipping: false,
+      ...detail(0.11, 0.24, 30, 5, ["with", "without", "with"]),
     },
     {
       name: "Branch pushed without a pull request",
@@ -343,6 +383,7 @@ export const fixture: Report = {
       tasks_without: 0,
       change: null,
       slipping: false,
+      ...detail(null, null, 60, 6, []),
     },
     {
       name: "Questions asked that the notes answer",
@@ -352,6 +393,7 @@ export const fixture: Report = {
       tasks_without: 3,
       change: { value: -0.3, low: -0.9, high: 0.8 },
       slipping: false,
+      ...detail(0.12, 0.17, 120, 7, ["without", "with"]),
     },
     {
       name: "Long logs pasted into a reply",
@@ -361,6 +403,7 @@ export const fixture: Report = {
       tasks_without: 16,
       change: { value: -0.4, low: -0.7, high: 0.15 },
       slipping: false,
+      ...detail(0.15, 0.25, 40, 8, ["with", "with", "without", "with", "with"]),
     },
     {
       name: "Old branches left open",
@@ -370,6 +413,7 @@ export const fixture: Report = {
       tasks_without: 11,
       change: null,
       slipping: false,
+      ...detail(0.2, 0, 90, 9, ["with"]),
     },
     {
       name: "Drafts saved in the wrong folder",
@@ -379,6 +423,7 @@ export const fixture: Report = {
       tasks_without: 33,
       change: { value: 0.05, low: -0.2, high: 0.4 },
       slipping: true,
+      ...detail(0.3, 0.29, 50, 10, ["without", "with", "with", "with"]),
     },
   ],
   mistakes,

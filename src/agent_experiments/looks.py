@@ -37,23 +37,35 @@ token AS (
 SELECT session, root, stamps > 0 AS stamped, CASE WHEN tasks = 1 THEN task ELSE root END AS task FROM token;
 """
 
-# Per task, a trial group's chances and misses. A session counts for a trial only when all its stamps (and its
-# root's) agree on the group, and only its chances after the first stamp naming the trial: a trial added mid-task
-# must not claim the replies before it.
-UNITS = """
+# A trial group's chances. A session counts for a trial only when all its stamps (and its root's) agree on the group,
+# and only its chances after the first stamp naming the trial: a trial added mid-task must not claim the replies
+# before it.
+GROUPS = """
 WITH named AS (
   SELECT t.session, t.task, st.ts, regexp_extract(st.stamp, '(?:^| )' || regexp_escape($trial) || '=(on|off)\\b', 1) AS grp
   FROM tasks t JOIN stamps st ON st.session IN (t.session, t.root)),
 grouped AS (
   SELECT session, any_value(task) AS task, max(grp) AS grp, min(ts) AS since FROM named WHERE grp <> ''
   GROUP BY session HAVING count(DISTINCT grp) = 1)
-SELECT g.grp, g.task, c."day", count(*) AS chances, sum(c.miss::INT) AS misses
-FROM chances c JOIN grouped g USING (session)
+"""
+IN_GROUP = """FROM chances c JOIN grouped g USING (session)
 LEFT JOIN sessions s ON s.session = c.session AND s."day" = c."day"
 WHERE c.measure = $measure AND c.ts > g.since AND c."day" BETWEEN $first AND $last
   AND ($model IS NULL OR s.model = $model)
-GROUP BY ALL
 """
+UNITS = (
+    GROUPS
+    + 'SELECT g.grp, g.task, c."day", count(*) AS chances, sum(c.miss::INT) AS misses\n'
+    + IN_GROUP
+    + "GROUP BY ALL\n"
+)
+MISSES = (
+    GROUPS
+    + 'SELECT g.grp, c.session, max(c."day")\n'
+    + IN_GROUP
+    + "  AND c.miss\nGROUP BY ALL ORDER BY max(c.ts) DESC, c.session LIMIT $n\n"
+)
+LATEST_MISSES = 5  # enough sessions for an agent to see a pattern, few enough to read in one sitting
 
 
 @dataclass(frozen=True)
@@ -119,6 +131,29 @@ def group_rows(con, trial: str, measure: str, first: str, last: str, model: str 
     """Rows of (group, task, day, chances, misses) for one trial and measure."""
     args = {"trial": trial, "measure": measure, "first": first, "last": last, "model": model}
     return con.execute(UNITS, args).fetchall()
+
+
+def latest_misses(con, trial: str, measure: str, first: str, last: str, model: str | None = None) -> list[dict]:
+    """The sessions with the latest misses among the tasks `group_rows` counts, newest first: each one's last day with
+    a miss, and its group."""
+    args = {"trial": trial, "measure": measure, "first": first, "last": last, "model": model, "n": LATEST_MISSES}
+    return [
+        {"day": d, "side": "with" if grp == "on" else "without", "session": s}
+        for grp, s, d in con.execute(MISSES, args).fetchall()
+    ]
+
+
+def daily_rates(
+    con, trial: str, measure: str, first: str, last: str, model: str | None = None, width: int = 3
+) -> list[dict]:
+    """Each group's miss rate over `width` days, for each day from `first`, counting no chances before it; None for a
+    day with no chances."""
+    per_day: dict[str, dict[str, tuple[int, int]]] = {"off": {}, "on": {}}
+    for grp, _, d, c, m in group_rows(con, trial, measure, first, last, model):
+        was = per_day[grp].get(d, (0, 0))
+        per_day[grp][d] = (was[0] + c, was[1] + m)
+    without, with_ = (rolling(per_day[g], first, last, width) for g in ("off", "on"))
+    return [{"day": d, "with": w, "without": o} for (d, o), (_, w) in zip(without, with_, strict=True)]
 
 
 def units(con, trial: str, measure: str, first: str, last: str, model: str | None = None) -> dict[str, np.ndarray]:

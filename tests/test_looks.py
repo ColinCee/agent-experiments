@@ -89,6 +89,18 @@ def test_units_leave_out_disagreeing_sessions_untyped_ones_and_chances_before_th
 
     assert groups["on"].tolist() == [[2.0, 1.0]]
     assert sorted(groups["off"].tolist()) == [[1.0, 0.0], [1.0, 1.0], [1.0, 1.0]]
+    # The sessions behind the misses are those same tasks', so a card's list agrees with its numbers.
+    assert looks.latest_misses(con, "t", "x", "2026-01-01", "2026-01-31") == [
+        {"day": "2026-01-02", "side": "with", "session": "plain"},
+        {"day": "2026-01-02", "side": "without", "session": "untokened-1"},
+        {"day": "2026-01-02", "side": "without", "session": "untokened-2"},
+    ]
+    rates = looks.daily_rates(con, "t", "x", "2026-01-01", "2026-01-03", width=2)
+    assert rates == [
+        {"day": "2026-01-01", "with": None, "without": None},
+        {"day": "2026-01-02", "with": 0.5, "without": 2 / 3},
+        {"day": "2026-01-03", "with": 0.5, "without": 2 / 3},
+    ]
 
 
 def test_a_look_is_written_once(tmp_path):

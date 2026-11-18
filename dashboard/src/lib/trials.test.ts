@@ -1,24 +1,19 @@
 import { expect, test } from "vitest";
 import type { Trial } from "@/data/report";
+import { trial as madeUp } from "./made-up";
 import { lookLabels, sortTrials, trendRows } from "./trials";
 
-const trial = (over: Partial<Trial>): Trial => ({
-  name: "A trial",
-  started: "2026-11-09",
-  ends: "2026-11-16",
-  state: "running",
-  verdict: null,
-  tasks_with: 14,
-  tasks_without: 9,
-  rate_with: 0.1,
-  rate_without: 0.2,
-  change: null,
-  needed: 70,
-  per_week: 90,
-  looks: [],
-  trend: [],
-  ...over,
-});
+const trial = (over: Partial<Trial>): Trial =>
+  madeUp({
+    started: "2026-11-09",
+    ends: "2026-11-16",
+    tasks_with: 14,
+    tasks_without: 9,
+    change: null,
+    needed: 70,
+    per_week: 90,
+    ...over,
+  });
 
 test("trials sort running, then scheduled soonest first, then finished latest first", () => {
   const sorted = sortTrials([

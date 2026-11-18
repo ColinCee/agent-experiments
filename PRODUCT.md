@@ -18,7 +18,7 @@ For every rule, answer three questions at a glance, drawn and not written: is it
 
 ## Behaviour
 
-Each line has an end-to-end test in `dashboard/e2e`, except "Copy for an agent", which waits on the report (Constraints).
+Each line has an end-to-end test in `dashboard/e2e`.
 
 | When | Then |
 |---|---|
@@ -30,7 +30,7 @@ Each line has an end-to-end test in `dashboard/e2e`, except "Copy for an agent",
 | He points at a status pill | Rows of other statuses dim. A click keeps only its rows. |
 | Any card shows | Its sections come in one order: verdict, can it be trusted, change in mistakes, mistake rate over time, hand to an agent. A rule with not enough tasks stops after the second. |
 | No rule is picked | The card says how the numbers are made and what each mark means. |
-| He clicks "Copy for an agent" (waits on the report) | The result and the sessions behind its latest misses are copied, worded as a request. |
+| He clicks "Copy for an agent" | The result and the sessions behind its latest misses are copied, worded as a request. |
 | A change is larger than the scale | Its band stops at the edge with a mark. |
 
 | Status | An experiment's verdict | An active rule's check |
@@ -54,8 +54,7 @@ The general rules are the [`designing-interfaces`](https://github.com/ColinCee/a
 - One self-contained file, opened from disk or published as a claude.ai page, with no server. No transcript text on the page.
 - Words he uses: "experiment" for a trial, "active rule" for a proven rule.
 - Not on the rebuilt page, though the report keeps carrying them: mistake trends, mistakes with no rule yet, replays, rule and skill size. Whether they return behind a link is undecided.
-- The report must gain three things the card needs. Until it does, an active rule's card has no chart and holds it to the fewest tasks a side can be judged on, and no card has "Copy for an agent": history and miss rates for active rules, the tasks an active rule needs, and the sessions behind a rule's misses.
 
 ## Checks
 
-Before a dashboard change is shown to him, `agent-experiments daily --agents-repo` is run on the real store and the real agents repo, and the page is checked with that data. The dev server is then left open on the change's branch (`dashboard` in `.claude/launch.json`), so he sees the change itself before it merges.
+Before a dashboard change is shown to him, `agent-experiments daily --agents-repo` is run with the real agents repo on a copy of the real store (`--db` and `--page` on the copy, never the live files, since a look taken there is never retaken), and the page is checked with that data. The dev server is then left open on the change's branch (`dashboard` in `.claude/launch.json`), so he sees the change itself before it merges.
