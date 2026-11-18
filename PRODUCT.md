@@ -18,20 +18,27 @@ For every rule, answer three questions at a glance, drawn and not written: is it
 
 ## Behaviour
 
-Each line is one end-to-end test in `dashboard/e2e`.
+Each line is to be one end-to-end test in `dashboard/e2e`; the rebuild adds them.
 
 | When | Then |
 |---|---|
-| The page opens | Every running experiment and active rule is one row: name, band, signed change, status icon. Finished experiments are a third group below them. |
-| A row has a result | Its status is one of four, taken from the method's verdict: works, not working, can't tell, not enough tasks. |
-| A row has no answer yet | It draws no band and shows a dash. |
+| The page opens | Every running or scheduled experiment and every active rule is one row: name, band, signed change, status icon. Finished experiments are a third group below them. |
+| A row shows | Its status is one of the four below, each with its own icon. |
+| A row's status is "not enough tasks" | It draws no band and shows a dash, so a running experiment never shows a lead. |
 | He points at a row, or moves focus to it | Its card shows beside the table. A click keeps it open; leaving the table returns to the kept one. |
 | He opens an agent's link to a rule | That rule's card is open. On a phone the card is the whole screen, with a way back. |
 | He points at a status pill | Rows of other statuses dim. A click keeps only its rows. |
-| Any card shows | Its sections come in one order: verdict, can it be trusted, change in mistakes, chances missed over time, look into it. A rule with no answer stops after the second. |
+| Any card shows | Its sections come in one order: verdict, can it be trusted, change in mistakes, mistake rate over time, look into it. A rule with not enough tasks stops after the second. |
 | No rule is picked | The card says how the numbers are made and what each mark means. |
 | He clicks "Copy for an agent" | The result and the sessions behind its latest misses are copied, worded as a request. |
 | A change is larger than the scale | Its band stops at the edge with a mark. |
+
+| Status | An experiment's verdict | An active rule's check |
+|---|---|---|
+| Works | `works` | `working` |
+| Not working | `no useful effect` | `slipping` |
+| Can't tell | `can't tell` | |
+| Not enough tasks | none, or `no verdict yet` | `waiting`, `nothing` |
 
 ## Look
 
@@ -49,9 +56,9 @@ Each line is one end-to-end test in `dashboard/e2e`.
 
 - One self-contained file, opened from disk or published as a claude.ai page, with no server. No transcript text on the page.
 - Words he uses: "experiment" for a trial, "active rule" for a proven rule.
-- Off the page, undecided between a link and removal: mistake trends, mistakes with no rule yet, replays, rule and skill size.
-- The report does not yet carry: history and miss rates for active rules, the tasks an active rule needs, the sessions behind a rule's misses.
+- Not on the rebuilt page, though the report keeps carrying them: mistake trends, mistakes with no rule yet, replays, rule and skill size. Whether they return behind a link is undecided.
+- The report must gain three things the card needs: history and miss rates for active rules, the tasks an active rule needs, and the sessions behind a rule's misses (for "Copy for an agent").
 
 ## Checks
 
-Before a dashboard change is shown to him, `agent-experiments daily` is run on the real store and the real agents repo, and the page is checked with that data.
+Before a dashboard change is shown to him, `agent-experiments daily --agents-repo` is run on the real store and the real agents repo, and the page is checked with that data.
