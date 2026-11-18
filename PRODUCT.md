@@ -2,7 +2,7 @@
 
 <!-- impeccable:product-schema 1 -->
 
-Who the dashboard is for and what it must show first. How the data is made: [docs/architecture.md](docs/architecture.md).
+What the dashboard must answer, how it behaves and how it looks. How its data is made: [docs/architecture.md](docs/architecture.md).
 
 ## Platform
 
@@ -10,41 +10,48 @@ web
 
 ## Users
 
-One person, who runs many agent sessions at once and writes the rules they follow. He does not browse the page: an agent links him to it, often to one result, and he reads it on whatever he has open, a phone or a claude.ai page as often as a desktop.
+One person, who runs many agent sessions at once and writes the rules they follow. He rarely browses the page: an agent links him to one result, and he reads it on a phone, a claude.ai page or a desktop.
 
 ## Product Purpose
 
-Show which rule experiments are running and which rules are active, so he can trust or question what an agent told him in a few seconds.
+For every rule, answer three questions at a glance, drawn and not written: is it working, how well, how sure. Then let him check that answer without leaving the page.
 
-## Operating Context
+## Behaviour
 
-- The page is one self-contained file, opened from disk or published as a claude.ai page, with no server.
-- Agents read the same report and link to the page from replies and messages.
+Each line is one end-to-end test in `dashboard/e2e`.
 
-## Capabilities and Constraints
+| When | Then |
+|---|---|
+| The page opens | Every running experiment and active rule is one row: name, band, signed change, status icon. Finished experiments are a third group below them. |
+| A row has a result | Its status is one of four, taken from the method's verdict: works, not working, can't tell, not enough tasks. |
+| A row has no answer yet | It draws no band and shows a dash. |
+| He points at a row, or moves focus to it | Its card shows beside the table. A click keeps it open; leaving the table returns to the kept one. |
+| He opens an agent's link to a rule | That rule's card is open. On a phone the card is the whole screen, with a way back. |
+| He points at a status pill | Rows of other statuses dim. A click keeps only its rows. |
+| Any card shows | Its sections come in one order: verdict, can it be trusted, change in mistakes, chances missed over time, look into it. A rule with no answer stops after the second. |
+| No rule is picked | The card says how the numbers are made and what each mark means. |
+| He clicks "Copy for an agent" | The result and the sessions behind its latest misses are copied, worded as a request. |
+| A change is larger than the scale | Its band stops at the edge with a mark. |
 
-- First: running experiments, and active rules with whether each still works.
-- Out of the way: experiments that failed or are no longer running, on another screen.
-- Not on the main screens: mistake trends, mistakes with no rule yet, replays, rule and skill size.
-- Words he uses: "experiment" for a trial, "active rule" for a proven rule.
-- Undecided: whether the content left off the main screens stays behind a link or is removed.
+## Look
 
-## Brand Commitments
-
-- Look: modern, minimal and technical, built from the shadcn components the dashboard already has. Clean layout, small type, hairlines; no themed or decorative styles.
-- A result is drawn as a thin band across its range with a small dot at the estimate, fewer mistakes to the left of a no-change tick.
-
-- Layout: one table of every rule with the picked rule in a card beside it, top edges level. The card never repeats what its row shows.
+- Minimal and technical, on the shadcn components the dashboard has: neutral colours, hairlines, 13px type, monospace numbers. Colour only for a result.
+- A result is a thin band across its 90% range with a small dot at the estimate and a tick at no change, fewer mistakes to the left. The column header is the scale, each number over its place.
+- One number format: the signed change in mistakes, in percent.
+- Words only for names and verdicts. What a mark means is said once, never under each chart.
+- The card never repeats what its row shows.
 - No dot or other mark as a separator between two facts: each fact gets its own labelled place.
-- Pointing at a row shows its card; a click keeps it open. Pointing at a status pill highlights its rows; a click keeps only those.
-- Motion on every change of state, short and small, and none for people who ask for reduced motion.
 - Every chart has labelled axes with units.
-- The card must let him check a result: how far the experiment has run, whether it has enough tasks, and the sessions behind it.
+- Every change of state moves, briefly and slightly; nothing moves for people who ask for reduced motion.
+- The table and the card start at the same top edge.
 
-## Product Principles
+## Constraints
 
-- A link from an agent lands on the one thing it is about, readable on a phone.
-- One screen answers one question.
-- Every experiment and rule answers three questions at a glance, drawn, not written: is it working, how well, how sure.
-- One picture per row, the same kind for every row; words only for names.
-- What is finished or failed never competes with what is running.
+- One self-contained file, opened from disk or published as a claude.ai page, with no server. No transcript text on the page.
+- Words he uses: "experiment" for a trial, "active rule" for a proven rule.
+- Off the page, undecided between a link and removal: mistake trends, mistakes with no rule yet, replays, rule and skill size.
+- The report does not yet carry: history and miss rates for active rules, the tasks an active rule needs, the sessions behind a rule's misses.
+
+## Checks
+
+Before a dashboard change is shown to him, `agent-experiments daily` is run on the real store and the real agents repo, and the page is checked with that data.
