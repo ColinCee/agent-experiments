@@ -33,5 +33,6 @@ Show which rule experiments are running and which rules are active, so he can tr
 
 - A link from an agent lands on the one thing it is about, readable on a phone.
 - One screen answers one question.
-- The answer in words comes before the chart that supports it.
+- Every experiment and rule answers three questions at a glance, drawn, not written: is it working, how well, how sure.
+- One picture per row, the same kind for every row; words only for names.
 - What is finished or failed never competes with what is running.
