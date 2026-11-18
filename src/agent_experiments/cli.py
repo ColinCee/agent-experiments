@@ -104,7 +104,13 @@ def build(db: Path, trials: list[looks.Trial], day: str, errors: list[str]) -> t
 
     def name(trial: looks.Trial, measure: str) -> str:
         # A trial with no name of its own is often named for its one measure.
-        return names.get(measure) or trial.title or names.get(trial.name, trial.name)
+        found = names.get(measure) or trial.title or names.get(trial.name)
+        if not found:
+            errors.append(
+                f"Trial {trial.name} shows its file name: give its measure {measure} a name in `measure_names` in the"
+                " measures file, or the trial file a line `name: <the mistake, in plain words>`."
+            )
+        return found or trial.name
 
     rows, permanent, new_looks = [], [], []
     for trial in trials:

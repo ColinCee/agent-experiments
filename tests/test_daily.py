@@ -58,6 +58,7 @@ def daily(tmp_path: Path, day: str = "2026-01-02") -> int:
     (trials / "t.md").write_text("---\nname: A plain name\nmeasures: bad-word\nstarted: 2026-01-01\n---\n")
     (trials / "later.md").write_text("---\nmeasures: bad-word\nstarted: 2026-01-10\n---\n")
     (trials / "s.md").write_text("---\nstatus: settled\nmeasures: bad-word\nstarted: 2025-12-01\n---\n")
+    (trials / "unnamed.md").write_text("---\nmeasures: no-name\nstarted: 2026-01-05\n---\n")
     (trials / "undated.md").write_text("---\nmeasures: bad-word\n---\n")
     paths = {"trials": trials, "measures": tmp_path / "measures.sql", "db": tmp_path / "x.duckdb"}
     paths |= {"page": tmp_path / "overview.html", "transcripts": tmp_path / "projects" / "*" / "*.jsonl"}
@@ -71,7 +72,10 @@ def template(monkeypatch):
 
 def test_daily_writes_the_report_and_puts_it_in_the_page(tmp_path: Path, capsys):
     assert daily(tmp_path) == 1  # the undated trial file
-    assert "undated.md" in capsys.readouterr().err
+    err = capsys.readouterr().err
+    assert "undated.md" in err
+    # A trial nothing names still shows, under its file name, and is reported so it gets a plain name.
+    assert "Trial unnamed shows its file name" in err and "Trial t " not in err
 
     text = (tmp_path / "report.json").read_text(encoding="utf-8")
     report = json.loads(text)
@@ -81,6 +85,7 @@ def test_daily_writes_the_report_and_puts_it_in_the_page(tmp_path: Path, capsys)
     trials = {t["started"]: t for t in report["trials"]}
     assert all(set(t) == KEYS["trial"] for t in trials.values())
     running, scheduled = trials["2026-01-01"], trials["2026-01-10"]
+    assert trials["2026-01-05"]["name"] == "unnamed"
     assert (running["name"], running["state"], running["ends"]) == ("Bad words", "running", "2026-01-08")
     assert (running["tasks_with"], running["tasks_without"], running["rate_with"]) == (1, 1, 1.0)
     assert running["change"] is None  # one task a half is too few to compare
