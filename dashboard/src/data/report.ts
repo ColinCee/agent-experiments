@@ -9,6 +9,12 @@ export type Range = { value: number; low: number | null; high: number | null };
 
 export type Verdict = "works" | "no useful effect" | "can't tell" | "no verdict yet";
 
+/** Each side's mistake rate on a day, over that day and the days before it; null with no chances. */
+export type RatePoint = { day: Day; with: number | null; without: number | null };
+
+/** A session with one of the latest mistakes, among the tasks the numbers count; its last day with one. */
+export type Miss = { day: Day; side: "with" | "without"; session: string };
+
 export interface Report {
   /** The data runs up to this day. */
   day: Day;
@@ -45,7 +51,9 @@ export interface Trial {
   per_week: number;
   looks: { look: number; day: Day; verdict: Verdict; tasks_with: number; tasks_without: number }[];
   /** 3-day rolling rates since start; empty if scheduled. */
-  trend: { day: Day; with: number | null; without: number | null }[];
+  trend: RatePoint[];
+  /** Up to 5 sessions, latest first. */
+  misses: Miss[];
 }
 
 export interface PermanentCheck {
@@ -54,9 +62,17 @@ export interface PermanentCheck {
   model: string | null;
   tasks_with: number;
   tasks_without: number;
+  rate_with: number | null;
+  rate_without: number | null;
   change: Range | null;
   /** The range rules out a 30% drop: the rule no longer earns its place. */
   slipping: boolean;
+  /** Tasks a side needs for a true halving to put the range clear of no change; null if over 320. */
+  needed: number | null;
+  /** 7-day rolling rates over the last 28 days, the tasks its numbers count. */
+  trend: RatePoint[];
+  /** Up to 5 sessions, latest first. */
+  misses: Miss[];
 }
 
 export interface Side {

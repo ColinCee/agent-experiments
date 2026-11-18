@@ -16,6 +16,7 @@ export const trial = (over: Partial<Trial>): Trial => ({
   per_week: 20,
   looks: [],
   trend: [],
+  misses: [],
   ...over,
 });
 
@@ -25,7 +26,12 @@ export const check = (over: Partial<PermanentCheck>): PermanentCheck => ({
   model: "model-a",
   tasks_with: 100,
   tasks_without: 12,
+  rate_with: 0.12,
+  rate_without: 0.2,
   change: { value: -0.4, low: -0.7, high: 0.15 },
   slipping: false,
+  needed: 40,
+  trend: [],
+  misses: [],
   ...over,
 });

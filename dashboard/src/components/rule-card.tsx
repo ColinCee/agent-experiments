@@ -3,13 +3,17 @@ import type { ReactNode } from "react";
 import type { Day, Report } from "@/data/report";
 import { isClipped, stripPosition } from "@/lib/change";
 import { dayLabel, number, signedPercent } from "@/lib/format";
+import { handText } from "@/lib/hand";
 import { rowHref } from "@/lib/hash";
+import { checkRows } from "@/lib/permanent";
 import type { Drawn, Row } from "@/lib/rows";
 import { STATUS_WORDS, type Status } from "@/lib/status";
+import { lookLabels, trendRows } from "@/lib/trials";
 import { ruleTrust, type Trust, trialTrust } from "@/lib/trust";
 import { cn } from "@/lib/utils";
 import { Band } from "./band";
 import { TrendChart } from "./charts/trend-chart";
+import { CopyButton } from "./copy-button";
 import { STATUS_TONE } from "./status-icon";
 
 function Section({ id, title, children }: { id: string; title: string; children: ReactNode }) {
@@ -21,11 +25,12 @@ function Section({ id, title, children }: { id: string; title: string; children:
   );
 }
 
-function Facts({ facts }: { facts: [string, string][] }) {
+/** Labelled values, one a line; a third item is the key when labels repeat. */
+function Facts({ facts }: { facts: [string, string, string?][] }) {
   return (
     <dl className="grid grid-cols-[1fr_auto] text-xs">
-      {facts.map(([label, value]) => (
-        <div key={label} className="col-span-2 grid grid-cols-subgrid border-t py-1.5">
+      {facts.map(([label, value, key]) => (
+        <div key={key ?? label} className="col-span-2 grid grid-cols-subgrid border-t py-1.5">
           <dt className="text-muted-foreground">{label}</dt>
           <dd className="text-right">{value}</dd>
         </div>
@@ -103,10 +108,32 @@ function Change({ change, status }: { change: Drawn; status: Status }) {
   );
 }
 
+/** A trial's rate by day of the trial; an active rule's by date over the days its numbers count. */
+function RateOverTime({ row, day }: { row: Row; day: Day }) {
+  if (row.kind === "trial") {
+    return (
+      <TrendChart
+        rows={trendRows(row.trial)}
+        marks={lookLabels(row.trial)}
+        // Seven "Day n" labels do not fit the card, so only the first names the unit.
+        tickFormatter={(label, index) => (index === 0 ? label : label.replace("Day ", ""))}
+      />
+    );
+  }
+  const { rows, ticks } = checkRows(row.check, day);
+  return <TrendChart rows={rows} ticks={ticks} />;
+}
+
+function hasRates(row: Row): boolean {
+  const trend = row.kind === "trial" ? row.trial.trend : row.check.trend;
+  return trend.filter((t) => t.with !== null || t.without !== null).length > 1;
+}
+
 /** One rule in full. Every card has the same sections in the same order; a rule with no answer stops after trust. */
 export function RuleCard({ row, day }: { row: Row; day: Day }) {
   const trial = row.kind === "trial" ? row.trial : null;
-  const trust = row.kind === "trial" ? trialTrust(row.trial) : ruleTrust(row.check);
+  const trust = row.kind === "trial" ? trialTrust(row.trial) : ruleTrust(row.check, day);
+  const misses = row.kind === "trial" ? row.trial.misses : row.check.misses;
   return (
     <div
       data-detail={row.id}
@@ -136,9 +163,26 @@ export function RuleCard({ row, day }: { row: Row; day: Day }) {
           <Change change={row.change} status={row.status} />
         </Section>
       )}
-      {row.change && trial && trial.trend.length > 1 && (
+      {row.change && hasRates(row) && (
         <Section id="rate" title="Mistake rate over time">
-          <TrendChart trial={trial} />
+          <RateOverTime row={row} day={day} />
+        </Section>
+      )}
+      {row.status !== "not-enough" && (
+        <Section id="hand" title="Hand to an agent">
+          {misses.length > 0 && (
+            <div data-misses>
+              <p className="mb-1 text-muted-foreground text-xs">Latest mistakes</p>
+              <Facts
+                facts={misses.map((miss) => [
+                  dayLabel(miss.day, day),
+                  miss.side === "with" ? "With rule" : "Without",
+                  miss.session,
+                ])}
+              />
+            </div>
+          )}
+          <CopyButton text={() => handText(row, day)}>Copy for an agent</CopyButton>
         </Section>
       )}
     </div>

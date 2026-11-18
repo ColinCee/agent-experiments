@@ -17,8 +17,17 @@ test("an experiment needs the tasks to find a halving, and says how long that is
   expect(trialTrust(trial({ per_week: 0, tasks_without: 3 })).enough).toBe("Not at this pace");
 });
 
-test("an active rule is held to the fewest tasks a side can be judged on", () => {
-  expect(ruleTrust(check({}))).toMatchObject({ needed: 5, neededWords: "5 at least", enough: "Yes" });
-  expect(ruleTrust(check({ tasks_without: 5 })).enough).toBe("Yes");
-  expect(ruleTrust(check({ tasks_without: 4 })).enough).toBe("Not yet");
+test("an active rule needs the tasks to find a halving, and only a young one can still reach them", () => {
+  const day = "2026-11-28";
+  expect(ruleTrust(check({ needed: 12 }), day)).toMatchObject({ needed: 12, neededWords: "12 needed", enough: "Yes" });
+  // A month old, its 28 days hold all the tasks they will: a short side stays short.
+  expect(ruleTrust(check({ since: "2026-10-01", tasks_without: 12, needed: 40 }), day).enough).toBe("Not at this pace");
+  // A week old, 3 tasks a week on the short side: 3 more weeks fill it to 12.
+  expect(ruleTrust(check({ since: "2026-11-22", tasks_without: 3, needed: 12 }), day).enough).toBe("In about 3 weeks");
+  expect(ruleTrust(check({ since: "2026-11-22", tasks_without: 0, needed: 12 }), day).enough).toBe("Not at this pace");
+  expect(ruleTrust(check({ needed: null }), day)).toMatchObject({
+    needed: 320,
+    neededWords: "over 320 needed",
+    enough: "Not at this pace",
+  });
 });

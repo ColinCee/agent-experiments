@@ -1,9 +1,7 @@
 import { CartesianGrid, Line, LineChart, ReferenceLine, XAxis, YAxis } from "recharts";
 import { ChartContainer, ChartTooltip } from "@/components/ui/chart";
-import type { Trial } from "@/data/report";
-import { rateCeiling, rateTicks } from "@/lib/charts";
+import { rateCeiling, rateTicks, type TrendRow } from "@/lib/charts";
 import { percent } from "@/lib/format";
-import { lookLabels, trendRows } from "@/lib/trials";
 import { ChartTip } from "./chart-tip";
 import { PointMark } from "./marks";
 
@@ -12,9 +10,21 @@ const SERIES = [
   { key: "with", name: "With rule", stroke: "var(--with)", fill: "fill-with", swatch: "bg-with" },
 ] as const;
 
-/** A trial's mistake rate by day, with and without the rule, each line named at its end and each checked day marked. */
-export function TrendChart({ trial }: { trial: Trial }) {
-  const rows = trendRows(trial);
+/**
+ * A mistake rate by day, with and without the rule, each line named at its end and each day in `marks` drawn as a
+ * dashed line. `ticks` are the labels the day axis names; every label when left out.
+ */
+export function TrendChart({
+  rows,
+  marks = [],
+  ticks,
+  tickFormatter,
+}: {
+  rows: TrendRow[];
+  marks?: string[];
+  ticks?: string[];
+  tickFormatter?: (label: string, index: number) => string;
+}) {
   const ceiling = rateCeiling(rows.flatMap((r) => [r.with, r.without]));
   return (
     <ChartContainer className="aspect-auto h-[180px] w-full">
@@ -25,8 +35,8 @@ export function TrendChart({ trial }: { trial: Trial }) {
           tickLine={false}
           axisLine={false}
           interval={0}
-          // Seven "Day n" labels do not fit the card, so only the first names the unit.
-          tickFormatter={(label: string, index: number) => (index === 0 ? label : label.replace("Day ", ""))}
+          ticks={ticks}
+          tickFormatter={tickFormatter}
         />
         <YAxis
           domain={[0, ceiling]}
@@ -38,7 +48,7 @@ export function TrendChart({ trial }: { trial: Trial }) {
           // Inner room so a 2px line at exactly 0% or 100% draws whole instead of being cut by the plot edge.
           padding={{ top: 4, bottom: 4 }}
         />
-        {lookLabels(trial).map((label) => (
+        {marks.map((label) => (
           <ReferenceLine key={label} x={label} stroke="var(--ring)" strokeDasharray="2 3" />
         ))}
         <ChartTooltip

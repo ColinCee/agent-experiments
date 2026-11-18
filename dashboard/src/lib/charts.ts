@@ -1,3 +1,6 @@
+/** One day of a rate chart: each side's rate, null with no chances. */
+export type TrendRow = { label: string; with: number | null; without: number | null };
+
 /** Each axis top a rate chart may use, with its tick step: round numbers only. */
 const CEILINGS = [
   { top: 0.2, step: 0.05 },

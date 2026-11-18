@@ -32,8 +32,9 @@ KEYS = {
     "report": {"day", "written", "sessions", "trials", "permanent", "mistakes", "replays", "sizes"},
     "sessions": {"total", "in_group", "split_since"},
     "trial": {"name", "started", "ends", "state", "verdict", "tasks_with", "tasks_without", "rate_with"}
-    | {"rate_without", "change", "needed", "per_week", "looks", "trend"},
-    "permanent": {"name", "since", "model", "tasks_with", "tasks_without", "change", "slipping"},
+    | {"rate_without", "change", "needed", "per_week", "looks", "trend", "misses"},
+    "permanent": {"name", "since", "model", "tasks_with", "tasks_without", "change", "slipping", "rate_with"}
+    | {"rate_without", "needed", "trend", "misses"},
     "mistake": {"name", "today", "rule", "before", "after", "change", "sure", "current", "series", "changes"},
 }
 
@@ -91,9 +92,17 @@ def test_daily_writes_the_report_and_puts_it_in_the_page(tmp_path: Path, capsys)
     assert running["change"] is None  # one task a half is too few to compare
     assert [p["day"] for p in running["trend"]] == ["2026-01-01", "2026-01-02"]
     assert running["trend"][1] == {"day": "2026-01-02", "with": 1.0, "without": 1.0}
+    assert {(m["side"], m["session"]) for m in running["misses"]} == {("with", "s1"), ("without", "s0")}
     assert (scheduled["state"], scheduled["trend"], scheduled["verdict"]) == ("scheduled", [], None)
     (permanent,) = report["permanent"]
     assert set(permanent) == KEYS["permanent"] and permanent["since"] == "2025-12-01"
+    assert (permanent["rate_with"], permanent["rate_without"], permanent["needed"]) == (1.0, 1.0, None)
+    assert {(m["side"], m["session"]) for m in permanent["misses"]} == {("with", "s1"), ("without", "s0")}
+    assert len(permanent["trend"]) == 28 and permanent["trend"][-1] == {
+        "day": "2026-01-02",
+        "with": 1.0,
+        "without": 1.0,
+    }
     mistakes = {m["name"]: m for m in report["mistakes"]}
     assert all(set(m) == KEYS["mistake"] for m in mistakes.values())
     ruled, unruled = mistakes["Bad words"], mistakes["Long </script><!-- replies"]

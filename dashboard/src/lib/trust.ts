@@ -1,5 +1,5 @@
-import type { PermanentCheck, Trial } from "@/data/report";
-import { FEWEST_TASKS } from "./change";
+import { differenceInCalendarDays, parseISO } from "date-fns";
+import type { Day, PermanentCheck, Trial } from "@/data/report";
 import { plural } from "./format";
 import { MOST_NEEDED } from "./trials";
 
@@ -33,13 +33,30 @@ export function trialTrust(trial: Trial): Trust {
   };
 }
 
-// The report gives an active rule no number needed, so its line is the fewest tasks a side can be judged on.
-export function ruleTrust(check: PermanentCheck): Trust {
+/** Days an active rule's numbers look back over; the report counts the last 28. */
+const CHECK_DAYS = 28;
+
+/**
+ * An active rule's sides only grow while it is younger than the days its numbers look back over; after that, a side
+ * short of the tasks it needs stays short at the same pace.
+ */
+export function ruleTrust(check: PermanentCheck, day: Day): Trust {
+  const needed = check.needed ?? MOST_NEEDED;
+  const fewer = Math.min(check.tasks_with, check.tasks_without);
+  const age = differenceInCalendarDays(parseISO(day), parseISO(check.since)) + 1;
+  const atFull = (fewer / age) * CHECK_DAYS;
+  const weeks = Math.ceil((needed - fewer) / (fewer / age) / 7);
+  const enough =
+    fewer >= needed && check.needed !== null
+      ? "Yes"
+      : check.needed !== null && atFull >= needed && Number.isFinite(weeks)
+        ? `In about ${plural(weeks, "week")}`
+        : "Not at this pace";
   return {
     with: check.tasks_with,
     without: check.tasks_without,
-    needed: FEWEST_TASKS,
-    neededWords: `${FEWEST_TASKS} at least`,
-    enough: Math.min(check.tasks_with, check.tasks_without) >= FEWEST_TASKS ? "Yes" : "Not yet",
+    needed,
+    neededWords: check.needed === null ? `over ${MOST_NEEDED} needed` : `${needed} needed`,
+    enough,
   };
 }

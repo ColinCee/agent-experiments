@@ -199,10 +199,9 @@ test("every card has its sections in one order, and a rule with not enough tasks
 }) => {
   const opened = await openWide(page);
   const expected = {
-    [WORKS]: ["verdict", "trust", "change", "rate"],
-    [CANT_TELL]: ["verdict", "trust", "change", "rate"],
-    // The report has no history for an active rule, so its card has no chart.
-    [RULE]: ["verdict", "trust", "change"],
+    [WORKS]: ["verdict", "trust", "change", "rate", "hand"],
+    [CANT_TELL]: ["verdict", "trust", "change", "rate", "hand"],
+    [RULE]: ["verdict", "trust", "change", "rate", "hand"],
     [RUNNING]: ["verdict", "trust"],
     [WAITING]: ["verdict", "trust"],
   };
@@ -218,6 +217,40 @@ test("every card has its sections in one order, and a rule with not enough tasks
   await expect(card(page, WORKS).locator('[data-end="low"]')).toHaveText("−78%");
   await expect(card(page, WORKS).locator('[data-end="high"]')).toHaveText("−33%");
   await expect(card(page, WORKS).locator("[data-needed]")).toHaveText("90 needed");
+  await page.goto(`${opened.url}#${RULE}`);
+  await expect(card(page, RULE).locator("[data-needed]")).toHaveText("40 needed");
+  // An active rule's chart runs over dates, a week apart back from the report's day.
+  const ticks = card(page, RULE).locator('[data-section="rate"] .recharts-cartesian-axis-tick-value');
+  await expect(ticks.first()).toBeVisible();
+  expect((await ticks.allTextContents()).filter((t) => !t.endsWith("%"))).toEqual([
+    "22 Oct",
+    "29 Oct",
+    "5 Nov",
+    "12 Nov",
+  ]);
+});
+
+test("copy for an agent copies the result and the sessions behind its latest misses, worded as a request", async ({
+  page,
+}) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText: async (text: string) => Object.assign(window, { copied: text }) },
+    });
+  });
+  const opened = await openWide(page);
+  await page.goto(`${opened.url}#${RULE}`);
+  const hand = card(page, RULE).locator('[data-section="hand"]');
+  await expect(hand.locator("[data-misses] dd")).toHaveCount(5);
+  await hand.getByRole("button", { name: "Copy for an agent" }).click();
+  await expect(hand.getByRole("status")).toHaveText("Copied");
+  const copied = String(await page.evaluate(() => (window as unknown as { copied: string }).copied));
+  const check = fixture.permanent.find((c) => c.name === "Long logs pasted into a reply");
+  expect(copied).toMatch(/^Find out why agents still make this mistake/);
+  expect(copied).toContain("Long logs pasted into a reply");
+  expect(copied).toContain("Works");
+  for (const miss of check?.misses ?? []) expect(copied).toContain(miss.session);
+  expect(check?.misses.length).toBeGreaterThan(0);
 });
 
 test("with no rule picked the card says how the numbers are made and what each mark means", async ({ page }) => {

@@ -1,5 +1,6 @@
 import { differenceInCalendarDays, parseISO } from "date-fns";
 import type { Day, Trial } from "@/data/report";
+import type { TrendRow } from "./charts";
 
 const days = (from: Day, to: Day) => differenceInCalendarDays(parseISO(to), parseISO(from));
 
@@ -18,7 +19,7 @@ export function sortTrials(trials: Trial[]): Trial[] {
 }
 
 /** The trend chart's rows by day of the trial ("Day 1" …), padded with empty days up to the trial's length. */
-export function trendRows(trial: Trial): { label: string; with: number | null; without: number | null }[] {
+export function trendRows(trial: Trial): TrendRow[] {
   const byDay = new Map(trial.trend.map((t) => [days(trial.started, t.day) + 1, t]));
   // The last look's day falls one past the trial's length, so the chart stops at the day before it.
   return Array.from({ length: days(trial.started, trial.ends) }, (_, i) => {
