@@ -57,6 +57,7 @@ test('a row says why there is no strip in a few words, leaving "nothing to compa
   expect(permanentRowNote(check({ tasks_with: 90, tasks_without: 11, change: null }))).toBe(
     "No mistakes without the rule",
   );
-  expect(permanentRowNote(check({ tasks_without: 0, change: null }))).toBe("No tasks without the rule yet");
+  expect(permanentRowNote(check({ tasks_with: 18, tasks_without: 0, change: null }))).toBe("18 tasks with · 0 without");
+  expect(permanentRowNote(check({ tasks_with: 1, tasks_without: 3 }))).toBe("1 task with · 3 without");
   expect(permanentRowNote(check({}))).toBeNull();
 });

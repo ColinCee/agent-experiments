@@ -100,11 +100,19 @@
   * {
     @apply border-border outline-ring/50;
   }
-  html {
-    @apply font-sans;
-  }
   body {
-    @apply bg-background text-foreground tabular-nums;
-    font-size: 0.9375rem;
+    @apply tabular-nums;
   }
+}
+
+/* Outside the layers: a host that wraps the page in its own document (a claude.ai artifact sets the body to white,
+   black and 14px) styles the body unlayered, which beats any layered rule. */
+body {
+  margin: 0;
+  background-color: var(--background);
+  color: var(--foreground);
+  /* Longhands: the `font` shorthand would reset the tabular figures the columns rely on. */
+  font-family: var(--font-sans);
+  font-size: 0.9375rem;
+  line-height: 1.5;
 }
