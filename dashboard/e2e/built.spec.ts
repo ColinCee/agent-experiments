@@ -460,3 +460,8 @@ test("tapping a rule-change marker on a phone says what changed then", async ({ 
   );
   await context.close();
 });
+
+test("digits stay tabular, so numbers in columns line up", async ({ page }) => {
+  await openBuilt(page);
+  expect(await page.evaluate(() => getComputedStyle(document.body).fontVariantNumeric)).toContain("tabular-nums");
+});

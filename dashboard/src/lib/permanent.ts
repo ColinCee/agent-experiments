@@ -40,6 +40,8 @@ export function permanentSummary(checks: PermanentCheck[], day: Day): string {
   return `Proven rules, each left off for 1 task in 10${when}`;
 }
 
+const tasks = (n: number) => `${n} ${n === 1 ? "task" : "tasks"}`;
+
 /**
  * What a proven rule's row shows where no strip is drawn: while it waits, how many tasks ran with and without it, so the
  * wait shows; with nothing to compare, why, leaving the rest to its status.
@@ -50,5 +52,3 @@ export function permanentRowNote(check: PermanentCheck): string | null {
   if (status === "waiting") return `${tasks(check.tasks_with)} with · ${check.tasks_without} without`;
   return permanentNote(check);
 }
-
-const tasks = (n: number) => `${n} ${n === 1 ? "task" : "tasks"}`;

@@ -111,5 +111,8 @@ body {
   margin: 0;
   background-color: var(--background);
   color: var(--foreground);
-  font: 0.9375rem / 1.5 var(--font-sans);
+  /* Longhands: the `font` shorthand would reset the tabular figures the columns rely on. */
+  font-family: var(--font-sans);
+  font-size: 0.9375rem;
+  line-height: 1.5;
 }

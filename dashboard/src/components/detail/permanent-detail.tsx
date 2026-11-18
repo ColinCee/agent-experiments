@@ -16,7 +16,7 @@ export function PermanentDetail({ check, day }: { check: PermanentCheck; day: Da
       headline={permanentHeadline(check)}
       line={PERMANENT_LINE}
       blocks={
-        // While it waits, the status and the counts below say it all: no empty chart repeating them.
+        // With no strip to draw, the status and the counts below say it all: no empty chart repeating them.
         note === null
           ? [
               {
