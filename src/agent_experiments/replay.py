@@ -27,6 +27,7 @@ from agent_experiments.stats import USEFUL_DROP, Effect, compare_paired
 CONTEXT_CHARS = 24_000  # the tail of the conversation a reply is written from: enough for the last few turns
 CALL_CHARS, RESULT_CHARS = 600, 300  # how much of each tool call, and of the start of each result, the context shows
 ASK = "(Write the agent's next message.)"
+TOOL_LINE = re.compile(r"^\[(\w+): (.*)\]\s*$", re.MULTILINE)  # a call, as FRAME asks a reply to write one
 FRAMES = ("bare", "claude-code")  # the rules as the whole system prompt, or appended to Claude Code's own
 PER_SESSION = 3  # so one long session cannot fill the sample
 GATE = 1.5  # replayed and real miss rates must agree within this factor for the replay to stand for the real agent
@@ -294,12 +295,17 @@ def score(measures: Path, measure: str, picks: list[dict], replies: list[dict]) 
     days = {m["uuid"]: m["day"] for m in picks}
     con = duckdb.connect()
     con.execute(REPLY_TABLES)
-    rows = [
-        (f"{r['uuid']} {r['arm']}", days[r["uuid"]], f"{days[r['uuid']]}T00:00:00.000Z", r["uuid"], r["reply"])
-        for r in replies
-        if r["uuid"] in days
-    ]
-    con.executemany("INSERT INTO texts VALUES (?, ?, ?, ?, ?)", rows)
+    texts, calls = [], []
+    for r in replies:
+        if r["uuid"] not in days:
+            continue
+        key = (f"{r['uuid']} {r['arm']}", days[r["uuid"]], f"{days[r['uuid']]}T00:00:00.000Z", r["uuid"])
+        texts.append((*key, TOOL_LINE.sub("", r["reply"]).strip()))
+        # A replayed call has no background flag, so a measure that needs one cannot miss in a replay.
+        calls += [(*key, tool, arg, False) for tool, arg in TOOL_LINE.findall(r["reply"])]
+    con.executemany("INSERT INTO texts VALUES (?, ?, ?, ?, ?)", texts)
+    if calls:
+        con.executemany("INSERT INTO calls VALUES (?, ?, ?, ?, ?, ?, ?)", calls)
     con.execute(measures.read_text(encoding="utf-8"))
     found = con.execute("SELECT s, bool_or(miss) FROM chances WHERE measure = ? GROUP BY s", [measure]).fetchall()
     con.close()

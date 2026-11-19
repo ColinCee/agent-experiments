@@ -37,7 +37,7 @@ def main(argv: list[str] | None = None) -> int:
     daily.add_argument("--db", type=Path, default=DATA / "experiments.duckdb")
     daily.add_argument("--page", type=Path, default=DATA / "overview.html", help="report.json is written beside it")
     rp = sub.add_parser("replay", help="answer past moments again under old and new rules, and compare their misses")
-    rp.add_argument("--measure", type=_plain, help="a measure on reply text: its chances are the moments replayed")
+    rp.add_argument("--measure", type=_plain, help="a measure on reply text or one call: its chances are the moments replayed")
     rp.add_argument("--old", type=Path, help="the old rules file")
     rp.add_argument("--new", type=Path, help="the new rules file")
     rp.add_argument("--model", help="the model that writes the replies, such as haiku or opus")

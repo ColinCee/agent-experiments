@@ -101,6 +101,23 @@ def test_a_reply_too_short_to_be_a_chance_is_left_out_of_the_pairs(tmp_path: Pat
     assert judge("f", "bad-word", picks, scored, "new", np.random.default_rng(1)).paired == 0
 
 
+def test_a_call_a_reply_writes_is_scored_as_a_call_and_left_out_of_its_text(tmp_path: Path):
+    (tmp_path / "m.sql").write_text(
+        """CREATE TEMP TABLE chances AS
+        SELECT 'commit' AS measure, s, "day", ts, uuid, arg NOT LIKE '% -- %' AS miss
+        FROM calls WHERE tool = 'Bash' AND arg LIKE 'git commit%'
+        UNION ALL SELECT 'git-in-text', s, "day", ts, uuid, txt LIKE '%git%' FROM texts"""
+    )
+    picks = _picks(1)
+    replies = [
+        {"uuid": "u0", "arm": "old", "reply": "Committing.\n[Bash: git commit -m fix]"},
+        {"uuid": "u0", "arm": "new", "reply": "Committing.\n[Bash: git commit -m fix -- a.py]"},
+    ]
+
+    assert score(tmp_path / "m.sql", "commit", picks, replies) == {("u0", "old"): True, ("u0", "new"): False}
+    assert score(tmp_path / "m.sql", "git-in-text", picks, replies) == {("u0", "old"): False, ("u0", "new"): False}
+
+
 @pytest.fixture(autouse=True)
 def _projects(tmp_path: Path, monkeypatch):
     monkeypatch.setattr(cli, "PROJECTS", tmp_path / "projects")
