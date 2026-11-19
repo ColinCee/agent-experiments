@@ -19,6 +19,7 @@ from pathlib import Path
 import duckdb
 import numpy as np
 from claude_agent_sdk import AssistantMessage, ClaudeAgentOptions, ResultMessage, query
+from claude_agent_sdk.types import SystemPromptFile, SystemPromptPreset
 
 from agent_experiments.counting import SCHEMA
 from agent_experiments.stats import USEFUL_DROP, Effect, compare_paired
@@ -26,6 +27,7 @@ from agent_experiments.stats import USEFUL_DROP, Effect, compare_paired
 CONTEXT_CHARS = 24_000  # the tail of the conversation a reply is written from: enough for the last few turns
 CALL_CHARS, RESULT_CHARS = 600, 300  # how much of each tool call, and of the start of each result, the context shows
 ASK = "(Write the agent's next message.)"
+FRAMES = ("bare", "claude-code")  # the rules as the whole system prompt, or appended to Claude Code's own
 PER_SESSION = 3  # so one long session cannot fill the sample
 GATE = 1.5  # replayed and real miss rates must agree within this factor for the replay to stand for the real agent
 REPLY_SECONDS = 600  # one reply takes well under a minute; past this it is hung, and is counted as failed
@@ -123,7 +125,7 @@ def _cut(text: str, most: int) -> str:
     return text[:most] + "…" if len(text) > most else text
 
 
-def context(lines: list[str], uuid: str) -> str:
+def context(lines: list[str], uuid: str, most: int = CONTEXT_CHARS) -> str:
     """The conversation before the moment, as text: what the user typed, what the agent wrote and ran, and how
     results began."""
     out = []
@@ -155,14 +157,20 @@ def context(lines: list[str], uuid: str) -> str:
                 c = b.get("content")
                 out.append(f"  (result) {_cut(_clean(c if isinstance(c, str) else json.dumps(c or '')), RESULT_CHARS)}")
     text = "\n\n".join(out)
-    return f"[earlier conversation cut]\n\n{text[-CONTEXT_CHARS:]}" if len(text) > CONTEXT_CHARS else text
+    return f"[earlier conversation cut]\n\n{text[-most:]}" if len(text) > most else text
 
 
-def options(system: Path, model: str, cwd: Path) -> ClaudeAgentOptions:
-    """The clean context a reply is written in: the framed rules file as the whole system prompt, no tools, settings,
-    MCP servers or saved session, and one turn. The system prompt goes by file, since a command line is limited."""
+def options(system: Path, model: str, cwd: Path, frame: str = "bare") -> ClaudeAgentOptions:
+    """The clean context a reply is written in: the framed rules file as the whole system prompt (or, in the
+    claude-code frame, after Claude Code's own), no tools, settings, MCP servers or saved session, and one turn. The
+    bare system prompt goes by file, since a command line is limited."""
+    prompt: SystemPromptPreset | SystemPromptFile = (
+        {"type": "preset", "preset": "claude_code", "append": system.read_text(encoding="utf-8")}
+        if frame == "claude-code"
+        else {"type": "file", "path": str(system)}
+    )
     return ClaudeAgentOptions(
-        system_prompt={"type": "file", "path": str(system)},
+        system_prompt=prompt,
         tools=[],
         setting_sources=[],
         mcp_servers={},
@@ -185,7 +193,7 @@ def _outside_home() -> Path:
     raise RuntimeError(f"no folder outside {home} for replies to run in")
 
 
-async def ask(prompt: str, system: Path, model: str) -> str:
+async def ask(prompt: str, system: Path, model: str, frame: str = "bare") -> str:
     """One reply, written in a fresh empty folder outside the home folder. Raises OutOfQuota when the model refused
     for quota, RuntimeError on any other failure."""
     reply, error, failed = None, None, False
@@ -193,7 +201,7 @@ async def ask(prompt: str, system: Path, model: str) -> str:
         prefix="agent-experiments-", dir=_outside_home(), ignore_cleanup_errors=True
     ) as cwd:
         async with asyncio.timeout(REPLY_SECONDS):
-            async for message in query(prompt=prompt, options=options(system, model, Path(cwd))):
+            async for message in query(prompt=prompt, options=options(system, model, Path(cwd), frame)):
                 # Claude Code can end with subtype "success" and an API error, such as a usage limit, as its result.
                 if isinstance(message, AssistantMessage) and message.error:
                     error = message.error
@@ -251,7 +259,7 @@ def moments(db: Path, projects: Path, measure: str, first: str, last: str) -> li
     ]
 
 
-def prompts(picks: list[dict]) -> dict[str, str]:
+def prompts(picks: list[dict], most: int = CONTEXT_CHARS) -> dict[str, str]:
     """Each moment's prompt, reading each transcript once."""
     by_file: dict[str, list[dict]] = {}
     for m in picks:
@@ -260,7 +268,7 @@ def prompts(picks: list[dict]) -> dict[str, str]:
     for file, ms in by_file.items():
         lines = Path(file).read_text(encoding="utf-8", errors="replace").splitlines()
         for m in ms:
-            out[m["uuid"]] = f"{context(lines, m['uuid'])}\n\n{ASK}"
+            out[m["uuid"]] = f"{context(lines, m['uuid'], most)}\n\n{ASK}"
     return out
 
 
@@ -356,24 +364,29 @@ def _sha(text: str) -> str:
     return hashlib.sha256(text.encode()).hexdigest()
 
 
-def _todo(out: Path, picks: list[dict]) -> list[tuple[dict, str]]:
+def _arms(manifest: dict) -> tuple[str, ...]:
+    return (manifest["in_force"],) if manifest.get("check_only") else ("old", "new")
+
+
+def _todo(out: Path, picks: list[dict], arms: tuple[str, ...]) -> list[tuple[dict, str]]:
     have = {(r["uuid"], r["arm"]) for r in _read_replies(out / "replies.jsonl")}
-    return [(m, arm) for arm in ("old", "new") for m in picks if (m["uuid"], arm) not in have]
+    return [(m, arm) for arm in arms for m in picks if (m["uuid"], arm) not in have]
 
 
 def write(out: Path) -> int:
     """Writes the replies a run folder still lacks. Returns 0, 1 when some failed, or QUOTA_EXIT."""
-    model = json.loads((out / "manifest.json").read_text(encoding="utf-8"))["model"]
+    manifest = json.loads((out / "manifest.json").read_text(encoding="utf-8"))
+    model, frame = manifest["model"], manifest.get("frame", "bare")
     picks = json.loads((out / "picks.json").read_text(encoding="utf-8"))
-    todo = _todo(out, picks)
+    todo = _todo(out, picks, _arms(manifest))
     needed = {m["uuid"] for m, _ in todo}
-    found = prompts([m for m in picks if m["uuid"] in needed])
+    found = prompts([m for m in picks if m["uuid"] in needed], manifest.get("context_chars", CONTEXT_CHARS))
     try:
         failed = asyncio.run(
             write_replies(
                 out / "replies.jsonl",
                 [(m, arm, found[m["uuid"]]) for m, arm in todo],
-                lambda prompt, arm: ask(prompt, out / f"system-{arm}.txt", model),
+                lambda prompt, arm: ask(prompt, out / f"system-{arm}.txt", model, frame),
             )
         )
     except OutOfQuota as e:
@@ -408,15 +421,19 @@ def run(args, projects: Path) -> int:
         inputs = {"measure": args.measure, "model": args.model, "n": args.n, "from": args.from_, "to": args.to}
         # The frame is in each arm's text; the rest of each prompt is shaped by these.
         inputs |= {arm: _sha(text) for arm, text in systems.items()}
-        inputs |= {"prompt": [CONTEXT_CHARS, CALL_CHARS, RESULT_CHARS, ASK]}
+        inputs |= {"prompt": [args.context_chars, CALL_CHARS, RESULT_CHARS, ASK], "frame": args.frame}
+        if args.check_only:
+            inputs |= {"check_only": args.in_force}
         out = (args.db.parent / "replays" / f"{args.measure}-{_sha(json.dumps(inputs, sort_keys=True))[:8]}").resolve()
-        manifest = inputs | {"in_force": args.in_force}
+        manifest = inputs | {"in_force": args.in_force, "context_chars": args.context_chars}
         picks_file = out / "picks.json"
         if picks_file.exists():
             picks = json.loads(picks_file.read_text(encoding="utf-8"))
         else:
             picks = pick(moments(args.db, projects, args.measure, args.from_, args.to), args.n, random.Random(1))
-        print(f"{len(_todo(out, picks))} replies to write with {args.model}, for {len(picks)} moments, in {out}")
+        print(
+            f"{len(_todo(out, picks, _arms(manifest)))} replies to write with {args.model}, for {len(picks)} moments, in {out}"
+        )
         if args.dry_run:
             return 0
         out.mkdir(parents=True, exist_ok=True)

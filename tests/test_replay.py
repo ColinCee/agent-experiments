@@ -124,7 +124,7 @@ def _store(tmp_path: Path) -> list[str]:
 def test_a_run_writes_each_reply_once_and_other_inputs_go_to_their_own_folder(tmp_path: Path, monkeypatch, capsys):
     calls = []
 
-    async def fake(prompt, system, model):
+    async def fake(prompt, system, model, frame="bare"):
         calls.append((model, system.name, prompt))
         return "a good reply"
 
@@ -143,8 +143,24 @@ def test_a_run_writes_each_reply_once_and_other_inputs_go_to_their_own_folder(tm
     assert len(list((tmp_path / "replays").iterdir())) == 2
 
 
+def test_a_check_only_run_writes_only_the_in_force_replies_and_still_reports_the_check(
+    tmp_path: Path, monkeypatch, capsys
+):
+    calls = []
+
+    async def fake(prompt, system, model, frame="bare"):
+        calls.append(system.name)
+        return "a bad reply"
+
+    monkeypatch.setattr(replay, "ask", fake)
+    main([*_store(tmp_path), "--model", "a", "--check-only"])
+
+    assert calls == ["system-old.txt"] * 3
+    assert "the real agents missed 100.0%, the replay 100.0%" in capsys.readouterr().out
+
+
 def test_running_out_of_quota_stops_the_run_and_keeps_the_replies_written(tmp_path: Path, monkeypatch):
-    async def fake(prompt, system, model):
+    async def fake(prompt, system, model, frame="bare"):
         if system.name == "system-new.txt":
             raise replay.OutOfQuota("usage limit")
         return "a bad reply"
@@ -164,7 +180,7 @@ def test_a_measure_must_be_a_plain_name(measure):
 
 
 def test_a_kill_mid_line_loses_only_that_reply(tmp_path: Path, monkeypatch):
-    async def fake(prompt, system, model):
+    async def fake(prompt, system, model, frame="bare"):
         return "a bad reply"
 
     monkeypatch.setattr(replay, "ask", fake)
