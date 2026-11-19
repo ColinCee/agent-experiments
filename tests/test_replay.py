@@ -1,6 +1,7 @@
 import asyncio
 import json
 import random
+import re
 import subprocess
 from pathlib import Path
 
@@ -22,6 +23,11 @@ MEASURES = """CREATE TEMP TABLE chances AS
 SELECT 'bad-word' AS measure, s, "day", ts, uuid, txt LIKE '%bad%' AS miss FROM texts WHERE len(txt) >= 5
 UNION ALL SELECT 'other', s, "day", ts, uuid, true FROM calls
 UNION ALL SELECT 'other', s, "day", ts, uuid, true FROM typed;"""
+
+
+def test_a_reply_has_every_table_a_measure_can_read_from_sessions_sql():
+    made = set(re.findall(r"CREATE TEMP TABLE (\w+)", (Path(replay.__file__).parent / "sessions.sql").read_text()))
+    assert made - replay.SESSION_ONLY <= set(re.findall(r"CREATE TEMP TABLE (\w+)", replay.REPLY_TABLES))
 
 
 def test_pick_takes_each_sessions_first_chance_before_any_second_and_at_most_three_a_session():

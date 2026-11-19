@@ -61,7 +61,10 @@ REPLY_TABLES = """
 CREATE TEMP TABLE texts (s VARCHAR, "day" VARCHAR, ts VARCHAR, uuid VARCHAR, txt VARCHAR);
 CREATE TEMP TABLE calls (s VARCHAR, "day" VARCHAR, ts VARCHAR, uuid VARCHAR, tool VARCHAR, arg VARCHAR, bg BOOLEAN);
 CREATE TEMP TABLE typed (s VARCHAR, "day" VARCHAR, ts VARCHAR, uuid VARCHAR, body VARCHAR);
+CREATE TEMP TABLE skill_loads (s VARCHAR, "day" VARCHAR, ts VARCHAR, skill VARCHAR, version VARCHAR);
 """
+# Tables sessions.sql makes only on the way to the ones above; measures never read them.
+SESSION_ONLY = {"raw", "started", "e", "roots", "blocks", "stamps", "sessions"}
 
 # The measure's chances in sessions someone typed in, each marked when it is its session's first in the days asked.
 MOMENTS = """
