@@ -37,7 +37,9 @@ def main(argv: list[str] | None = None) -> int:
     daily.add_argument("--db", type=Path, default=DATA / "experiments.duckdb")
     daily.add_argument("--page", type=Path, default=DATA / "overview.html", help="report.json is written beside it")
     rp = sub.add_parser("replay", help="answer past moments again under old and new rules, and compare their misses")
-    rp.add_argument("--measure", type=_plain, help="a measure on reply text or one call: its chances are the moments replayed")
+    rp.add_argument(
+        "--measure", type=_plain, help="a measure on reply text or one call: its chances are the moments replayed"
+    )
     rp.add_argument("--old", type=Path, help="the old rules file")
     rp.add_argument("--new", type=Path, help="the new rules file")
     rp.add_argument("--model", help="the model that writes the replies, such as haiku or opus")
@@ -46,7 +48,9 @@ def main(argv: list[str] | None = None) -> int:
     rp.add_argument("--to", default="9999-99-99", help="last day of moments, YYYY-MM-DD")
     rp.add_argument("--n", type=int, default=200, help="moments to replay, at most 3 a session")
     rp.add_argument("--check-only", action="store_true", help="write only the in-force arm, for the check alone")
-    rp.add_argument("--context-chars", type=int, default=replay.CONTEXT_CHARS, help="conversation each reply sees")
+    rp.add_argument(
+        "--context-chars", type=_positive, default=replay.CONTEXT_CHARS, help="conversation each reply sees"
+    )
     rp.add_argument(
         "--frame", choices=replay.FRAMES, default="bare", help="rules alone, or after Claude Code's own system prompt"
     )
@@ -100,6 +104,12 @@ def _plain(name: str) -> str:
     if not re.fullmatch(r"[A-Za-z0-9_-]+", name):
         raise argparse.ArgumentTypeError(f"{name!r}: use letters, digits, - and _ only")
     return name
+
+
+def _positive(text: str) -> int:
+    if not text.isdigit() or int(text) < 1:
+        raise argparse.ArgumentTypeError(f"{text!r}: give a whole number of 1 or more")
+    return int(text)
 
 
 def build(db: Path, trials: list[looks.Trial], day: str, errors: list[str]) -> tuple[dict, list[looks.Look]]:

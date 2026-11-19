@@ -300,10 +300,12 @@ def score(measures: Path, measure: str, picks: list[dict], replies: list[dict]) 
         if r["uuid"] not in days:
             continue
         key = (f"{r['uuid']} {r['arm']}", days[r["uuid"]], f"{days[r['uuid']]}T00:00:00.000Z", r["uuid"])
-        texts.append((*key, TOOL_LINE.sub("", r["reply"]).strip()))
+        if text := TOOL_LINE.sub("", r["reply"]).strip():
+            texts.append((*key, text))
         # A replayed call has no background flag, so a measure that needs one cannot miss in a replay.
         calls += [(*key, tool, arg, False) for tool, arg in TOOL_LINE.findall(r["reply"])]
-    con.executemany("INSERT INTO texts VALUES (?, ?, ?, ?, ?)", texts)
+    if texts:
+        con.executemany("INSERT INTO texts VALUES (?, ?, ?, ?, ?)", texts)
     if calls:
         con.executemany("INSERT INTO calls VALUES (?, ?, ?, ?, ?, ?, ?)", calls)
     con.execute(measures.read_text(encoding="utf-8"))
@@ -430,7 +432,9 @@ def run(args, projects: Path) -> int:
         inputs = {"measure": args.measure, "model": args.model, "n": args.n, "from": args.from_, "to": args.to}
         # The frame is in each arm's text; the rest of each prompt is shaped by these.
         inputs |= {arm: _sha(text) for arm, text in systems.items()}
-        inputs |= {"prompt": [args.context_chars, CALL_CHARS, RESULT_CHARS, ASK], "frame": args.frame}
+        inputs |= {"prompt": [args.context_chars, CALL_CHARS, RESULT_CHARS, ASK]}
+        if args.frame != "bare":  # so the default runs keep their folders from before frames existed
+            inputs |= {"frame": args.frame}
         if args.check_only:
             inputs |= {"check_only": args.in_force}
         out = (args.db.parent / "replays" / f"{args.measure}-{_sha(json.dumps(inputs, sort_keys=True))[:8]}").resolve()
