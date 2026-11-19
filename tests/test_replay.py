@@ -1,6 +1,7 @@
 import asyncio
 import json
 import random
+import re
 import subprocess
 from pathlib import Path
 
@@ -22,6 +23,11 @@ MEASURES = """CREATE TEMP TABLE chances AS
 SELECT 'bad-word' AS measure, s, "day", ts, uuid, txt LIKE '%bad%' AS miss FROM texts WHERE len(txt) >= 5
 UNION ALL SELECT 'other', s, "day", ts, uuid, true FROM calls
 UNION ALL SELECT 'other', s, "day", ts, uuid, true FROM typed;"""
+
+
+def test_a_reply_has_every_table_a_measure_can_read_from_sessions_sql():
+    made = set(re.findall(r"CREATE TEMP TABLE (\w+)", (Path(replay.__file__).parent / "sessions.sql").read_text()))
+    assert made - replay.SESSION_ONLY <= set(re.findall(r"CREATE TEMP TABLE (\w+)", replay.REPLY_TABLES))
 
 
 def test_pick_takes_each_sessions_first_chance_before_any_second_and_at_most_three_a_session():
@@ -95,6 +101,23 @@ def test_a_reply_too_short_to_be_a_chance_is_left_out_of_the_pairs(tmp_path: Pat
     assert judge("f", "bad-word", picks, scored, "new", np.random.default_rng(1)).paired == 0
 
 
+def test_a_call_a_reply_writes_is_scored_as_a_call_and_left_out_of_its_text(tmp_path: Path):
+    (tmp_path / "m.sql").write_text(
+        """CREATE TEMP TABLE chances AS
+        SELECT 'commit' AS measure, s, "day", ts, uuid, arg NOT LIKE '% -- %' AS miss
+        FROM calls WHERE tool = 'Bash' AND arg LIKE 'git commit%'
+        UNION ALL SELECT 'git-in-text', s, "day", ts, uuid, txt LIKE '%git%' FROM texts"""
+    )
+    picks = _picks(1)
+    replies = [
+        {"uuid": "u0", "arm": "old", "reply": "Committing.\n[Bash: git commit -m fix]"},
+        {"uuid": "u0", "arm": "new", "reply": "Committing.\n[Bash: git commit -m fix -- a.py]"},
+    ]
+
+    assert score(tmp_path / "m.sql", "commit", picks, replies) == {("u0", "old"): True, ("u0", "new"): False}
+    assert score(tmp_path / "m.sql", "git-in-text", picks, replies) == {("u0", "old"): False, ("u0", "new"): False}
+
+
 @pytest.fixture(autouse=True)
 def _projects(tmp_path: Path, monkeypatch):
     monkeypatch.setattr(cli, "PROJECTS", tmp_path / "projects")
@@ -124,7 +147,7 @@ def _store(tmp_path: Path) -> list[str]:
 def test_a_run_writes_each_reply_once_and_other_inputs_go_to_their_own_folder(tmp_path: Path, monkeypatch, capsys):
     calls = []
 
-    async def fake(prompt, system, model):
+    async def fake(prompt, system, model, frame="bare"):
         calls.append((model, system.name, prompt))
         return "a good reply"
 
@@ -143,8 +166,24 @@ def test_a_run_writes_each_reply_once_and_other_inputs_go_to_their_own_folder(tm
     assert len(list((tmp_path / "replays").iterdir())) == 2
 
 
+def test_a_check_only_run_writes_only_the_in_force_replies_and_still_reports_the_check(
+    tmp_path: Path, monkeypatch, capsys
+):
+    calls = []
+
+    async def fake(prompt, system, model, frame="bare"):
+        calls.append(system.name)
+        return "a bad reply"
+
+    monkeypatch.setattr(replay, "ask", fake)
+    main([*_store(tmp_path), "--model", "a", "--check-only"])
+
+    assert calls == ["system-old.txt"] * 3
+    assert "the real agents missed 100.0%, the replay 100.0%" in capsys.readouterr().out
+
+
 def test_running_out_of_quota_stops_the_run_and_keeps_the_replies_written(tmp_path: Path, monkeypatch):
-    async def fake(prompt, system, model):
+    async def fake(prompt, system, model, frame="bare"):
         if system.name == "system-new.txt":
             raise replay.OutOfQuota("usage limit")
         return "a bad reply"
@@ -164,7 +203,7 @@ def test_a_measure_must_be_a_plain_name(measure):
 
 
 def test_a_kill_mid_line_loses_only_that_reply(tmp_path: Path, monkeypatch):
-    async def fake(prompt, system, model):
+    async def fake(prompt, system, model, frame="bare"):
         return "a bad reply"
 
     monkeypatch.setattr(replay, "ask", fake)
