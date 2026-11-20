@@ -30,6 +30,15 @@ export interface Report {
   sizes: Sizes;
   /** One per mistake the measures file ties to a skill: the skill not loaded when its moment came. */
   skills: Skill[];
+  /** Everything agents load now; null when the report was written without the installed rules. */
+  live: Live | null;
+}
+
+/** Each rule line and skill agents load; `row` names the page's row that measures it, or null. */
+export interface Live {
+  /** `label` is the line's opening words, `text` the whole line, `group` the heading or trial state it sits under. */
+  rules: { label: string; text: string; group: string; row: string | null }[];
+  skills: { name: string; row: string | null }[];
 }
 
 export interface Trial {

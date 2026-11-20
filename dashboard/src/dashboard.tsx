@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
+import { LiveNow } from "@/components/live-now";
 import { Pills } from "@/components/pills";
 import { PageFacts, RuleCard } from "@/components/rule-card";
 import { RuleTable } from "@/components/rule-table";
@@ -83,6 +84,7 @@ export function Dashboard({ report }: { report: Report }) {
   }, [alone, pinned]);
   return (
     <div className="grid gap-4">
+      {!alone && report.live && <LiveNow live={report.live} rows={rows} skills={skills} />}
       {!alone && <Pills counts={counts} filter={filter} onLight={setLit} onFilter={toggleFilter} />}
       <div className="grid items-start gap-6 min-[1100px]:grid-cols-[minmax(0,1fr)_22.5rem]">
         {!alone && (

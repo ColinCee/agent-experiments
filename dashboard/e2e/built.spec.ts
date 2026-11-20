@@ -343,3 +343,21 @@ test("an injected report is shown, even with </script> in a name", async ({ page
   await expect(page.getByText("A </script> in a name")).toBeVisible();
   expect(opened.errors).toEqual([]);
 });
+
+test("live now counts what is measured, and folds away only what is not", async ({ page }) => {
+  await openWide(page);
+  const live = page.locator("[data-live]");
+  await expect(live.locator('[data-count="Rule lines"]')).toContainText("2 of 5");
+  await expect(live.locator('[data-count="Skills"]')).toContainText("2 of 3");
+  await expect(live.getByText("Fix the cause")).toBeHidden();
+  await live.getByText("Not measured (4)").click();
+  await expect(live.getByText("Fix the cause")).toBeVisible();
+  await expect(live.getByText("writing-notes")).toBeVisible();
+  await expect(live.getByText("Run the tests before a commit")).toHaveCount(0);
+});
+
+test("a report without the installed rules shows no live now section", async ({ page }) => {
+  await page.setViewportSize(widths.desktop);
+  await openBuilt(page, { ...fixture, live: null });
+  await expect(page.locator("[data-live]")).toHaveCount(0);
+});

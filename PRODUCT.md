@@ -23,6 +23,7 @@ Each line has an end-to-end test in `dashboard/e2e`.
 | When | Then |
 |---|---|
 | The page opens | Every running or scheduled experiment and every active rule is one row: name, band, signed change, status icon. Finished experiments are a third group below them. |
+| The page opens | Above the rules, two counts: how many of the rule lines and skills agents load are measured, which are the rows below. Under them, folded, the lines and skills nothing measures, under their headings in his own words, outside the page's vocabulary. |
 | A row shows | Its status is one of the four below, each with its own icon. |
 | A row's status is "not enough tasks" | It draws no band and shows a dash, so a running experiment never shows a lead. |
 | He points at a row, or moves focus to it | Its card shows beside the table. A click keeps it open; leaving the table returns to the kept one. |

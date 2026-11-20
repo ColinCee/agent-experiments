@@ -567,6 +567,40 @@ export const fixture: Report = {
       misses: [],
     },
   ],
+  live: {
+    rules: [
+      {
+        label: "Short replies",
+        text: "Short replies: the goal and where it stands.",
+        group: "Every project",
+        row: null,
+      },
+      {
+        label: "Fix the cause",
+        text: "Fix the cause, not the case in front of you.",
+        group: "Every project",
+        row: null,
+      },
+      { label: "Read config live", text: "Read config live, not from memory.", group: "Every project", row: null },
+      {
+        label: "Run the tests before a commit",
+        text: "Run the tests before a commit.",
+        group: "Experiments",
+        row: "Tests skipped before a commit",
+      },
+      {
+        label: "Keep logs out of replies",
+        text: "Keep logs out of replies; link them instead.",
+        group: "Active rules",
+        row: "Long logs pasted into a reply",
+      },
+    ],
+    skills: [
+      { name: "code-review", row: "Reviews done without the review skill" },
+      { name: "release-checklist", row: "Releases cut without the release skill" },
+      { name: "writing-notes", row: null },
+    ],
+  },
 };
 
 const noData = series(0, 0, null, 0).map(({ day }) => ({ day, rate: null }));
@@ -607,4 +641,5 @@ export const emptyReport: Report = {
   replays: [],
   sizes: { series: [], largest: [], months: [] },
   skills: [],
+  live: null,
 };
