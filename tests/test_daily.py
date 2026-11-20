@@ -29,7 +29,7 @@ TEMPLATE = (
 PACKAGED = overview.template
 SIDE = {"rate", "low", "high", "tasks", "from"}
 KEYS = {
-    "report": {"day", "written", "sessions", "trials", "permanent", "mistakes", "replays", "sizes", "skills"},
+    "report": {"day", "written", "sessions", "trials", "permanent", "mistakes", "replays", "sizes", "skills", "live"},
     "sessions": {"total", "in_group", "split_since"},
     "trial": {"name", "started", "ends", "state", "verdict", "tasks_with", "tasks_without", "rate_with"}
     | {"rate_without", "change", "needed", "per_week", "looks", "trend", "misses"},
@@ -58,10 +58,13 @@ def daily(tmp_path: Path, day: str = "2026-01-02") -> int:
     trials.mkdir(exist_ok=True)
     (trials / "t.md").write_text("---\nname: A plain name\nmeasures: bad-word\nstarted: 2026-01-01\n---\n")
     (trials / "later.md").write_text("---\nmeasures: bad-word\nstarted: 2026-01-10\n---\n")
-    (trials / "s.md").write_text("---\nstatus: settled\nmeasures: bad-word\nstarted: 2025-12-01\n---\n")
+    (trials / "s.md").write_text("---\nstatus: settled\nmeasures: bad-word\nstarted: 2025-12-01\n---\n## On\nKept.\n")
     (trials / "unnamed.md").write_text("---\nmeasures: no-name\nstarted: 2026-01-05\n---\n")
     (trials / "undated.md").write_text("---\nmeasures: bad-word\n---\n")
-    paths = {"trials": trials, "measures": tmp_path / "measures.sql", "db": tmp_path / "x.duckdb"}
+    (tmp_path / "installed").mkdir(exist_ok=True)
+    (tmp_path / "installed" / "AGENTS.md").write_text("# Rules\n\n- **A rule:** in full.\n")
+    paths = {"trials": trials, "installed": tmp_path / "installed", "measures": tmp_path / "measures.sql"}
+    paths["db"] = tmp_path / "x.duckdb"
     paths |= {"page": tmp_path / "overview.html", "transcripts": tmp_path / "projects" / "*" / "*.jsonl"}
     return main(["daily", "--day", day, *(a for k, v in paths.items() for a in (f"--{k}", str(v)))])
 
@@ -82,6 +85,13 @@ def test_daily_writes_the_report_and_puts_it_in_the_page(tmp_path: Path, capsys)
     report = json.loads(text)
     assert "NaN" not in text and "Infinity" not in text
     assert set(report) == KEYS["report"] and set(report["sessions"]) == KEYS["sessions"]
+    assert report["live"] == {
+        "rules": [
+            {"label": "A rule", "text": "A rule: in full.", "group": "Rules", "row": None},
+            {"label": "Kept", "text": "Kept.", "group": "Active rules", "row": "Bad words"},
+        ],
+        "skills": [],
+    }
     assert report["sessions"] == {"total": 2, "in_group": 2, "split_since": "2026-01-02"}
     trials = {t["started"]: t for t in report["trials"]}
     assert all(set(t) == KEYS["trial"] for t in trials.values())

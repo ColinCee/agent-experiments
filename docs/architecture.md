@@ -65,6 +65,10 @@ A continued session copies its parent's entries; each counts once, for the root 
 - **By version.** A version gets a rate only from 10 tasks: skills change several times a week, so most versions never get one, and those that do are compared by their ranges, not tested. Before and after is not a test (Method).
 - **Not covered.** Whether an agent followed a skill once loaded; and whether a new description triggers on the right prompts before it ships, which `claude plugin eval` with a `tool_used: Skill` grader does.
 
+## Live now
+
+[`live.py`](../src/agent_experiments/live.py) lists what agents load: each top-level line of the installed `AGENTS.md` and each installed skill folder with a `SKILL.md` (`daily --installed`, default `~/.claude`, since an install can lag a merge), and each line of a trial's `On` section, from the same trial files the rows come from. A line or skill counts as measured when a row of the page is built from it: a trial by its file name, a skill by the names in `skill_measures`. Nothing else ties a plain rule line to a measure, so a line that a measure checks but that has no trial file shows as not measured, and every line of a trial's `On` section counts as measured by its row.
+
 ## Method
 
 [`stats.py`](../src/agent_experiments/stats.py) uses SciPy for both tests.

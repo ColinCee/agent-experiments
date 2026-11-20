@@ -10,7 +10,7 @@ from pathlib import Path
 
 import numpy as np
 
-from agent_experiments import looks, overview, replay, size, skills
+from agent_experiments import live, looks, overview, replay, size, skills
 from agent_experiments.counting import count
 from agent_experiments.looks import LIMITS, TRIAL_DAYS, shift
 from agent_experiments.stats import Effect, compare, tasks_needed
@@ -35,6 +35,12 @@ def main(argv: list[str] | None = None) -> int:
     daily.add_argument("--measures", type=Path, default=DATA / "measures" / "measures.sql")
     daily.add_argument("--transcripts", default=str(PROJECTS / "*" / "*.jsonl"))
     daily.add_argument("--db", type=Path, default=DATA / "experiments.duckdb")
+    daily.add_argument(
+        "--installed",
+        type=Path,
+        default=Path.home() / ".claude",
+        help="folder holding the AGENTS.md and skills agents load",
+    )
     daily.add_argument("--page", type=Path, default=DATA / "overview.html", help="report.json is written beside it")
     rp = sub.add_parser("replay", help="answer past moments again under old and new rules, and compare their misses")
     rp.add_argument(
@@ -78,11 +84,14 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     day = args.day or (datetime.now(UTC).date() - timedelta(days=1)).isoformat()
     errors: list[str] = []
-    trials = looks.read_trials(args.trials or (args.agents_repo or Path.cwd()) / "home" / "trials", errors)
+    trials_dir = args.trials or (args.agents_repo or Path.cwd()) / "home" / "trials"
+    trials = looks.read_trials(trials_dir, errors)
     count(args.transcripts, args.measures, args.db)
     if args.agents_repo:
         size.measure(args.agents_repo, size.PATHS, args.db)
-    report, new_looks = build(args.db, trials, day, errors)
+    report, new_looks = build(
+        args.db, trials, day, errors, (args.installed / "AGENTS.md", trials_dir, args.installed / "skills")
+    )
     for lk in new_looks:
         print(
             f"{lk.trial} ({lk.measure}), look {lk.look}: {lk.verdict}; drop {lk.drop:.0%} ({lk.low:.0%} to {lk.high:.0%})"
@@ -112,10 +121,17 @@ def _positive(text: str) -> int:
     return int(text)
 
 
-def build(db: Path, trials: list[looks.Trial], day: str, errors: list[str]) -> tuple[dict, list[looks.Look]]:
+def build(
+    db: Path,
+    trials: list[looks.Trial],
+    day: str,
+    errors: list[str],
+    installed: tuple[Path, Path, Path] | None = None,
+) -> tuple[dict, list[looks.Look]]:
     """Takes the looks due as of `day`, and returns the report the overview page shows (its shape:
     dashboard/src/data/report.ts) with the looks just taken. A trial that fails is left out and added to
-    `errors`, so the others still show."""
+    `errors`, so the others still show. With `installed` (the rules file, trials folder and skills folder agents
+    load), the report also lists everything live and which row measures it."""
     rng = np.random.default_rng(1)
     # Numbers only the page uses draw from their own generator, so adding one never moves a look's p or range.
     shown = np.random.default_rng(2)
@@ -130,9 +146,11 @@ def build(db: Path, trials: list[looks.Trial], day: str, errors: list[str]) -> t
                 f"Trial {trial.name} shows its file name: give its measure {measure} a name in `measure_names` in the"
                 " measures file, or the trial file a line `name: <the mistake, in plain words>`."
             )
-        return found or trial.name
+        found = found or trial.name
+        row_of.setdefault(trial.name, found)
+        return found
 
-    rows, permanent, new_looks = [], [], []
+    rows, permanent, new_looks, row_of = [], [], [], {}
     for trial in trials:
         try:
             if trial.status == "settled":
@@ -191,6 +209,16 @@ def build(db: Path, trials: list[looks.Trial], day: str, errors: list[str]) -> t
         "replays": replays,
         "sizes": sizes,
         "skills": skill_rows,
+        "live": live.report(
+            installed[0],
+            trials,
+            installed[1],
+            installed[2],
+            row_of,
+            {s: r["name"] for r in skill_rows for s in r["skills"]},
+        )
+        if installed
+        else None,
     }
     return report, new_looks
 
