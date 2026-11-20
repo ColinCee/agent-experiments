@@ -344,7 +344,7 @@ test("an injected report is shown, even with </script> in a name", async ({ page
   expect(opened.errors).toEqual([]);
 });
 
-test("live now counts what is measured first, and its folded lists link to the rows", async ({ page }) => {
+test("live now counts what is measured, and folds away only what is not", async ({ page }) => {
   await openWide(page);
   const live = page.locator("[data-live]");
   await expect(live.locator('[data-count="Rule lines"]')).toContainText("2 of 5");
@@ -352,13 +352,8 @@ test("live now counts what is measured first, and its folded lists link to the r
   await expect(live.getByText("Fix the cause")).toBeHidden();
   await live.getByText("Not measured (4)").click();
   await expect(live.getByText("Fix the cause")).toBeVisible();
-  await live.getByText("Measured (4)", { exact: true }).click();
-  await live.locator("li", { hasText: "Run the tests before a commit" }).getByRole("link").click();
-  await expect(card(page, WORKS)).toBeVisible();
-  const skill = live.locator("li", { hasText: "code-review" }).getByRole("link");
-  await expect(skill).toHaveText(/% missed$/);
-  await skill.click();
-  await expect(card(page, "skill-reviews-done-without-the-review-skill")).toBeVisible();
+  await expect(live.getByText("writing-notes")).toBeVisible();
+  await expect(live.getByText("Run the tests before a commit")).toHaveCount(0);
 });
 
 test("a report without the installed rules shows no live now section", async ({ page }) => {
