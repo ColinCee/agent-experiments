@@ -1,7 +1,8 @@
 -- Reads every session transcript once into the temp tables a measures file and the stored tables are built from.
 -- counting.py sets the variable `transcripts` (a glob of .jsonl files), runs this file, then the measures file.
---   texts(s, day, ts, uuid, txt)             each text block an agent wrote
---   calls(s, day, ts, uuid, tool, arg, bg)   each tool call: its command, file path or skill; bg = run in the background
+--   texts(s, day, ts, uuid, txt, step)             each text block an agent wrote
+--   calls(s, day, ts, uuid, tool, arg, bg, step)   each tool call: its command, file path or skill; bg = run in the
+--                                                  background; step = the model call that wrote it, shared by its blocks
 --   typed(s, day, ts, uuid, body)            each message the user typed
 --   stamps(s, ts, stamp)                     each stamp the trial hook gave a session, and when
 --   skill_loads(s, day, ts, skill, version)  each skill an agent loaded, and a hash of the text it read
@@ -40,13 +41,14 @@ CREATE TEMP TABLE roots AS
 SELECT raw.s, arg_min(e.s, e.ts) AS root FROM raw JOIN e USING (uuid) GROUP BY raw.s;
 
 CREATE TEMP TABLE blocks AS
-SELECT s, left(ts, 10) AS "day", ts, uuid, unnest(json_extract(blocks, '$[*]')) AS b FROM e WHERE kind = 'assistant';
+SELECT s, left(ts, 10) AS "day", ts, uuid, coalesce(message, uuid) AS step, unnest(json_extract(blocks, '$[*]')) AS b
+FROM e WHERE kind = 'assistant';
 CREATE TEMP TABLE texts AS
-SELECT s, "day", ts, uuid, b ->> 'text' AS txt FROM blocks WHERE (b ->> 'type') = 'text';
+SELECT s, "day", ts, uuid, b ->> 'text' AS txt, step FROM blocks WHERE (b ->> 'type') = 'text';
 CREATE TEMP TABLE calls AS
 SELECT s, "day", ts, uuid, b ->> 'name' AS tool,
        coalesce(b -> 'input' ->> 'command', b -> 'input' ->> 'file_path', b -> 'input' ->> 'skill', '') AS arg,
-       coalesce((b -> 'input' ->> 'run_in_background')::BOOL, false) AS bg
+       coalesce((b -> 'input' ->> 'run_in_background')::BOOL, false) AS bg, step
 FROM blocks WHERE (b ->> 'type') = 'tool_use';
 -- Text that starts with < is a harness note or another agent.
 CREATE TEMP TABLE typed AS

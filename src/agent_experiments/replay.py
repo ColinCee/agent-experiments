@@ -59,8 +59,8 @@ its result. Write nothing about this setup."""
 
 # The temp tables a measures file reads, as sessions.sql makes them; a reply is one text, with nothing called or typed.
 REPLY_TABLES = """
-CREATE TEMP TABLE texts (s VARCHAR, "day" VARCHAR, ts VARCHAR, uuid VARCHAR, txt VARCHAR);
-CREATE TEMP TABLE calls (s VARCHAR, "day" VARCHAR, ts VARCHAR, uuid VARCHAR, tool VARCHAR, arg VARCHAR, bg BOOLEAN);
+CREATE TEMP TABLE texts (s VARCHAR, "day" VARCHAR, ts VARCHAR, uuid VARCHAR, txt VARCHAR, step VARCHAR);
+CREATE TEMP TABLE calls (s VARCHAR, "day" VARCHAR, ts VARCHAR, uuid VARCHAR, tool VARCHAR, arg VARCHAR, bg BOOLEAN, step VARCHAR);
 CREATE TEMP TABLE typed (s VARCHAR, "day" VARCHAR, ts VARCHAR, uuid VARCHAR, body VARCHAR);
 CREATE TEMP TABLE skill_loads (s VARCHAR, "day" VARCHAR, ts VARCHAR, skill VARCHAR, version VARCHAR);
 """
@@ -301,13 +301,13 @@ def score(measures: Path, measure: str, picks: list[dict], replies: list[dict]) 
             continue
         key = (f"{r['uuid']} {r['arm']}", days[r["uuid"]], f"{days[r['uuid']]}T00:00:00.000Z", r["uuid"])
         if text := TOOL_LINE.sub("", r["reply"]).strip():
-            texts.append((*key, text))
+            texts.append((*key, text, key[0]))
         # A replayed call has no background flag, so a measure that needs one cannot miss in a replay.
-        calls += [(*key, tool, arg, False) for tool, arg in TOOL_LINE.findall(r["reply"])]
+        calls += [(*key, tool, arg, False, key[0]) for tool, arg in TOOL_LINE.findall(r["reply"])]
     if texts:
-        con.executemany("INSERT INTO texts VALUES (?, ?, ?, ?, ?)", texts)
+        con.executemany("INSERT INTO texts VALUES (?, ?, ?, ?, ?, ?)", texts)
     if calls:
-        con.executemany("INSERT INTO calls VALUES (?, ?, ?, ?, ?, ?, ?)", calls)
+        con.executemany("INSERT INTO calls VALUES (?, ?, ?, ?, ?, ?, ?, ?)", calls)
     con.execute(measures.read_text(encoding="utf-8"))
     found = con.execute("SELECT s, bool_or(miss) FROM chances WHERE measure = ? GROUP BY s", [measure]).fetchall()
     con.close()
