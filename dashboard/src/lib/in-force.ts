@@ -7,9 +7,8 @@ export const TRIM_DAYS = 30;
 /** One row of the rules and skills in force. */
 export type ForceRow = {
   id: string;
+  /** The rule in plain words: no list or table marks, no code ticks. */
   name: string;
-  /** The full wording in plain words: no list or table marks, no code ticks. */
-  wording: string;
   item: InForce;
   /** Its mistakes, in the report's order of names; none when not measured. */
   mistakes: Mistake[];
@@ -50,7 +49,7 @@ export function forceRows(report: Report): ForceRow[] {
   const byName = new Map(report.mistakes.map((m) => [m.name, m]));
   const seen = new Set<string>();
   return (report.in_force ?? []).map((item) => {
-    const { name } = item;
+    const name = item.kind === "skill" ? item.text : plainRule(item.text);
     let id = `${item.kind}-${slug(name)}`;
     for (let n = 2; seen.has(id); n++) id = `${item.kind}-${slug(name)}-${n}`;
     seen.add(id);
@@ -62,7 +61,6 @@ export function forceRows(report: Report): ForceRow[] {
     return {
       id,
       name,
-      wording: item.kind === "skill" ? item.text : plainRule(item.text),
       item,
       mistakes,
       worst,

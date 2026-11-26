@@ -56,7 +56,7 @@ class Trial:
     title: str = ""  # the page's name for it; the file name is what stamps use
     what: str = ""  # the change, in plain words: its `changes` row
     filed: bool = True  # a trial file in the agents repo, which `daily` asks to update; else a bare `changes` row
-    wording: str = ""  # its `## On` rule, which the hook gives every task
+    wording: str = ""  # its `## On` lines, which the hook gives every task
 
 
 @dataclass(frozen=True)
@@ -95,7 +95,7 @@ def read_trials(folder: Path, errors: list[str]) -> list[Trial]:
         measures = tuple(m.strip() for m in field("measures").split(",") if m.strip())
         status = "settled" if field("status") == "settled" else "testing"
         on = re.search(r"^## On\s*\n(.*?)(?=^## |\Z)", text, re.MULTILINE | re.DOTALL)
-        wording = " ".join(on.group(1).split()) if on else ""
+        wording = "\n".join(line.strip() for line in on.group(1).splitlines() if line.strip()) if on else ""
         trials.append(Trial(path.stem, status, measures, started, field("name"), wording=wording))
     return trials
 
@@ -133,12 +133,17 @@ def own(trial: Trial, measure: str, day: str) -> bool:
 
 def with_changes(con, trials: list[Trial]) -> list[Trial]:
     """The trial files, each with its change in plain words, and every other rule change from JUDGED_FROM as a trial
-    of its own, so each rule change gets one verdict (docs/architecture.md#verdicts)."""
+    of its own, so each rule change gets one verdict (docs/architecture.md#verdicts). A change that dated a trial
+    already judged is that trial's, even once its file has moved on to a new wording and start."""
     found = con.execute('SELECT measure, "day", what FROM changes ORDER BY "day", measure').fetchall()
+    judged = [
+        Trial(t, "settled", (m,), s)
+        for t, s, m in con.execute("SELECT trial, started, measure FROM verdicts").fetchall()
+    ]
     filed = [replace(t, what=next((w for m, d, w in found if own(t, m, d)), "")) for t in trials]
     bare: dict[tuple[str, str], list[str]] = {}
     for measure, day, what in found:
-        if day >= JUDGED_FROM and not any(own(t, measure, day) for t in trials):
+        if day >= JUDGED_FROM and not any(own(t, measure, day) for t in trials + judged):
             bare.setdefault((measure, day), []).append(what)  # changes on one day are one change, with one verdict
     return filed + [
         Trial(measure, "testing", (measure,), day, what="; ".join(whats), filed=False)

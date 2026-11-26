@@ -66,7 +66,7 @@ function ForceRows({ rows, pinned, shown, events, onFocusOut }: Rows) {
       )}
       {...rowHandlers(row.id, pinned, events, onFocusOut)}
     >
-      <span data-name className="truncate text-[0.8125rem]">
+      <span data-name className="line-clamp-2 text-[0.8125rem]">
         {row.name}
       </span>
       <span data-mistakes className="text-right">

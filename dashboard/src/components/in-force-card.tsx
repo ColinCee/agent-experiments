@@ -100,7 +100,6 @@ export function InForceCard({ row, day }: { row: ForceRow; day: Day }) {
       </a>
       <section data-section="rule">
         <h2 className="text-pretty font-semibold text-[0.9375rem]">{row.name}</h2>
-        {row.wording !== row.name && <p className="mt-1 text-pretty text-xs">{row.wording}</p>}
         <p className="mt-1 text-muted-foreground text-xs">{item.file}</p>
       </section>
       <Section id="use" title="Use">

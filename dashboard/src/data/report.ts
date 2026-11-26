@@ -33,11 +33,9 @@ export interface InForce {
   kind: "rule" | "trial" | "skill";
   /** Its rules file, trial file or skill folder. */
   file: string;
-  /** Its short name: one short sentence for a rule, the folder for a skill. */
-  name: string;
-  /** The line as written, the trial's wording, or the skill's name. */
+  /** The line as written, one line of a trial's wording, or the skill's name. */
   text: string;
-  /** Names of the mistakes (`Mistake.name`) that count it; none: not measured. */
+  /** Names of the mistakes (`Mistake.name`) that count it: a rule line's named skills', a trial's own; none: not measured. */
   measures: string[];
   /** A rule line's chances to be broken, a skill's loads, over `window`; null where nothing counts it. */
   used: number | null;
