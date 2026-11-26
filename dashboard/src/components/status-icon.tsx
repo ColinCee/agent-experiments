@@ -1,15 +1,15 @@
-import { CircleCheck, CircleDashed, CircleHelp, CircleX } from "lucide-react";
+import { CircleCheck, CircleDashed, CircleMinus, CircleX } from "lucide-react";
 import { STATUS_WORDS, type Status } from "@/lib/status";
 import { cn } from "@/lib/utils";
 
-const ICON = { works: CircleCheck, "not-working": CircleX, "cant-tell": CircleHelp, "not-enough": CircleDashed };
+const ICON = { works: CircleCheck, worse: CircleX, "no-effect": CircleMinus, due: CircleDashed };
 
 /** The page's only colours: a status's icon, number and band all take its tone. */
 export const STATUS_TONE: Record<Status, string> = {
   works: "text-good",
-  "not-working": "text-bad",
-  "cant-tell": "text-unsure",
-  "not-enough": "text-muted-foreground",
+  worse: "text-bad",
+  "no-effect": "text-unsure",
+  due: "text-muted-foreground",
 };
 
 /** Pass `decorative` when the status is written beside the icon. */

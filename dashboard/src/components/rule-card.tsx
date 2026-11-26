@@ -1,20 +1,20 @@
 import { ChevronLeft } from "lucide-react";
 import type { ReactNode } from "react";
-import type { Day, Report } from "@/data/report";
+import type { Day, Report, Side, Trial } from "@/data/report";
 import { isClipped, stripPosition } from "@/lib/change";
-import { dayLabel, number, signedPercent } from "@/lib/format";
+import { rateCeiling, rateTicks } from "@/lib/charts";
+import { dayLabel, number, percent, signedPercent } from "@/lib/format";
 import { handText } from "@/lib/hand";
 import { rowHref } from "@/lib/hash";
-import { checkRows } from "@/lib/permanent";
 import type { Drawn, Row } from "@/lib/rows";
 import { STATUS_WORDS, type Status } from "@/lib/status";
-import { lookLabels, trendRows } from "@/lib/trials";
-import { ruleTrust, type Trust, trialTrust } from "@/lib/trust";
 import { cn } from "@/lib/utils";
 import { Band } from "./band";
-import { TrendChart } from "./charts/trend-chart";
 import { CopyButton } from "./copy-button";
 import { STATUS_TONE } from "./status-icon";
+
+/** Days of real use a change gets before its verdict (docs/architecture.md#verdicts). */
+const REAL_DAYS = 3;
 
 export function Section({ id, title, children }: { id: string; title: string; children: ReactNode }) {
   return (
@@ -39,38 +39,70 @@ export function Facts({ facts }: { facts: [string, string, string?][] }) {
   );
 }
 
-function TrustBars({ trust }: { trust: Trust }) {
-  const scale = Math.max(trust.needed * 1.25, trust.with, trust.without);
-  const line = `${(trust.needed / scale) * 100}%`;
-  const bar = (label: string, tasks: number) => (
-    <>
+/** Each side's mistake rate as a dot on one axis, with its 90% range as a band behind it. */
+function BeforeAfter({ trial, day }: { trial: Trial; day: Day }) {
+  const sides = [
+    ["before", "Before", trial.before],
+    ["after", "Since", trial.after],
+  ] as const;
+  const top = rateCeiling(sides.flatMap(([, , s]) => (s ? [s.rate, s.high] : [])));
+  const at = (rate: number) => `${(Math.min(rate, top) / top) * 100}%`;
+  const spoken = sides
+    .map(([, label, s]) => `${label}: ${s ? `${percent(s.rate)} of chances broken` : "none counted"}`)
+    .join(", ");
+  const row = (key: string, label: string, side: Side | null) => (
+    <div key={key} data-side={key} className="contents">
       <span className="text-muted-foreground">{label}</span>
-      <span className="relative h-1.5 rounded-full bg-muted">
-        <span
-          data-bar={tasks}
-          className="absolute inset-y-0 left-0 rounded-full bg-foreground"
-          style={{ width: `${(tasks / scale) * 100}%` }}
-        />
-        <span className="absolute -inset-y-1 border-ring border-l border-dashed" style={{ left: line }} />
+      <span className="relative h-4">
+        <span className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-border" />
+        {side?.low != null && side.high != null && (
+          <span
+            data-range
+            className="absolute top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-foreground opacity-25"
+            style={{ left: at(side.low), width: `calc(${at(side.high)} - ${at(side.low)})` }}
+          />
+        )}
+        {side && (
+          <span
+            data-rate={side.rate}
+            className="absolute top-1/2 size-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-foreground"
+            style={{ left: at(side.rate) }}
+          />
+        )}
       </span>
-      <span className="text-right font-mono">{number(tasks)}</span>
-    </>
+      <span className="text-right font-mono">{side ? percent(side.rate) : "–"}</span>
+    </div>
   );
   return (
-    <>
-      <div className="grid grid-cols-[4.25rem_minmax(0,1fr)_2.5rem] items-center gap-x-2.5 gap-y-1.5 text-xs">
+    <figure className="m-0 grid gap-1.5">
+      <div
+        role="img"
+        aria-label={spoken}
+        className="grid grid-cols-[3.25rem_minmax(0,1fr)_2.5rem] items-center gap-x-2.5 gap-y-2 text-xs"
+      >
+        {sides.map(([key, label, side]) => row(key, label, side))}
         <span />
-        <span className="relative h-4 font-mono text-muted-foreground">
-          <span data-needed className="absolute -translate-x-1/2 whitespace-nowrap" style={{ left: line }}>
-            {trust.neededWords}
-          </span>
+        <span data-axis className="relative h-4 font-mono text-muted-foreground">
+          {rateTicks(top).map((tick, i, all) => (
+            <span
+              key={tick}
+              className={cn(
+                "absolute top-0",
+                i === 0 ? "" : i === all.length - 1 ? "-translate-x-full" : "-translate-x-1/2",
+              )}
+              style={{ left: at(tick) }}
+            >
+              {percent(tick)}
+            </span>
+          ))}
         </span>
         <span />
-        {bar("With rule", trust.with)}
-        {bar("Without", trust.without)}
       </div>
-      <Facts facts={[["Enough tasks", trust.enough]]} />
-    </>
+      <figcaption className="text-muted-foreground text-xs">
+        Share of chances broken, {dayLabel(trial.before?.from ?? trial.started, day)} to the change, then since{" "}
+        {dayLabel(trial.started, day)}
+      </figcaption>
+    </figure>
   );
 }
 
@@ -108,32 +140,37 @@ function Change({ change, status }: { change: Drawn; status: Status }) {
   );
 }
 
-/** A trial's rate by day of the trial; an active rule's by date over the days its numbers count. */
-function RateOverTime({ row, day }: { row: Row; day: Day }) {
-  if (row.kind === "trial") {
-    return (
-      <TrendChart
-        rows={trendRows(row.trial)}
-        marks={lookLabels(row.trial)}
-        // Seven "Day n" labels do not fit the card, so only the first names the unit.
-        tickFormatter={(label, index) => (index === 0 ? label : label.replace("Day ", ""))}
-      />
-    );
+/** What the verdict rests on: the days and tasks on each side, and for a rare mistake, its replay. */
+function Basis({ trial, day }: { trial: Trial; day: Day }) {
+  const facts: [string, string][] = [
+    ["Days of real use", `${trial.real_days} of ${REAL_DAYS}`],
+    [
+      trial.verdict ? "Judged on" : "Verdict due",
+      trial.due ? dayLabel(trial.due, day) : `after ${REAL_DAYS - trial.real_days} more`,
+    ],
+    ["Tasks before", trial.before ? number(trial.before.tasks) : "None"],
+    ["Tasks since", trial.after ? number(trial.after.tasks) : "None"],
+  ];
+  if (trial.verdict) facts.push(["Judged from", trial.source === "replay" ? "Replay" : "Before and since"]);
+  if (trial.rare) {
+    const replay = trial.replay;
+    facts.push([
+      "Replay",
+      replay === null
+        ? "Needed: too rare for 3 days"
+        : !replay.trusted
+          ? "Can't stand for real agents"
+          : replay.change
+            ? signedPercent(replay.change.value)
+            : "Too few moments",
+    ]);
   }
-  const { rows, ticks } = checkRows(row.check, day);
-  return <TrendChart rows={rows} ticks={ticks} />;
+  return <Facts facts={facts} />;
 }
 
-function hasRates(row: Row): boolean {
-  const trend = row.kind === "trial" ? row.trial.trend : row.check.trend;
-  return trend.filter((t) => t.with !== null || t.without !== null).length > 1;
-}
-
-/** One rule in full. Every card has the same sections in the same order; a rule with no answer stops after trust. */
+/** One rule change in full. Every card has the same sections in the same order; with no verdict, no change. */
 export function RuleCard({ row, day }: { row: Row; day: Day }) {
-  const trial = row.kind === "trial" ? row.trial : null;
-  const trust = row.kind === "trial" ? trialTrust(row.trial) : ruleTrust(row.check, day);
-  const misses = row.kind === "trial" ? row.trial.misses : row.check.misses;
+  const { trial } = row;
   return (
     <div
       data-detail={row.id}
@@ -144,47 +181,34 @@ export function RuleCard({ row, day }: { row: Row; day: Day }) {
         className="-my-1 flex min-h-8 items-center gap-1 text-muted-foreground text-xs min-[1100px]:hidden"
       >
         <ChevronLeft aria-hidden className="size-3.5" />
-        All rules
+        All rule changes
       </a>
       <section data-section="verdict">
         <h2 className="text-balance font-semibold text-[0.9375rem]">{row.name}</h2>
         <p data-verdict className={cn("mt-0.5 font-medium", STATUS_TONE[row.status])}>
           {STATUS_WORDS[row.status]}
-          {trial?.state === "scheduled" && (
-            <span className="font-normal text-muted-foreground"> Starts {dayLabel(trial.started, day)}</span>
-          )}
         </p>
       </section>
-      <Section id="trust" title="Can it be trusted">
-        <TrustBars trust={trust} />
+      <Section id="before-after" title="Mistake rate before and since">
+        <BeforeAfter trial={trial} day={day} />
       </Section>
       {row.change && (
         <Section id="change" title="Change in mistakes">
           <Change change={row.change} status={row.status} />
         </Section>
       )}
-      {row.change && hasRates(row) && (
-        <Section id="rate" title="Mistake rate over time">
-          <RateOverTime row={row} day={day} />
-        </Section>
-      )}
-      {row.status !== "not-enough" && (
-        <Section id="hand" title="Hand to an agent">
-          {misses.length > 0 && (
-            <div data-misses>
-              <p className="mb-1 text-muted-foreground text-xs">Latest mistakes</p>
-              <Facts
-                facts={misses.map((miss) => [
-                  dayLabel(miss.day, day),
-                  miss.side === "with" ? "With rule" : "Without",
-                  miss.session,
-                ])}
-              />
-            </div>
-          )}
-          <CopyButton text={() => handText(row, day)}>Copy for an agent</CopyButton>
-        </Section>
-      )}
+      <Section id="basis" title="What it rests on">
+        <Basis trial={trial} day={day} />
+      </Section>
+      <Section id="hand" title="Hand to an agent">
+        {trial.misses.length > 0 && (
+          <div data-misses>
+            <p className="mb-1 text-muted-foreground text-xs">Latest mistakes</p>
+            <Facts facts={trial.misses.map((miss) => [dayLabel(miss.day, day), miss.session, miss.session])} />
+          </div>
+        )}
+        <CopyButton text={() => handText(row, day)}>Copy for an agent</CopyButton>
+      </Section>
     </div>
   );
 }
@@ -198,19 +222,19 @@ export function PageFacts({ report }: { report: Report }) {
     >
       <div>
         <h2 className="font-semibold text-[0.9375rem]">How these numbers are made</h2>
-        <p className="mt-0.5 text-muted-foreground text-xs">Pick a rule to see its evidence.</p>
+        <p className="mt-0.5 text-muted-foreground text-xs">Pick a rule change to see its evidence.</p>
       </div>
       <Facts
         facts={[
           [`Conversations on ${dayLabel(report.day, report.day)}`, number(report.sessions.total)],
-          ["In an experiment", number(report.sessions.in_group)],
-          ["How tasks are split", "At random, by task"],
+          ["A verdict", `On day ${REAL_DAYS} of real use, never later`],
+          ["A day of real use", "Any day someone typed to an agent"],
+          ["Compared", "Mistake rate before the change and since"],
+          ["Works or Worse", "The whole band on one side of 0"],
           ["A band", "Where the change lies 9 times in 10"],
-          ["−63%", "63% fewer mistakes with the rule"],
-          ["Dashed line on a band", "The 30% cut a rule must reach"],
-          ["Dashed lines on a chart", "Days it was checked"],
-          ["Tasks needed", "To find a halving 4 times in 5"],
-          ["A do-nothing rule passes", "Under 7% of the time"],
+          ["−63%", "63% fewer mistakes since the change"],
+          ["A change that does nothing", "Called Works or Worse about 1 time in 4"],
+          ["A rare mistake", "Under 2 chances a day: a replay tests it"],
           ["A skill missed", "A task needed it and never loaded it"],
           ["Dashed lines on a skill's chart", "A new version first loaded"],
         ]}

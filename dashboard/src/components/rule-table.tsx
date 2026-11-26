@@ -33,7 +33,7 @@ export function rowHandlers(id: string, pinned: string | null, events: RowEvents
   };
 }
 
-/** Every experiment and active rule, one row each, group by group. */
+/** Every rule change under test or judged this week, one row each, group by group. */
 export function RuleTable({
   rows,
   pinned,
@@ -52,12 +52,12 @@ export function RuleTable({
   onFocusOut: () => void;
 }) {
   if (rows.length === 0) {
-    return <p className="rounded-lg border px-3.5 py-6 text-muted-foreground">No experiments or active rules yet.</p>;
+    return <p className="rounded-lg border px-3.5 py-6 text-muted-foreground">No rule changes under test this week.</p>;
   }
   return (
     <div data-table className="overflow-clip rounded-lg border" onPointerLeave={onLeave}>
       <div className={cn(GRID, "h-9 border-b text-muted-foreground text-xs max-sm:hidden")}>
-        <span>Rule</span>
+        <span>Rule change</span>
         <Scale />
         <span className="text-right">Change</span>
       </div>

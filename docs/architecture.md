@@ -2,19 +2,19 @@
 
 How a rule trial goes from session transcripts to a verdict on one page.
 
-![Trial files and a hook give each task a group; counting reads transcripts and the private measures file into one DuckDB file; looks and verdicts read it, append looks, and write the overview page](architecture.svg)
+![Trial files and a hook stamp each task; counting reads transcripts and the private measures file into one DuckDB file; verdicts read it, append verdicts, and write the overview page](architecture.svg)
 
 Everything dashed in the picture is the user's own data and stays under `~/.claude/keep-going/` or `~/.claude/projects/`, never in this repository.
 
 ## Hook
 
-A trial is a file in the agents repo's `home/trials/` (format: that repo's `docs/keep-going.md`; a file with no `started:` date is reported and skipped). Its hook, at each session and subagent start, puts the rule's `On` or `Off` wording in the session's context and writes one line that lands in the transcript as a `hook_additional_context` attachment:
+A trial is a file in the agents repo's `home/trials/` (format: that repo's `docs/keep-going.md`; a file with no `started:` date is reported and skipped). Its hook, at each session and subagent start, puts every trial's `On` wording in the session's context and writes one line that lands in the transcript as a `hook_additional_context` attachment:
 
 ```
-Rule trials: <trial>=on|off ... holdout=yes|no task=<8 hex> rules=<7 hex>
+Rule trials: <trial>=on ... task=<8 hex> rules=<7 hex>
 ```
 
-The group comes from a hash of the trial's name and the task, so a task keeps its group across restarts and two trials split tasks independently. A `settled` trial is on for every task except the holdout tenth.
+The task token keeps a task one unit across restarts. Stamps from before every task got `On` also carry `=off` groups and `holdout=`; nothing reads those now.
 
 ## Counting
 
@@ -29,16 +29,18 @@ The group comes from a hash of the trial's name and the task, so a task keeps it
 
 A continued session copies its parent's entries; each counts once, for the root session. A measures file is SQL that creates a temp table `chances` from the temp tables `texts`, `calls` and `typed`; `sessions.sql` names their columns. It may also create `measure_names(measure, name)`, names the page shows in place of measure ids, `changes(measure, day, what)`, the days a rule for a measure changed, and `skill_measures(measure, skill)`, the measures that count a skill not loaded when needed, under each name the skill has had. A full rebuild takes about 8 s on 2 GB of transcripts.
 
-`looks` and `replays` are never rebuilt: a look is written once, and a replay's row changes only when that replay is rerun.
+`verdicts`, `looks` (the holdout era's, no longer written) and `replays` are never rebuilt: a verdict is written once, and a replay's row changes only when that replay is rerun.
 
-## Looks
+## Verdicts
 
-[`looks.py`](../src/agent_experiments/looks.py) turns chances into tasks per group, then into looks.
+[`verdicts.py`](../src/agent_experiments/verdicts.py) gives each trial one verdict for each of its measures, from its mistake rate before the change against its first days after.
 
-- **Unit.** A task is the stamp's `task=` token, else the root session. A session counts for a trial only when every stamp it and its root got agrees on its group, and only its chances after the first stamp that named the trial, so a trial added mid-task does not claim earlier replies. Sessions nobody typed in, or with no stamp, are left out; the page counts the unstamped.
-- **When.** A trial is looked at when its smaller group reaches 10, 20 and 40 tasks, and a last time 7 days after `started`, whatever its size. A look is due only past every look already taken under that trial name and `started` date, so a restarted trial starts again; none follows `works` or the last look.
-- **Verdict.** An early look says `works` or `no verdict yet`. The last says `works`, `no useful effect` (the 90% range of the drop rules out a 30% drop) or `can't tell`. Fewer than 5 tasks in a group is always `can't tell`.
-- **Settled rules.** Holdout tasks against the rest over the last 28 days, on the model with the most replies in the last 7, so a model that no longer needs a rule shows. It is no longer helping when its range rules out a 30% drop.
+- **Unit.** A task is the stamp's `task=` token, else the root session. Sessions nobody typed in are left out.
+- **When.** On the trial's third day of real use from `started` (`REAL_DAYS`), a day being one someone typed in a session; never later. A settled trial that started before `JUDGED_FROM` had the holdout's verdict and gets none.
+- **Sides.** Before: from the measure's earlier rule change in `changes`, or `BEFORE_DAYS` back if later, to the day before `started`; a `changes` row within `OWN_CHANGE` days before `started` dates the trial's own change and is skipped. After: `started` to the verdict day.
+- **Verdict.** `works` when the 90% range of the change lies wholly below 0, `worse` when wholly above, each only with `MIN_TASKS` on both sides; else `no big effect`.
+- **Rare.** A measure with under `RARE` chances per day of real use before the trial cannot tell in three days, so its wording is replayed (Replays) on day 1. When before and after say `no big effect`, a replay of it from just before `started` on that passes its check and is sure decides instead.
+- **Acted on.** `daily` exits 1 for a trial still `status: testing` once it has its verdict, and for a rare one with no replay. The agents repo's `docs/keep-going.md` says what each verdict asks.
 - **Usual range.** For each measure, the latest day's miss rate against the middle 98% of rates from the same number of tasks drawn from the 28 days before.
 
 ## Replays
@@ -70,20 +72,18 @@ A continued session copies its parent's entries; each counts once, for the root 
 [`stats.py`](../src/agent_experiments/stats.py) uses SciPy for both tests.
 
 - **Why tasks.** Misses clump within a task: one agent that ignores a rule ignores it all session. Counting chances as independent would make every trial look sure. So tasks are shuffled between groups and resampled whole, and the rate is a ratio of sums (all misses over all chances in a group), which weights a task by its chances. Counting misses over chances found a real halving 3 to 5 times as often as counting tasks with any miss.
-- **p.** `scipy.stats.permutation_test` over task indices, one-sided: the rule's group misses less. Real looks use 99,999 shuffles, since the first limit needs steps of p well below 0.0003.
-- **Range.** `scipy.stats.bootstrap`, percentile, 90%: the drop `1 - on/off`, resampling tasks within each group. A resample with no misses without the rule has no drop and is left out.
+- **p.** `scipy.stats.permutation_test` over task indices, one-sided, for replays: the new wording misses less.
+- **Range.** `scipy.stats.bootstrap`, percentile, 90%: the drop `1 - after/before`, resampling tasks within each side. A resample with no misses without the rule has no drop and is left out.
 - **Rate.** A group's miss rate alone, as the overview page gives each side of a before and after, has its 90% range from `scipy.stats.bootstrap` over its tasks, percentile.
 - **Replays.** The same moments answered under the old and the new wording: shuffles swap the two answers within a session, and the bootstrap draws whole sessions.
-- **Limits.** One-sided O'Brien-Fleming-style limits for the three looks: p < 0.0003, 0.0071 and 0.0225. On these sessions they passed a do-nothing rule 3.6% of the time (p < 0.02 at each look: 6%); on made-up tasks, 3.0% in 1,000 runs. `tests/test_stats.py` fails if that rises past 7% in 300.
-- **Power.** For each running trial the page shows the tasks per group (10 to 320, doubling) at which one look at 0.0225 finds a true halving 80% of the time, simulated from that measure's tasks over the last 28 days with the rule's group's misses thinned by half. On the user's sessions up to 11 November 2026 it said 20 for the commonest miss, 40 or 80 for four measures and 160 or 320 for four, while a week brings 5 to 19 tasks per group. So a week often cannot decide, and a trial that can't tell gets a commoner measure or a bolder change, not a longer run.
+- **Do-nothing calls.** On made-up tasks at real sizes (30 to 150 before, 5 to 15 after) a change that does nothing gets `works` 4 to 5% of the time and `worse` 5 to 6%, with `MIN_TASKS` at 8; at 5, `works` passed 7%. `tests/test_stats.py` fails if either passes 7% in 300. On the user's sessions it is worse: made-up change dates from 10 October to 21 November 2026, away from real changes, got `works` 20% and `worse` 7% of the time, since rates drift week to week (two measures gave half the `works`). So about 1 verdict in 4 on a change that does nothing reads as a result; a replay, or a repeat change, is the check on one that matters.
 
 ## Overview page
 
-`daily` writes `report.json`, the facts (its shape: [`report.ts`](../dashboard/src/data/report.ts)), beside it `overview.html`: the dashboard built from `dashboard/` into [`dashboard.html`](../src/agent_experiments/dashboard.html), with the report put in its `<script id="report">` by [`overview.py`](../src/agent_experiments/overview.py). Both are written in full before either replaces the last one, so a failed run leaves yesterday's page. A change there is `with / without - 1` (or `after / before - 1`), the drop's opposite, so below 0 is fewer misses. The page shows the trials and the permanent checks, one row each ([PRODUCT.md](../PRODUCT.md)); below them, the skills (Skills). The report also carries the mistakes, replays and sizes below, which the page does not show.
+`daily` writes `report.json`, the facts (its shape: [`report.ts`](../dashboard/src/data/report.ts)), beside it `overview.html`: the dashboard built from `dashboard/` into [`dashboard.html`](../src/agent_experiments/dashboard.html), with the report put in its `<script id="report">` by [`overview.py`](../src/agent_experiments/overview.py). Both are written in full before either replaces the last one, so a failed run leaves yesterday's page. A change there is `after / before - 1`, the drop's opposite, so below 0 is fewer misses. The page shows the trials still testing, started or judged in the last 7 days, one row each ([PRODUCT.md](../PRODUCT.md)); below them, the skills (Skills). The report also carries the mistakes, replays and sizes below, which the page does not show.
 
-- **Trials.** Per trial and measure: each half's tasks and miss rate, the change with its 90% range, tasks needed (Method), its looks, each half's rate over 3 days since the start, and the 5 sessions with its latest misses (their ids and days, never their text), which the page copies for an agent to read.
-- **Permanent checks.** Each settled rule against its holdout (Looks), over the same tasks: each side's miss rate, and its rate over 7 days for each of the last 28, since the holdout gets about 1 task in 10; tasks needed for a true halving to put the range clear of no change (p < 0.05), as if both sides were the same size; and the 5 sessions with its latest misses. Numbers only the page uses draw from their own random generator, so adding one never moves a look.
-- **Mistakes.** Each measure's latest day against its usual range, its rate over 3 days for 6 weeks with each day a rule for it changed (`changes`) and each testing trial's start, and its misses before and after the latest rule change, or over the last 28 days with no rule. A trial's start is no such boundary: a testing trial gives the rule to half the tasks, and a settled one changes nothing. Before and after is not a test: whatever else changed that day moves it too, which a trial's random halves rule out.
+- **Trials.** Per trial and measure: each side's rate with its 90% range and tasks, over the days its verdict uses, its days of real use so far, its verdict and what decided it, its latest replay, and the 5 sessions with its latest misses since `started` (their ids and days, never their text), which the page copies for an agent to read.
+- **Mistakes.** Each measure's latest day against its usual range, its rate over 3 days for 6 weeks with each day a rule for it changed (`changes`) and each testing trial's start, and its misses before and after the latest rule change, or over the last 28 days with no rule. Trial starts are marked on it; a trial's own before and after are its verdict's (Verdicts).
 - **Replays**, with whether the replay passed its check, and **rule and skill size**: words over time, largest files, and per month and pattern the share of changes deleting no line and of changed lines added.
 
 A trial that fails is left out, and `daily` prints why and exits 1 after writing the page. So does a trial the page can only show by its file name: its measure has no `measure_names` row and its file no `name:`.

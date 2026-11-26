@@ -5,9 +5,9 @@ How and why: docs/architecture.md#skills. Reads the skill_loads, skill_measures 
 
 import numpy as np
 
-from agent_experiments import looks
-from agent_experiments.looks import shift
+from agent_experiments import verdicts
 from agent_experiments.stats import rate_range
+from agent_experiments.verdicts import shift
 
 TIMELINE_DAYS = 42
 SERIES_DAYS = 7  # a skill's moment comes a few times a day at most, so its rate is drawn over a week
@@ -57,7 +57,7 @@ def report(con, names: dict[str, str], day: str, rng: np.random.Generator) -> li
 
 def _row(con, measure: str, skills: list[str], name: str | None, day: str, rng: np.random.Generator) -> dict:
     first = shift(day, 1 - TIMELINE_DAYS)
-    recent = shift(day, 1 - looks.USUAL_DAYS)
+    recent = shift(day, 1 - verdicts.USUAL_DAYS)
     per_version: dict[str, list[tuple[int, int]]] = {}
     for version, _, chances, misses in con.execute(
         VERSION_TASKS, {"measure": measure, "first": first, "last": day}
@@ -89,15 +89,15 @@ def _row(con, measure: str, skills: list[str], name: str | None, day: str, rng: 
     known = [d for d in (committed[0] if committed else None, found[0][2] if found else None) if d]
     born = min(known, default="")
     recent = max(recent, born)
-    counts = looks.by_day(con, measure, max(shift(first, 1 - SERIES_DAYS), born), day)
-    args = {"measure": measure, "first": recent, "last": day, "n": looks.LATEST_MISSES}
+    counts = verdicts.by_day(con, measure, max(shift(first, 1 - SERIES_DAYS), born), day)
+    args = {"measure": measure, "first": recent, "last": day, "n": verdicts.LATEST_MISSES}
     misses = con.execute(MISSES, args).fetchall()
     return {
         "name": name or " / ".join(skills),
         "skills": skills,
-        "now": looks.side(con, measure, recent, day, rng)[0],
+        "now": verdicts.side(con, measure, recent, day, rng)[0],
         "series": [
-            {"day": d, "rate": r if d >= born else None} for d, r in looks.rolling(counts, first, day, SERIES_DAYS)
+            {"day": d, "rate": r if d >= born else None} for d, r in verdicts.rolling(counts, first, day, SERIES_DAYS)
         ],
         "versions": versions,
         "misses": [{"day": d, "session": s} for s, d in misses],

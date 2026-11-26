@@ -8,10 +8,7 @@ import { STATUS_TONE } from "./status-icon";
 
 const at = (change: number) => `${stripPosition(change) * 100}%`;
 
-/** A rule must stay able to cut mistakes by this much (docs/architecture.md#looks). */
-const USEFUL = -0.3;
-
-/** A change and its 90% range on the page's one scale; `large` also marks the cut a rule must reach. */
+/** A change and its 90% range on the page's one scale. */
 export function Band({ change, status, large = false }: { change: Drawn; status: Status; large?: boolean }) {
   const left = stripPosition(change.low);
   const width = stripPosition(change.high) - left;
@@ -19,13 +16,6 @@ export function Band({ change, status, large = false }: { change: Drawn; status:
     <div data-track="change" className={cn("relative", large ? "h-6" : "h-4", STATUS_TONE[status])}>
       <span className="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 bg-border" />
       <span data-zero className="absolute top-0 h-full w-px -translate-x-1/2 bg-ring" style={{ left: at(0) }} />
-      {large && (
-        <span
-          data-useful
-          className="absolute top-0 h-full border-ring border-l border-dashed"
-          style={{ left: at(USEFUL) }}
-        />
-      )}
       <span
         data-range
         className={cn(
@@ -54,7 +44,7 @@ const TICKS = [-1, -0.5, 0, 0.5, 1];
 /** The band column's header is the scale itself, each number over its place on the bands below. */
 export function Scale() {
   return (
-    <div data-axis title="Change in mistakes with the rule" className="relative h-4 font-mono text-xs">
+    <div data-axis title="Change in mistakes since the rule changed" className="relative h-4 font-mono text-xs">
       {TICKS.map((tick, i) => (
         <span
           key={tick}

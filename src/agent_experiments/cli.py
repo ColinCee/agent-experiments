@@ -1,5 +1,5 @@
-"""agent-experiments: `daily` counts, takes the looks due and writes the overview page; `replay` tests a rule's wording
-on past moments; `size` reads rule and skill sizes from git (docs/architecture.md)."""
+"""agent-experiments: `daily` counts, takes the verdicts due and writes the overview page; `replay` tests a rule's
+wording on past moments; `size` reads rule and skill sizes from git (docs/architecture.md)."""
 
 import argparse
 import re
@@ -10,23 +10,21 @@ from pathlib import Path
 
 import numpy as np
 
-from agent_experiments import looks, overview, replay, size, skills
+from agent_experiments import overview, replay, size, skills, verdicts
 from agent_experiments.counting import count
-from agent_experiments.looks import LIMITS, TRIAL_DAYS, shift
-from agent_experiments.stats import Effect, compare, tasks_needed
+from agent_experiments.stats import Effect, compare
+from agent_experiments.verdicts import shift
 
 DATA = Path.home() / ".claude" / "keep-going"
 PROJECTS = Path.home() / ".claude" / "projects"
 TIMELINE_DAYS = 42  # each measure's timeline: long enough to hold a few rule changes and the weeks around them
-# An active rule's holdout gets about 1 task in 10, so its rate is drawn over a week where a trial's halves take 3 days.
-CHECK_DAYS = 7
-CHECK_LIMIT = 0.05  # a one-sided p under this puts the 90% range of a change clear of no change
+WEEK = 7  # the page shows the trials started, or given a verdict, in the last week, and every one still testing
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="agent-experiments", description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
-    daily = sub.add_parser("daily", help="count, take the looks due, and write the overview page")
+    daily = sub.add_parser("daily", help="count, take the verdicts due, and write the overview page")
     daily.add_argument("--day", help="the day to report, YYYY-MM-DD (default: yesterday, UTC)")
     daily.add_argument(
         "--agents-repo", type=Path, help="the repo whose home/trials holds trials, and whose rules are sized"
@@ -78,18 +76,16 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     day = args.day or (datetime.now(UTC).date() - timedelta(days=1)).isoformat()
     errors: list[str] = []
-    trials = looks.read_trials(args.trials or (args.agents_repo or Path.cwd()) / "home" / "trials", errors)
+    trials = verdicts.read_trials(args.trials or (args.agents_repo or Path.cwd()) / "home" / "trials", errors)
     count(args.transcripts, args.measures, args.db)
     if args.agents_repo:
         size.measure(args.agents_repo, size.PATHS, args.db)
-    report, new_looks = build(args.db, trials, day, errors)
-    for lk in new_looks:
-        print(
-            f"{lk.trial} ({lk.measure}), look {lk.look}: {lk.verdict}; drop {lk.drop:.0%} ({lk.low:.0%} to {lk.high:.0%})"
-        )
-    running = sum(t["state"] == "running" for t in report["trials"])
-    s = report["sessions"]
-    print(f"{day}: {running} trial measures running, {s['in_group']} of {s['total']} sessions with a group.")
+    report, new = build(args.db, trials, day, errors)
+    for v in new:
+        change = "no rate to compare" if np.isnan(v.change) else f"change {v.change:+.0%}"
+        print(f"{v.trial} ({v.measure}): {v.verdict} on {v.day}, from {v.source}; {change}")
+    testing = sum(t["verdict"] is None for t in report["trials"])
+    print(f"{day}: {testing} trial measures awaiting a verdict, {report['sessions']['total']} sessions typed in.")
     try:
         print(f"Wrote {overview.write(args.page, report)} and {args.page}")
     except (ValueError, FileNotFoundError) as e:  # no dashboard built, or one with no slot for the report
@@ -112,17 +108,17 @@ def _positive(text: str) -> int:
     return int(text)
 
 
-def build(db: Path, trials: list[looks.Trial], day: str, errors: list[str]) -> tuple[dict, list[looks.Look]]:
-    """Takes the looks due as of `day`, and returns the report the overview page shows (its shape:
-    dashboard/src/data/report.ts) with the looks just taken. A trial that fails is left out and added to
-    `errors`, so the others still show."""
+def build(db: Path, trials: list[verdicts.Trial], day: str, errors: list[str]) -> tuple[dict, list[verdicts.Verdict]]:
+    """Takes the verdicts due as of `day`, and returns the report the overview page shows (its shape:
+    dashboard/src/data/report.ts) with the verdicts just taken. A trial that fails is left out and added to `errors`,
+    so the others still show; so is one past its verdict that is still testing, or a rare one with no replay."""
     rng = np.random.default_rng(1)
-    # Numbers only the page uses draw from their own generator, so adding one never moves a look's p or range.
+    # Numbers only the page uses draw from their own generator, so adding one never moves a verdict's range.
     shown = np.random.default_rng(2)
-    con = looks.open_store(db)
+    con = verdicts.open_store(db)
     names = dict(con.execute("SELECT measure, name FROM measure_names").fetchall())
 
-    def name(trial: looks.Trial, measure: str) -> str:
+    def name(trial: verdicts.Trial, measure: str) -> str:
         # A trial with no name of its own is often named for its one measure.
         found = names.get(measure) or trial.title or names.get(trial.name)
         if not found:
@@ -132,45 +128,44 @@ def build(db: Path, trials: list[looks.Trial], day: str, errors: list[str]) -> t
             )
         return found or trial.name
 
-    rows, permanent, new_looks = [], [], []
-    for trial in trials:
+    rows, new = [], []
+    week = shift(day, 1 - WEEK)
+    for trial in (t for t in trials if t.status == "testing" or t.started >= verdicts.JUDGED_FROM):
         try:
-            if trial.status == "settled":
-                permanent += [
-                    {
-                        "name": name(trial, s["measure"]),
-                        "since": trial.started,
-                        "model": s["model"],
-                        "tasks_with": s["tasks_on"],
-                        "tasks_without": s["tasks_off"],
-                        "change": _change(s["effect"]),
-                        "slipping": s["off_course"],
-                        **_check_detail(con, trial, s["measure"], s["model"], day, shown),
-                    }
-                    for s in looks.settled(con, [trial], day, rng)
-                ]
-            else:
-                for measure in trial.measures:
-                    row, new = _trial_row(con, trial, measure, day, rng)
-                    row["misses"] = looks.latest_misses(con, trial.name, measure, trial.started, day)
+            for measure in trial.measures:
+                stored = con.execute(
+                    "SELECT count(*) FROM verdicts WHERE trial = ? AND started = ? AND measure = ?",
+                    [trial.name, trial.started, measure],
+                ).fetchone()
+                found = verdicts.judge(con, trial, measure, day, rng)
+                new += [found] if found and not (stored and stored[0]) else []
+                row = _trial_row(con, trial, measure, found, day, shown)
+                if trial.status == "testing" or trial.started >= week or (found and found.day >= week):
                     rows.append({"name": name(trial, measure), **row})
-                    new_looks += [new] if new else []
+                if trial.status != "testing":
+                    continue
+                if found:
+                    errors.append(
+                        f"Trial {trial.name}: {found.verdict} on {found.day}, its day {verdicts.REAL_DAYS} of real use,"
+                        f" and still `status: testing`. {ACT[found.verdict]} Then add its line to docs/findings.md."
+                    )
+                elif row["rare"] and row["real_days"] and not row["replay"]:
+                    errors.append(
+                        f"Trial {trial.name}: {measure} has under {verdicts.RARE} chances a day of real use, too few for"
+                        f" {verdicts.REAL_DAYS} days to tell. Run `agent-experiments replay --measure {measure}` with"
+                        " the trial's Off and On as --old and --new before its verdict is due."
+                    )
         except Exception:
             errors.append(f"Trial {trial.name} left off the page:\n{traceback.format_exc()}")
+    rows.sort(key=lambda r: (r["verdict"] is not None, r["started"], r["name"]))
     changes = con.execute(
         """SELECT measure, "day", what, 'rule' FROM changes WHERE "day" <= ? ORDER BY "day\"""", [day]
     ).fetchall()
-    # Trial starts are marked, never a before and after boundary (docs/architecture.md#overview-page).
-    changes += [
-        (m, t.started, t.title or t.name, "trial")
-        for t in trials
-        if t.status != "settled" and t.started <= day
-        for m in t.measures
-    ]
-    mistakes = [_mistake(con, m, names.get(m, m), changes, day, rng) for m in looks.measures(con)]
+    # Trial starts are marked; a before and after boundary is a rule change (docs/architecture.md#overview-page).
+    changes += [(m, t.started, t.title or t.name, "trial") for t in trials if t.started <= day for m in t.measures]
+    mistakes = [_mistake(con, m, names.get(m, m), changes, day, rng) for m in verdicts.measures(con)]
     mistakes.sort(key=lambda r: r["name"])
-    in_group, total = looks.stamped(con, day)
-    first_stamp = con.execute("SELECT min(ts) FROM stamps").fetchone()
+    in_group, total = verdicts.stamped(con, day)
     found = con.execute('SELECT * FROM replays ORDER BY "day" DESC, measure')
     columns = [d[0] for d in found.description]
     replays = [_replay(dict(zip(columns, r, strict=True)), names) for r in found.fetchall()]
@@ -180,23 +175,26 @@ def build(db: Path, trials: list[looks.Trial], day: str, errors: list[str]) -> t
     report = {
         "day": day,
         "written": datetime.now(UTC).isoformat(timespec="seconds"),
-        "sessions": {
-            "total": total,
-            "in_group": in_group,
-            "split_since": first_stamp[0][:10] if first_stamp and first_stamp[0] else None,
-        },
+        "sessions": {"total": total, "stamped": in_group},
         "trials": rows,
-        "permanent": permanent,
         "mistakes": mistakes,
         "replays": replays,
         "sizes": sizes,
         "skills": skill_rows,
     }
-    return report, new_looks
+    return report, new
+
+
+# What each verdict asks of the trial file (docs/keep-going.md in the agents repo).
+ACT = {
+    "works": "Settle it: `status: settled`.",
+    "worse": "Replace the wording with a hook or check, and delete the trial file.",
+    "no big effect": "Keep the line (`status: settled`) or delete the file; either way it is no longer tracked.",
+}
 
 
 def _change(effect: Effect | None) -> dict | None:
-    """An effect as the report's change, with / without - 1, so below 0 is fewer misses; null with no rate to compare
+    """An effect as the report's change, after / before - 1, so below 0 is fewer misses; null with no rate to compare
     against."""
     if effect is None or effect.drop is None or np.isnan(effect.drop):
         return None
@@ -204,23 +202,36 @@ def _change(effect: Effect | None) -> dict | None:
     return {"value": -effect.drop, "low": low, "high": high}
 
 
-def _rate(tasks: np.ndarray) -> float | None:
-    chances = tasks[:, 0].sum()
-    return tasks[:, 1].sum() / chances if chances else None
-
-
-def _check_detail(con, trial: looks.Trial, measure: str, model: str | None, day: str, rng: np.random.Generator):
-    """What an active rule's card adds to its row, over the same tasks as its check (looks.settled): each side's rate
-    and its history, the tasks a side needs to find a true halving, and the sessions behind its latest misses."""
-    first = shift(day, 1 - looks.USUAL_DAYS)
-    g = looks.units(con, trial.name, measure, first, day, model)
-    history = looks.daily_rates(con, trial.name, measure, shift(first, 1 - CHECK_DAYS), day, model, CHECK_DAYS)
+def _trial_row(
+    con, trial: verdicts.Trial, measure: str, found: verdicts.Verdict | None, day: str, rng: np.random.Generator
+) -> dict:
+    """A trial's row for one measure: each side's rate with its range, over the days its verdict uses (to `day` until
+    it has one), the verdict, the replay that can settle a rare measure, and the sessions behind the latest misses."""
+    last, used = verdicts.due(con, trial, day)
+    end = found.day if found else last or day
+    first = verdicts.before_from(con, trial, measure)
+    before = verdicts.side(con, measure, first, shift(trial.started, -1), rng)[0]
+    after = verdicts.side(con, measure, trial.started, end, rng)[0] if day >= trial.started else None
+    replayed = verdicts.latest_replay(con, trial, measure)
     return {
-        "rate_with": _rate(g["on"]),
-        "rate_without": _rate(g["off"]),
-        "needed": tasks_needed(looks.measure_tasks(con, measure, first, day), CHECK_LIMIT, rng),
-        "trend": [point for point in history if point["day"] >= first],
-        "misses": looks.latest_misses(con, trial.name, measure, first, day, model),
+        "started": trial.started,
+        "status": trial.status,
+        "due": found.day if found else last,
+        "real_days": verdicts.REAL_DAYS if found else used,
+        "rare": verdicts.is_rare(con, trial, measure),
+        "before": before,
+        "after": after,
+        "change": None
+        if found is None or np.isnan(found.change)
+        else {
+            "value": found.change,
+            "low": None if np.isnan(found.low) else found.low,
+            "high": None if np.isnan(found.high) else found.high,
+        },
+        "verdict": found.verdict if found else None,
+        "source": found.source if found else None,
+        "replay": _replay(replayed, {}) if replayed else None,
+        "misses": verdicts.latest_misses(con, measure, trial.started, end) if day >= trial.started else [],
     }
 
 
@@ -230,7 +241,7 @@ def _mistake(con, measure: str, name: str, changes: list, day: str, rng: np.rand
     rule yet, its misses over the last USUAL_DAYS (docs/architecture.md#overview-page)."""
     marks = sorted({(d, w, k) for m, d, w, k in changes if m == measure})
     days = [(d, w) for d, w, k in marks if k == "rule"]
-    flag = looks.flag(con, measure, day, rng)
+    flag = verdicts.flag(con, measure, day, rng)
     first = shift(day, 1 - TIMELINE_DAYS)
     today = None
     if flag:
@@ -248,18 +259,18 @@ def _mistake(con, measure: str, name: str, changes: list, day: str, rng: np.rand
         "current": None,
         "series": [
             {"day": d, "rate": r}
-            for d, r in looks.rolling(looks.by_day(con, measure, shift(first, -2), day), first, day)
+            for d, r in verdicts.rolling(verdicts.by_day(con, measure, shift(first, -2), day), first, day)
         ],
         "changes": [{"day": d, "what": w, "kind": k} for d, w, k in marks if d >= first],
     }
     if not days:
-        row["current"] = looks.side(con, measure, shift(day, 1 - looks.USUAL_DAYS), day, rng)[0]
+        row["current"] = verdicts.side(con, measure, shift(day, 1 - verdicts.USUAL_DAYS), day, rng)[0]
         return row
     latest = days[-1][0]
     earlier = [d for d, _ in days if d < latest]
     start = max(earlier[-1] if earlier else "", shift(latest, -TIMELINE_DAYS))
-    row["before"], before = looks.side(con, measure, start, shift(latest, -1), rng)
-    row["after"], after = looks.side(con, measure, latest, day, rng)
+    row["before"], before = verdicts.side(con, measure, start, shift(latest, -1), rng)
+    row["after"], after = verdicts.side(con, measure, latest, day, rng)
     if min(len(before), len(after)) > 1:
         # After against before as one number and its range; p is not used, so few shuffles.
         change = _change(compare(before, after, rng, resamples=99))
@@ -288,44 +299,3 @@ def _replay(r: dict, names: dict[str, str]) -> dict:
         "paired": r["paired"],
         "change": change,
     }
-
-
-def _trial_row(con, trial: looks.Trial, measure: str, day: str, rng: np.random.Generator):
-    """A testing trial's row for one measure, and the look it took if one was due."""
-    off, on, effect, new = looks.look_at(con, trial, measure, day, rng)
-    taken = [
-        looks.Look(*r)
-        for r in con.execute(
-            "SELECT * FROM looks WHERE trial = ? AND started = ? AND measure = ? ORDER BY look",
-            [trial.name, trial.started, measure],
-        ).fetchall()
-    ]
-    recent = looks.measure_tasks(con, measure, shift(day, 1 - looks.USUAL_DAYS), day)
-    trend = looks.daily_rates(con, trial.name, measure, trial.started, day) if day >= trial.started else []
-    final = taken and (taken[-1].verdict == "works" or taken[-1].look == len(looks.LOOK_SIZES))
-    row = {
-        "started": trial.started,
-        # The last look is due on the first day TRIAL_DAYS after the start (looks.due_look).
-        "ends": shift(trial.started, TRIAL_DAYS),
-        "state": "scheduled" if day < trial.started else "finished" if final else "running",
-        "verdict": taken[-1].verdict if taken else None,
-        "tasks_with": len(on),
-        "tasks_without": len(off),
-        "rate_with": _rate(on),
-        "rate_without": _rate(off),
-        "change": _change(effect),
-        "needed": tasks_needed(recent, LIMITS[-1], rng),
-        "per_week": round(len(recent) / looks.USUAL_DAYS * TRIAL_DAYS / 2),
-        "looks": [
-            {
-                "look": lk.look,
-                "day": lk.day,
-                "verdict": lk.verdict,
-                "tasks_with": lk.tasks_on,
-                "tasks_without": lk.tasks_off,
-            }
-            for lk in taken
-        ],
-        "trend": trend,
-    }
-    return row, new

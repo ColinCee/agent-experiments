@@ -1,6 +1,6 @@
 // A made-up report about a fictional team's agents, for the dev server and tests. It covers every state the page shows.
 import { addDays, format, parseISO } from "date-fns";
-import type { Day, Miss, Mistake, MistakeChange, PermanentCheck, Range, RatePoint, Report, Side } from "./report";
+import type { Day, Miss, Mistake, MistakeChange, Range, Replay, Report, Side } from "./report";
 
 const DAY = "2026-11-12";
 const SERIES_DAYS = 42;
@@ -207,37 +207,33 @@ const mistakes: Mistake[] = [
 ].sort((a, b) => a.name.localeCompare(b.name));
 
 /** The latest misses, a day apart back from `last`, under made-up session ids. */
-const misses = (last: Day, sides: Miss["side"][], seed: number): Miss[] =>
-  sides.map((side, i) => ({
+const misses = (last: Day, count: number, seed: number): Miss[] =>
+  Array.from({ length: count }, (_, i) => ({
     day: shift(last, -i),
-    side,
     session: `00000000-0000-4000-8000-${String(seed * 100 + i).padStart(12, "0")}`,
   }));
 
-const CHECK_DAYS = 28;
+/** A side of a change: its rate and range over `tasks` tasks from `from`. */
+const rate = (r: number, low: number, high: number, tasks: number, from: Day): Side => ({
+  rate: r,
+  low,
+  high,
+  tasks,
+  from,
+});
 
-/** An active rule's rates over its last 28 days: the side without it is 1 task in 10, so it has gaps and swings. */
-function checkTrend(rateWith: number, rateWithout: number, seed: number): RatePoint[] {
-  const next = random(seed);
-  return Array.from({ length: CHECK_DAYS }, (_, i) => ({
-    day: shift(DAY, i + 1 - CHECK_DAYS),
-    with: round(rateWith * (0.8 + next() * 0.4)),
-    without: i < 3 || next() < 0.15 ? null : round(Math.min(1, rateWithout * (0.5 + next()))),
-  }));
-}
-
-const detail = (
-  rateWith: number | null,
-  rateWithout: number | null,
-  needed: number | null,
-  seed: number,
-  sides: Miss["side"][],
-): Pick<PermanentCheck, "rate_with" | "rate_without" | "needed" | "trend" | "misses"> => ({
-  rate_with: rateWith,
-  rate_without: rateWithout,
-  needed,
-  trend: rateWith === null || rateWithout === null ? [] : checkTrend(rateWith, rateWithout, seed),
-  misses: misses(DAY, sides, seed),
+const replayOf = (name: string, day: Day, trusted: boolean, change: Range | null): Replay => ({
+  name,
+  day,
+  verdict: change === null ? "can't tell" : "works",
+  trusted,
+  real_rate: 0.3,
+  replay_rate: trusted ? 0.28 : 0.1,
+  rate_old: 0.3,
+  rate_new: 0.12,
+  moments: 40,
+  paired: 36,
+  change,
 });
 
 const sizePoints = (first: number, last: number) =>
@@ -253,177 +249,97 @@ const skillWords = sizePoints(0, 12600);
 export const fixture: Report = {
   day: DAY,
   written: "2026-11-13T06:00:00Z",
-  sessions: { total: 48, in_group: 24, split_since: "2026-10-01" },
+  sessions: { total: 48, stamped: 48 },
   trials: [
     {
       name: "Screenshots sent without a link",
       started: shift(DAY, 1),
-      ends: shift(DAY, 8),
-      state: "scheduled",
-      verdict: null,
-      tasks_with: 0,
-      tasks_without: 0,
-      rate_with: null,
-      rate_without: null,
+      status: "testing",
+      due: null,
+      real_days: 0,
+      rare: false,
+      before: rate(0.21, 0.16, 0.27, 160, shift(DAY, -41)),
+      after: null,
       change: null,
-      needed: 140,
-      per_week: 60,
-      looks: [],
-      trend: [],
+      verdict: null,
+      source: null,
+      replay: null,
       misses: [],
     },
     {
       name: "Config read from memory",
-      started: shift(DAY, -3),
-      ends: shift(DAY, 4),
-      state: "running",
-      verdict: "no verdict yet",
-      tasks_with: 34,
-      tasks_without: 31,
-      rate_with: 0.088,
-      rate_without: 0.194,
-      change: { value: -0.546, low: -0.85, high: 0.3 },
-      needed: 120,
-      per_week: 55,
-      looks: [{ look: 1, day: DAY, verdict: "no verdict yet", tasks_with: 34, tasks_without: 31 }],
-      trend: [
-        { day: shift(DAY, -3), with: null, without: 0.2 },
-        { day: shift(DAY, -2), with: 0.11, without: 0.21 },
-        { day: shift(DAY, -1), with: 0.09, without: 0.18 },
-        { day: DAY, with: 0.088, without: 0.194 },
-      ],
-      misses: misses(DAY, ["without", "with", "without"], 1),
+      started: shift(DAY, -1),
+      status: "testing",
+      due: null,
+      real_days: 2,
+      rare: false,
+      before: rate(0.19, 0.14, 0.25, 140, shift(DAY, -42)),
+      after: rate(0.09, 0.03, 0.16, 11, shift(DAY, -1)),
+      change: null,
+      verdict: null,
+      source: null,
+      replay: null,
+      misses: misses(DAY, 3, 1),
     },
     {
       name: "Tests skipped before a commit",
-      started: "2026-11-01",
-      ends: "2026-11-08",
-      state: "finished",
-      verdict: "works",
-      tasks_with: 70,
-      tasks_without: 66,
-      rate_with: 0.1,
-      rate_without: 0.25,
+      started: shift(DAY, -4),
+      status: "testing",
+      due: shift(DAY, -2),
+      real_days: 3,
+      rare: false,
+      before: rate(0.25, 0.2, 0.31, 120, shift(DAY, -46)),
+      after: rate(0.1, 0.05, 0.16, 18, shift(DAY, -4)),
       change: { value: -0.6, low: -0.78, high: -0.33 },
-      needed: 90,
-      per_week: 65,
-      looks: [
-        { look: 1, day: "2026-11-04", verdict: "no verdict yet", tasks_with: 31, tasks_without: 29 },
-        { look: 2, day: "2026-11-06", verdict: "works", tasks_with: 70, tasks_without: 66 },
-      ],
-      trend: Array.from({ length: 6 }, (_, i) => ({
-        day: shift("2026-11-01", i),
-        with: i === 0 ? null : round(0.13 - i * 0.005),
-        without: round(0.23 + (i % 2) * 0.03),
-      })),
-      misses: misses("2026-11-06", ["with", "without", "without", "with", "without"], 2),
+      verdict: "works",
+      source: "before and after",
+      replay: null,
+      misses: misses(shift(DAY, -2), 5, 2),
     },
     {
       name: "Commit messages with no reason",
-      started: "2026-10-17",
-      ends: "2026-10-24",
-      state: "finished",
-      verdict: "can't tell",
-      tasks_with: 9,
-      tasks_without: 11,
-      rate_with: 0.22,
-      rate_without: 0.27,
-      change: { value: -0.19, low: -0.48, high: 0.3 },
-      needed: 160,
-      per_week: 10,
-      looks: [{ look: 4, day: "2026-10-24", verdict: "can't tell", tasks_with: 9, tasks_without: 11 }],
-      trend: Array.from({ length: 7 }, (_, i) => ({
-        day: shift("2026-10-17", i),
-        with: round(0.25 - i * 0.005),
-        without: round(0.26 + (i % 2) * 0.02),
-      })),
-      misses: misses("2026-10-23", ["with", "without"], 3),
+      started: shift(DAY, -5),
+      status: "settled",
+      due: shift(DAY, -3),
+      real_days: 3,
+      rare: true,
+      before: rate(0.27, 0.15, 0.4, 30, shift(DAY, -47)),
+      after: rate(0.22, 0, 0.6, 4, shift(DAY, -5)),
+      change: { value: -0.19, low: -1, high: 1.2 },
+      verdict: "no big effect",
+      source: "before and after",
+      replay: replayOf("Commit messages with no reason", shift(DAY, -6), false, null),
+      misses: misses(shift(DAY, -3), 2, 3),
     },
     {
       name: "Ports taken without checking",
-      started: "2026-10-26",
-      ends: "2026-11-02",
-      state: "finished",
-      verdict: "no useful effect",
-      tasks_with: 44,
-      tasks_without: 40,
-      rate_with: 0.14,
-      rate_without: 0.06,
+      started: shift(DAY, -6),
+      status: "testing",
+      due: shift(DAY, -4),
+      real_days: 3,
+      rare: false,
+      before: rate(0.06, 0.04, 0.08, 110, shift(DAY, -48)),
+      after: rate(0.14, 0.08, 0.2, 21, shift(DAY, -6)),
       change: { value: 1.33, low: 0.2, high: 3.1 },
-      needed: 40,
-      per_week: 42,
-      looks: [
-        { look: 1, day: "2026-10-28", verdict: "no verdict yet", tasks_with: 12, tasks_without: 11 },
-        { look: 3, day: "2026-11-01", verdict: "no useful effect", tasks_with: 44, tasks_without: 40 },
-      ],
-      trend: Array.from({ length: 7 }, (_, i) => ({
-        day: shift("2026-10-26", i),
-        with: round(0.09 + i * 0.008),
-        without: round(0.07 - (i % 2) * 0.01),
-      })),
-      misses: misses("2026-11-01", ["with", "with", "without"], 4),
+      verdict: "worse",
+      source: "before and after",
+      replay: null,
+      misses: misses(shift(DAY, -4), 3, 4),
     },
-  ],
-  permanent: [
     {
       name: "Replies with no summary line",
-      since: "2026-10-30",
-      model: "model-a",
-      tasks_with: 140,
-      tasks_without: 15,
+      started: shift(DAY, -3),
+      status: "settled",
+      due: shift(DAY, -1),
+      real_days: 3,
+      rare: true,
+      before: rate(0.24, 0.12, 0.38, 25, shift(DAY, -45)),
+      after: rate(0.25, 0, 0.5, 3, shift(DAY, -3)),
       change: { value: -0.55, low: -0.8, high: -0.1 },
-      slipping: false,
-      ...detail(0.11, 0.24, 30, 5, ["with", "without", "with"]),
-    },
-    {
-      name: "Branch pushed without a pull request",
-      since: DAY,
-      model: "model-a",
-      tasks_with: 3,
-      tasks_without: 0,
-      change: null,
-      slipping: false,
-      ...detail(null, null, 60, 6, []),
-    },
-    {
-      name: "Questions asked that the notes answer",
-      since: "2026-11-05",
-      model: "model-a",
-      tasks_with: 40,
-      tasks_without: 3,
-      change: { value: -0.3, low: -0.9, high: 0.8 },
-      slipping: false,
-      ...detail(0.12, 0.17, 120, 7, ["without", "with"]),
-    },
-    {
-      name: "Long logs pasted into a reply",
-      since: "2026-10-30",
-      model: "model-a",
-      tasks_with: 150,
-      tasks_without: 16,
-      change: { value: -0.4, low: -0.7, high: 0.15 },
-      slipping: false,
-      ...detail(0.15, 0.25, 40, 8, ["with", "with", "without", "with", "with"]),
-    },
-    {
-      name: "Old branches left open",
-      since: "2026-10-30",
-      model: "model-a",
-      tasks_with: 90,
-      tasks_without: 11,
-      change: null,
-      slipping: false,
-      ...detail(0.2, 0, 90, 9, ["with"]),
-    },
-    {
-      name: "Drafts saved in the wrong folder",
-      since: "2026-09-20",
-      model: "model-a",
-      tasks_with: 300,
-      tasks_without: 33,
-      change: { value: 0.05, low: -0.2, high: 0.4 },
-      slipping: true,
-      ...detail(0.3, 0.29, 50, 10, ["without", "with", "with", "with"]),
+      verdict: "works",
+      source: "replay",
+      replay: replayOf("Replies with no summary line", shift(DAY, -2), true, { value: -0.55, low: -0.8, high: -0.1 }),
+      misses: misses(shift(DAY, -1), 1, 5),
     },
   ],
   mistakes,
@@ -571,13 +487,12 @@ export const fixture: Report = {
 
 const noData = series(0, 0, null, 0).map(({ day }) => ({ day, rate: null }));
 
-/** A report with nothing in it yet: no trials, permanent rules or replays, and mistakes without any data. */
+/** A report with nothing in it yet: no rule changes or replays, and mistakes without any data. */
 export const emptyReport: Report = {
   day: DAY,
   written: "2026-11-13T06:00:00Z",
-  sessions: { total: 0, in_group: 0, split_since: null },
+  sessions: { total: 0, stamped: 0 },
   trials: [],
-  permanent: [],
   mistakes: [
     {
       name: "Replies with no summary line",
