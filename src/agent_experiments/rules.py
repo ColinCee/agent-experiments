@@ -103,9 +103,10 @@ def report(
     """One row per rule line, trial `## On` line and skill: the names of the measures that count its mistake (none is
     not measured), and how often it was used over the last TRIM_DAYS days, or since it was written, with the days
     counted; null where nothing counts it. A rule line's use is its chances to be broken, a skill's its loads. A rule
-    line is measured by the skills it names, a trial by its own measures. A count that fails is added to `errors` and
+    line is measured by the skills it names and by each measure whose phrase it holds, a trial by its own measures. A count that fails is added to `errors` and
     its uses left null, so the page is still written."""
     by_skill = con.execute("SELECT skill, measure FROM skill_measures ORDER BY skill, measure").fetchall()
+    by_phrase = con.execute("SELECT phrase, measure FROM rule_measures ORDER BY measure").fetchall()
     first = shift(day, 1 - TRIM_DAYS)
     counted, days = chances(rule_use, first, day)
     try:
@@ -127,7 +128,7 @@ def report(
                 "kind": "rule",
                 "file": file,
                 "text": text,
-                "measures": measured([m for sk, m in by_skill if sk in named]),
+                "measures": measured([m for sk, m in by_skill if sk in named] + [m for p, m in by_phrase if p in text]),
                 "used": sum(d >= since[0] for d in counted.get(k, [])) if since else None,
                 "window": {"from": since[0], "days": len(since)} if since else None,
             }

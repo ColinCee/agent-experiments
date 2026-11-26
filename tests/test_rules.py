@@ -41,13 +41,14 @@ def test_each_rule_line_trial_line_and_skill_is_a_row_with_its_measures_and_use(
     use = rule_use(tmp_path, {"2026-01-02": [LINES[0], LINES[1]], "2026-01-03": [LINES[0]]})
     con = duckdb.connect()
     con.execute("CREATE TABLE skill_measures AS SELECT * FROM (VALUES ('ship-skill', 'shipping')) t(measure, skill)")
+    con.execute("CREATE TABLE rule_measures AS SELECT * FROM (VALUES ('leak', 'print a secret')) t(measure, phrase)")
     trial = Trial("t", "testing", ("bad-word",), "2026-01-02", wording="Say less.\nSay it once.")
 
     rows = rules.report(
         con,
         repo,
         [trial],
-        {"ship-skill": "Shipped without the skill"},
+        {"ship-skill": "Shipped without the skill", "leak": "Secrets printed"},
         "2026-01-03",
         use,
         [],
@@ -58,7 +59,7 @@ def test_each_rule_line_trial_line_and_skill_is_a_row_with_its_measures_and_use(
     window = {"from": "2026-01-02", "days": 2}
     assert found == {
         ("rule", LINES[0]): (["Shipped without the skill"], 2, window),
-        ("rule", LINES[1]): ([], 1, window),
+        ("rule", LINES[1]): (["Secrets printed"], 1, window),
         ("rule", LINES[2]): ([], 0, window),
         ("trial", "Say less."): (["bad-word"], None, None),
         ("trial", "Say it once."): (["bad-word"], None, None),
@@ -72,6 +73,7 @@ def test_a_line_written_after_the_count_began_counts_only_from_then(tmp_path: Pa
     use = rule_use(tmp_path, {"2026-01-02": [LINES[0]], "2026-01-03": [LINES[0]], "2026-01-04": []})
     con = duckdb.connect()
     con.execute("CREATE TABLE skill_measures (measure VARCHAR, skill VARCHAR)")
+    con.execute("CREATE TABLE rule_measures (measure VARCHAR, phrase VARCHAR)")
 
     rows = rules.report(con, repo, [], {}, "2026-01-04", use, [], lambda _: {})
 
@@ -98,6 +100,7 @@ def test_a_failing_count_is_reported_and_leaves_its_uses_out(tmp_path: Path):
     repo = repo_with_rules(tmp_path, "2026-01-01")
     con = duckdb.connect()
     con.execute("CREATE TABLE skill_measures (measure VARCHAR, skill VARCHAR)")
+    con.execute("CREATE TABLE rule_measures (measure VARCHAR, phrase VARCHAR)")
     errors: list[str] = []
 
     def broken(_: Path) -> dict[str, int]:
