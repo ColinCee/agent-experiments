@@ -8,11 +8,12 @@ export interface TipRow {
 }
 
 /** The hover box of every chart: what the point is (a date, a day of the trial) and its values. */
-export function ChartTip({ title, rows }: { title: string; rows: TipRow[] }) {
+export function ChartTip({ title, rows, note }: { title: string; rows: TipRow[]; note?: string }) {
   if (rows.length === 0) return null;
   return (
     <div className="grid min-w-32 gap-1 rounded-md border bg-popover px-2.5 py-1.5 text-xs text-popover-foreground">
       <div className="font-medium">{title}</div>
+      {note && <p className="max-w-64 text-muted-foreground">{note}</p>}
       {rows.map((row) => (
         <div key={row.name} className="flex items-center gap-2">
           {row.swatch && <span className={cn("size-2 rounded-full", row.swatch)} />}

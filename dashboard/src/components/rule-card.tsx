@@ -7,14 +7,11 @@ import { dayLabel, number, percent, signedPercent } from "@/lib/format";
 import { handText } from "@/lib/hand";
 import { rowHref } from "@/lib/hash";
 import type { Drawn, Row } from "@/lib/rows";
-import { STATUS_WORDS, type Status } from "@/lib/status";
+import { REAL_DAYS, STATUS_WORDS, type Status } from "@/lib/status";
 import { cn } from "@/lib/utils";
 import { Band } from "./band";
 import { CopyButton } from "./copy-button";
 import { STATUS_TONE } from "./status-icon";
-
-/** Days of real use a change gets before its verdict (docs/architecture.md#verdicts). */
-const REAL_DAYS = 3;
 
 export function Section({ id, title, children }: { id: string; title: string; children: ReactNode }) {
   return (
@@ -131,7 +128,7 @@ function Change({ change, status }: { change: Drawn; status: Status }) {
       <p data-estimate className="mb-1 font-medium font-mono text-base min-[1100px]:hidden">
         {signedPercent(change.value)}
       </p>
-      <Band change={change} status={status} large />
+      <Band change={change} status={status} />
       <div className="relative mt-1 h-4 font-mono text-muted-foreground text-xs">
         {end(low, "low", signedPercent(change.low))}
         {end(high, "high", isClipped(change) ? `${signedPercent(change.high)} ›` : signedPercent(change.high))}
@@ -146,7 +143,7 @@ function Basis({ trial, day }: { trial: Trial; day: Day }) {
     ["Days of real use", `${trial.real_days} of ${REAL_DAYS}`],
     [
       trial.verdict ? "Judged on" : "Verdict due",
-      trial.due ? dayLabel(trial.due, day) : `after ${REAL_DAYS - trial.real_days} more`,
+      trial.verdict ? dayLabel(trial.due, day) : `${dayLabel(trial.due, day)}, if each day has use`,
     ],
     ["Tasks before", trial.before ? number(trial.before.tasks) : "None"],
     ["Tasks since", trial.after ? number(trial.after.tasks) : "None"],
@@ -185,6 +182,7 @@ export function RuleCard({ row, day }: { row: Row; day: Day }) {
       </a>
       <section data-section="verdict">
         <h2 className="text-balance font-semibold text-[0.9375rem]">{row.name}</h2>
+        {trial.what && <p className="text-muted-foreground text-xs">{trial.name}</p>}
         <p data-verdict className={cn("mt-0.5 font-medium", STATUS_TONE[row.status])}>
           {STATUS_WORDS[row.status]}
         </p>
@@ -235,8 +233,7 @@ export function PageFacts({ report }: { report: Report }) {
           ["−63%", "63% fewer mistakes since the change"],
           ["A change that does nothing", "Called Works or Worse about 1 time in 4"],
           ["A rare mistake", "Under 2 chances a day: a replay tests it"],
-          ["A skill missed", "A task needed it and never loaded it"],
-          ["Dashed lines on a skill's chart", "A new version first loaded"],
+          ["A needless stop", "An agent stopped and had to be nudged on, as a labeller model judged"],
         ]}
       />
     </div>

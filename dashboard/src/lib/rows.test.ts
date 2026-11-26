@@ -6,10 +6,10 @@ import { pageRows } from "./rows";
 
 const report = (over: Partial<Report>): Report => ({ ...emptyReport, ...over });
 
-test("a row with no verdict carries no change, so a change under test never shows a lead", () => {
-  const [row] = pageRows(report({ trials: [trial({ verdict: null })] }));
-  expect(row.status).toBe("due");
-  expect(row.change).toBeNull();
+test("a row with no verdict carries no change, and is named for the change when its words are known", () => {
+  const [row] = pageRows(report({ trials: [trial({ verdict: null, what: "A hook asks first" })] }));
+  expect([row.status, row.change, row.name]).toEqual(["due", null, "A hook asks first"]);
+  expect(pageRows(report({ trials: [trial({ what: null })] }))[0].name).toBe("A change");
 });
 
 test("changes under test come first, earliest started first, then verdicts, latest first", () => {
@@ -17,18 +17,13 @@ test("changes under test come first, earliest started first, then verdicts, late
     report({
       trials: [
         trial({ name: "Older verdict", due: "2026-11-03" }),
-        trial({ name: "Later", verdict: null, due: null, started: "2026-11-05" }),
+        trial({ name: "Later", verdict: null, started: "2026-11-05" }),
         trial({ name: "Newer verdict", due: "2026-11-04" }),
-        trial({ name: "Sooner", verdict: null, due: null, started: "2026-11-04" }),
+        trial({ name: "Sooner", verdict: null, started: "2026-11-04" }),
       ],
     }),
   );
-  expect(rows.map((row) => `${row.group}:${row.name}`)).toEqual([
-    "due:Sooner",
-    "due:Later",
-    "judged:Newer verdict",
-    "judged:Older verdict",
-  ]);
+  expect(rows.map((row) => row.name)).toEqual(["Sooner", "Later", "Newer verdict", "Older verdict"]);
 });
 
 test("every row of the fixture has its own id, and a repeated name gets a number", () => {

@@ -3,6 +3,7 @@ import type { Trial } from "@/data/report";
 
 export const trial = (over: Partial<Trial>): Trial => ({
   name: "A change",
+  what: null,
   started: "2026-11-01",
   status: "testing",
   due: "2026-11-03",

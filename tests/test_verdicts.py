@@ -85,6 +85,19 @@ def test_the_before_side_starts_at_the_earlier_rule_change_but_not_the_trials_ow
     assert verdicts.before_from(con, TRIAL, "x") == verdicts.shift(TRIAL.started, -verdicts.BEFORE_DAYS)
 
 
+def test_a_rule_change_with_no_trial_file_is_judged_too_and_a_trials_own_change_names_it(tmp_path):
+    con = store(tmp_path)
+    con.execute(
+        "INSERT INTO changes VALUES ('x', '2026-11-18', 'its own'), ('y', '2026-11-24', 'a hook'),"
+        " ('y', '2026-11-02', 'before the method')"
+    )
+    trial = Trial("t", "testing", ("x",), "2026-11-19")
+
+    filed, bare = verdicts.with_changes(con, [trial])
+    assert (filed.name, filed.what, filed.filed) == ("t", "its own", True)
+    assert (bare.measures, bare.started, bare.what, bare.filed) == (("y",), "2026-11-24", "a hook", False)
+
+
 def test_a_rare_measure_is_settled_by_a_trusted_replay(tmp_path):
     con = store(tmp_path)
     days(con, "2026-01-01", 9, 1, [])  # days of real use with no chance

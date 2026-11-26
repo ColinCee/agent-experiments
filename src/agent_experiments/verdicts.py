@@ -6,7 +6,7 @@ How and why: docs/architecture.md#verdicts. Reads and writes the experiments fil
 
 import math
 import re
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from datetime import date, timedelta
 from pathlib import Path
 
@@ -54,6 +54,8 @@ class Trial:
     measures: tuple[str, ...]
     started: str
     title: str = ""  # the page's name for it; the file name is what stamps use
+    what: str = ""  # the change, in plain words: its `changes` row
+    filed: bool = True  # a trial file in the agents repo, which `daily` asks to update; else a bare `changes` row
 
 
 @dataclass(frozen=True)
@@ -119,6 +121,24 @@ def due(con, trial: Trial, day: str) -> tuple[str | None, int]:
     real use it has had by `day`, at most three."""
     used = real_days(con, trial.started, day)[:REAL_DAYS]
     return (used[-1] if len(used) == REAL_DAYS else None), len(used)
+
+
+def own(trial: Trial, measure: str, day: str) -> bool:
+    """A `changes` row on `day` dates this trial's own change."""
+    return measure in trial.measures and shift(trial.started, -OWN_CHANGE) <= day <= trial.started
+
+
+def with_changes(con, trials: list[Trial]) -> list[Trial]:
+    """The trial files, each with its change in plain words, and every other rule change from JUDGED_FROM as a trial
+    of its own, so each rule change gets one verdict (docs/architecture.md#verdicts)."""
+    found = con.execute('SELECT measure, "day", what FROM changes ORDER BY "day", measure').fetchall()
+    filed = [replace(t, what=next((w for m, d, w in found if own(t, m, d)), "")) for t in trials]
+    bare = [
+        Trial(measure, "testing", (measure,), day, what=what, filed=False)
+        for measure, day, what in found
+        if day >= JUDGED_FROM and not any(own(t, measure, day) for t in trials)
+    ]
+    return filed + bare
 
 
 def before_from(con, trial: Trial, measure: str) -> str:

@@ -10,7 +10,7 @@ from pathlib import Path
 
 import numpy as np
 
-from agent_experiments import overview, replay, size, skills, verdicts
+from agent_experiments import overview, replay, size, stops, verdicts
 from agent_experiments.counting import count
 from agent_experiments.stats import Effect, compare
 from agent_experiments.verdicts import shift
@@ -33,6 +33,8 @@ def main(argv: list[str] | None = None) -> int:
     daily.add_argument("--measures", type=Path, default=DATA / "measures" / "measures.sql")
     daily.add_argument("--transcripts", default=str(PROJECTS / "*" / "*.jsonl"))
     daily.add_argument("--db", type=Path, default=DATA / "experiments.duckdb")
+    daily.add_argument("--labels", type=Path, default=DATA / "labels", help="the labeller's labelled stops, *.jsonl")
+    daily.add_argument("--versions", type=Path, default=DATA / "versions.csv", help="the stop rules' versions")
     daily.add_argument("--page", type=Path, default=DATA / "overview.html", help="report.json is written beside it")
     rp = sub.add_parser("replay", help="answer past moments again under old and new rules, and compare their misses")
     rp.add_argument(
@@ -81,6 +83,7 @@ def main(argv: list[str] | None = None) -> int:
     if args.agents_repo:
         size.measure(args.agents_repo, size.PATHS, args.db)
     report, new = build(args.db, trials, day, errors)
+    report["stops"] = stops.by_version(args.labels, args.versions)
     for v in new:
         change = "no rate to compare" if np.isnan(v.change) else f"change {v.change:+.0%}"
         print(f"{v.trial} ({v.measure}): {v.verdict} on {v.day}, from {v.source}; {change}")
@@ -116,6 +119,7 @@ def build(db: Path, trials: list[verdicts.Trial], day: str, errors: list[str]) -
     # Numbers only the page uses draw from their own generator, so adding one never moves a verdict's range.
     shown = np.random.default_rng(2)
     con = verdicts.open_store(db)
+    trials = verdicts.with_changes(con, trials)
     names = dict(con.execute("SELECT measure, name FROM measure_names").fetchall())
 
     def name(trial: verdicts.Trial, measure: str) -> str:
@@ -140,9 +144,9 @@ def build(db: Path, trials: list[verdicts.Trial], day: str, errors: list[str]) -
                 found = verdicts.judge(con, trial, measure, day, rng)
                 new += [found] if found and not (stored and stored[0]) else []
                 row = _trial_row(con, trial, measure, found, day, shown)
-                if trial.status == "testing" or trial.started >= week or (found and found.day >= week):
+                if row["status"] == "testing" or trial.started >= week or (found and found.day >= week):
                     rows.append({"name": name(trial, measure), **row})
-                if trial.status != "testing":
+                if not trial.filed or trial.status != "testing":
                     continue
                 if found:
                     errors.append(
@@ -164,7 +168,9 @@ def build(db: Path, trials: list[verdicts.Trial], day: str, errors: list[str]) -
         """SELECT measure, "day", what, 'rule' FROM changes WHERE "day" <= ? ORDER BY "day\"""", [day]
     ).fetchall()
     # Trial starts are marked; a before and after boundary is a rule change (docs/architecture.md#overview-page).
-    changes += [(m, t.started, t.title or t.name, "trial") for t in trials if t.started <= day for m in t.measures]
+    changes += [
+        (m, t.started, t.title or t.name, "trial") for t in trials if t.filed and t.started <= day for m in t.measures
+    ]
     mistakes = [_mistake(con, m, names.get(m, m), changes, day, rng) for m in verdicts.measures(con)]
     mistakes.sort(key=lambda r: r["name"])
     in_group, total = verdicts.stamped(con, day)
@@ -172,7 +178,6 @@ def build(db: Path, trials: list[verdicts.Trial], day: str, errors: list[str]) -
     columns = [d[0] for d in found.description]
     replays = [_replay(dict(zip(columns, r, strict=True)), names) for r in found.fetchall()]
     sizes = size.report(con)
-    skill_rows = skills.report(con, names, day, shown)
     con.close()
     report = {
         "day": day,
@@ -182,7 +187,6 @@ def build(db: Path, trials: list[verdicts.Trial], day: str, errors: list[str]) -
         "mistakes": mistakes,
         "replays": replays,
         "sizes": sizes,
-        "skills": skill_rows,
     }
     return report, new
 
@@ -211,14 +215,17 @@ def _trial_row(
     it has one), the verdict, the replay that can settle a rare measure, and the sessions behind the latest misses."""
     last, used = verdicts.due(con, trial, day)
     end = found.day if found else last or day
+    # Until it is reached, the verdict's day if every day from here has real use.
+    expected = shift(max(trial.started, shift(day, 1)), verdicts.REAL_DAYS - used - 1)
     first = verdicts.before_from(con, trial, measure)
     before = verdicts.side(con, measure, first, shift(trial.started, -1), rng)[0]
     after = verdicts.side(con, measure, trial.started, end, rng)[0] if day >= trial.started else None
     replayed = verdicts.latest_replay(con, trial, measure)
     return {
+        "what": trial.what or None,
         "started": trial.started,
-        "status": trial.status,
-        "due": found.day if found else last,
+        "status": trial.status if trial.filed else "settled" if found else "testing",
+        "due": found.day if found else last or expected,
         "real_days": verdicts.REAL_DAYS if found else used,
         "rare": verdicts.is_rare(con, trial, measure),
         "before": before,

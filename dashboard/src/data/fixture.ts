@@ -253,9 +253,10 @@ export const fixture: Report = {
   trials: [
     {
       name: "Screenshots sent without a link",
+      what: "A hook asks for the link before a screenshot is sent",
       started: shift(DAY, 1),
       status: "testing",
-      due: null,
+      due: shift(DAY, 3),
       real_days: 0,
       rare: false,
       before: rate(0.21, 0.16, 0.27, 160, shift(DAY, -41)),
@@ -268,9 +269,10 @@ export const fixture: Report = {
     },
     {
       name: "Config read from memory",
+      what: "Read ports, paths and config live",
       started: shift(DAY, -1),
       status: "testing",
-      due: null,
+      due: shift(DAY, 1),
       real_days: 2,
       rare: false,
       before: rate(0.19, 0.14, 0.25, 140, shift(DAY, -42)),
@@ -283,6 +285,7 @@ export const fixture: Report = {
     },
     {
       name: "Tests skipped before a commit",
+      what: "Run the tests before each commit",
       started: shift(DAY, -4),
       status: "testing",
       due: shift(DAY, -2),
@@ -298,6 +301,7 @@ export const fixture: Report = {
     },
     {
       name: "Commit messages with no reason",
+      what: null,
       started: shift(DAY, -5),
       status: "settled",
       due: shift(DAY, -3),
@@ -313,6 +317,7 @@ export const fixture: Report = {
     },
     {
       name: "Ports taken without checking",
+      what: "Check what is in use before taking a port",
       started: shift(DAY, -6),
       status: "testing",
       due: shift(DAY, -4),
@@ -328,6 +333,7 @@ export const fixture: Report = {
     },
     {
       name: "Replies with no summary line",
+      what: "End each reply with a one-line summary",
       started: shift(DAY, -3),
       status: "settled",
       due: shift(DAY, -1),
@@ -423,64 +429,17 @@ export const fixture: Report = {
       { month: "2026-11", label: "Skills", changes: 8, only_added: 0.75, added_share: 0.8 },
     ],
   },
-  skills: [
+  stops: [
+    { version: "v0", from: "2026-09-01", what: "No rule on when to stop", stops: 640, rate: 0.3 },
+    { version: "v1", from: "2026-09-20", what: "Act without asking unless it is destructive", stops: 380, rate: 0.19 },
+    { version: "v2", from: "2026-10-05", what: "Stop only for a decision only he can make", stops: 300, rate: 0.16 },
+    { version: "v3", from: "2026-10-20", what: "A reminder before each stop", stops: 41, rate: null },
     {
-      name: "Releases cut without the release skill",
-      skills: ["release-checklist"],
-      now: side(0.12, 0.05, 0.22, 40, shift(DAY, -27)),
-      series: series(0.45, 0.1, "2026-10-20", 21, ["2026-10-20", "2026-11-10"]),
-      versions: [
-        {
-          version: "c41d9e2",
-          skill: "release-checklist",
-          since: "2026-11-10",
-          tasks: 4,
-          rate: null,
-          low: null,
-          high: null,
-        },
-        {
-          version: "8a0f3b7",
-          skill: "release-checklist",
-          since: "2026-10-20",
-          tasks: 22,
-          rate: 0.1,
-          low: 0.03,
-          high: 0.2,
-        },
-        {
-          version: "51e6c08",
-          skill: "release-checklist",
-          since: "2026-09-20",
-          tasks: 18,
-          rate: 0.45,
-          low: 0.27,
-          high: 0.64,
-        },
-      ],
-      misses: [
-        { day: "2026-11-11", session: "4f1c2a90-7d3e-4b8a-9c21-0e5f6a7b8c9d" },
-        { day: "2026-11-06", session: "a83d6e12-5b4f-4c7a-8e90-1f2a3b4c5d6e" },
-      ],
-    },
-    {
-      name: "Reviews done without the review skill",
-      skills: ["code-review", "reviewing"],
-      now: side(0.6, 0.44, 0.75, 31, shift(DAY, -27)),
-      series: series(0.6, 0.6, null, 22, ["2026-10-28"]),
-      versions: [
-        { version: "e902b4d", skill: "code-review", since: "2026-10-28", tasks: 19, rate: 0.58, low: 0.38, high: 0.77 },
-        { version: "3b7c1f5", skill: "reviewing", since: "2026-09-02", tasks: 14, rate: 0.64, low: 0.4, high: 0.86 },
-      ],
-      misses: [{ day: "2026-11-12", session: "c2e4a6b8-1d3f-4a5b-8c7d-9e0f1a2b3c4d" }],
-    },
-    {
-      name: "Exports run without the export skill",
-      skills: ["data-export"],
-      now: null,
-      series: series(0, 0, null, 23).map(({ day }) => ({ day, rate: null })),
-      versions: [],
-      misses: [],
+      version: "v4",
+      from: "2026-10-24",
+      what: "An offer for a step the agent could take is a stop",
+      stops: 410,
+      rate: 0.21,
     },
   ],
 };
@@ -521,5 +480,5 @@ export const emptyReport: Report = {
   ],
   replays: [],
   sizes: { series: [], largest: [], months: [] },
-  skills: [],
+  stops: [],
 };

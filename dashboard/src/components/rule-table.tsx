@@ -1,15 +1,15 @@
 import type { FocusEvent, MouseEvent, PointerEvent } from "react";
-import { signedPercent } from "@/lib/format";
+import type { Day } from "@/data/report";
+import { dayLabel, percent } from "@/lib/format";
 import { rowHref } from "@/lib/hash";
-import { GROUP_WORDS, GROUPS, type Row } from "@/lib/rows";
-import { STATUS_WORDS, type Status } from "@/lib/status";
+import type { Row } from "@/lib/rows";
+import { REAL_DAYS, STATUS_WORDS } from "@/lib/status";
 import { cn } from "@/lib/utils";
-import { Band, Scale } from "./band";
 import { STATUS_TONE, StatusIcon } from "./status-icon";
 
-// One grid for the header and every row, so each band sits under the scale. On a phone the band takes a second line.
-export const GRID =
-  "grid grid-cols-[minmax(0,1fr)_3.5rem_1rem] items-center gap-x-4 px-3.5 sm:grid-cols-[minmax(0,1fr)_17rem_3.5rem_1rem]";
+// One grid for the header and every row. On a phone the verdict takes a second line under the change.
+const GRID =
+  "grid grid-cols-[minmax(0,1fr)_3rem_5rem] items-baseline gap-x-3 px-3.5 sm:grid-cols-[minmax(0,1fr)_3.5rem_5rem_8.5rem] sm:gap-x-4";
 
 export interface RowEvents {
   onPreview: (id: string) => void;
@@ -17,8 +17,8 @@ export interface RowEvents {
   onToggle: (id: string) => void;
 }
 
-/** A table row's pointer, focus and click handling, alike in every table on the page. */
-export function rowHandlers(id: string, pinned: string | null, events: RowEvents, onFocusOut: () => void) {
+/** A row's pointer, focus and click handling. */
+function rowHandlers(id: string, pinned: string | null, events: RowEvents, onFocusOut: () => void) {
   return {
     onPointerEnter: (event: PointerEvent<HTMLElement>) => event.pointerType === "mouse" && events.onPreview(id),
     onFocus: (event: FocusEvent<HTMLElement>) => event.currentTarget.matches(":focus-visible") && events.onFocusRow(id),
@@ -33,87 +33,93 @@ export function rowHandlers(id: string, pinned: string | null, events: RowEvents
   };
 }
 
-/** Every rule change under test or judged this week, one row each, group by group. */
+/** A row's verdict, or the day it is due while it waits. */
+function verdictWords(row: Row, day: Day): string {
+  return row.trial.verdict ? STATUS_WORDS[row.status] : `Day ${REAL_DAYS} on ${dayLabel(row.trial.due, day)}`;
+}
+
+/** Since the change: its rate so far, or the day it starts. */
+function sinceWords(row: Row, day: Day): string {
+  const { after, started } = row.trial;
+  return after ? percent(after.rate) : `from ${dayLabel(started, day)}`;
+}
+
+/** This week's rule changes, one row each: the mistake rate before and since, and the verdict. */
 export function RuleTable({
   rows,
+  day,
   pinned,
   shown,
-  lit,
   events,
   onLeave,
   onFocusOut,
 }: {
   rows: Row[];
+  day: Day;
   pinned: string | null;
   shown: string | null;
-  lit: Status | null;
   events: RowEvents;
   onLeave: () => void;
   onFocusOut: () => void;
 }) {
   if (rows.length === 0) {
-    return <p className="rounded-lg border px-3.5 py-6 text-muted-foreground">No rule changes under test this week.</p>;
+    return <p className="rounded-lg border px-3.5 py-6 text-muted-foreground">No rule changes this week.</p>;
   }
   return (
     <div data-table className="overflow-clip rounded-lg border" onPointerLeave={onLeave}>
-      <div className={cn(GRID, "h-9 border-b text-muted-foreground text-xs max-sm:hidden")}>
-        <span>Rule change</span>
-        <Scale />
-        <span className="text-right">Change</span>
+      <div className={cn(GRID, "items-center border-b py-2 text-muted-foreground text-xs")}>
+        <span>Change</span>
+        <span className="text-right">Before</span>
+        <span className="text-right">Since</span>
+        <span className="max-sm:hidden">Verdict</span>
       </div>
-      {GROUPS.map((group) => {
-        const inGroup = rows.filter((row) => row.group === group);
-        if (inGroup.length === 0) return null;
-        return (
-          <section key={group} data-group={group} aria-label={GROUP_WORDS[group]} className="border-b last:border-b-0">
-            <h2
-              className="border-b bg-muted px-3.5 py-1.5 font-medium text-muted-foreground text-xs"
-              style={{ viewTransitionName: `group-${group}` }}
-            >
-              {GROUP_WORDS[group]}
-            </h2>
-            {inGroup.map((row) => (
-              <a
-                key={row.id}
-                href={rowHref(row.id)}
-                data-row={row.id}
-                data-status={row.status}
-                aria-label={`${row.name}, ${row.change ? `${signedPercent(row.change.value)}, ` : ""}${STATUS_WORDS[row.status]}`}
-                aria-current={pinned === row.id ? "true" : undefined}
-                className={cn(
-                  GRID,
-                  "relative min-h-10 border-b py-2 outline-none transition-[background-color,opacity] last:border-b-0",
-                  "hover:bg-muted focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
-                  shown === row.id && "bg-muted",
-                  pinned === row.id &&
-                    "before:absolute before:inset-y-0 before:left-0 before:w-0.5 before:bg-foreground",
-                  lit !== null && lit !== row.status && "opacity-30",
-                )}
-                style={{ viewTransitionName: `row-${row.id}` }}
-                {...rowHandlers(row.id, pinned, events, onFocusOut)}
-              >
-                <span data-name className="font-medium">
-                  {row.name}
-                </span>
-                {row.change && (
-                  <span className="max-sm:col-span-3 max-sm:row-start-2 max-sm:mt-1.5 sm:col-start-2">
-                    <Band change={row.change} status={row.status} />
-                  </span>
-                )}
-                <span
-                  data-change
-                  className={cn("text-right font-medium font-mono sm:col-start-3", STATUS_TONE[row.status])}
-                >
-                  {row.change ? signedPercent(row.change.value) : "–"}
-                </span>
-                <span className="sm:col-start-4">
-                  <StatusIcon status={row.status} />
-                </span>
-              </a>
-            ))}
-          </section>
-        );
-      })}
+      {rows.map((row) => (
+        <a
+          key={row.id}
+          href={rowHref(row.id)}
+          data-row={row.id}
+          data-status={row.status}
+          aria-label={`${row.name}: before ${row.trial.before ? percent(row.trial.before.rate) : "none"}, since ${sinceWords(row, day)}, ${verdictWords(row, day)}`}
+          aria-current={pinned === row.id ? "true" : undefined}
+          className={cn(
+            GRID,
+            "relative gap-y-1 border-b py-2.5 outline-none transition-colors last:border-b-0",
+            "hover:bg-muted focus-visible:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
+            shown === row.id && "bg-muted",
+            pinned === row.id && "before:absolute before:inset-y-0 before:left-0 before:w-0.5 before:bg-foreground",
+          )}
+          {...rowHandlers(row.id, pinned, events, onFocusOut)}
+        >
+          <span className="grid gap-0.5">
+            <span data-name className="font-medium">
+              {row.name}
+            </span>
+            {row.trial.what && <span className="text-muted-foreground text-xs">{row.trial.name}</span>}
+          </span>
+          <span data-before className="text-right font-mono text-xs">
+            {row.trial.before ? percent(row.trial.before.rate) : "–"}
+          </span>
+          <span
+            data-since
+            className={cn(
+              "whitespace-nowrap text-right text-xs",
+              row.trial.after ? "font-mono" : "text-muted-foreground",
+            )}
+          >
+            {sinceWords(row, day)}
+          </span>
+          <span
+            data-verdict
+            className={cn(
+              "flex items-center gap-1.5 text-xs max-sm:col-span-3 max-sm:row-start-2",
+              STATUS_TONE[row.status],
+            )}
+          >
+            <StatusIcon status={row.status} decorative />
+            {verdictWords(row, day)}
+          </span>
+        </a>
+      ))}
     </div>
   );
 }

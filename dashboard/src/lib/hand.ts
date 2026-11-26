@@ -8,9 +8,9 @@ export function handText(row: Row, day: Day): string {
   const { trial } = row;
   const side = (s: Side | null) => (s === null ? "none counted" : `${percent(s.rate)} over ${plural(s.tasks, "task")}`);
   const lines = [
-    `Find out why agents still make this mistake, and propose what would stop it: "${row.name}".`,
+    `Find out why agents still make this mistake, and propose what would stop it: "${trial.name}".`,
     "",
-    `The rule change of ${trial.started}, as of ${day}: ${STATUS_WORDS[row.status]}.`,
+    `The rule change of ${trial.started}${trial.what ? ` (${trial.what})` : ""}, as of ${day}: ${STATUS_WORDS[row.status]}.`,
     `Mistake rate before the change ${side(trial.before)}, since it ${side(trial.after)}.`,
   ];
   if (row.change) {
