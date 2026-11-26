@@ -150,3 +150,25 @@ def test_a_trial_file_without_a_date_is_reported_and_the_rest_are_read(tmp_path)
 
     assert trials == [Trial("quoted", "testing", ("x",), "2026-01-01", "A plain name")]
     assert len(errors) == 1 and "undated.md" in errors[0]
+
+
+def test_a_deleted_trials_change_is_not_judged_again(tmp_path):
+    con = store(tmp_path)
+    con.execute("INSERT INTO changes VALUES ('x', '2026-11-18', 'a rule since cut')")
+    con.execute(
+        "INSERT INTO verdicts VALUES ('t', '2026-11-19', 'x', '2026-11-21', 'before and after', 9, 9, .5, .5, 0, -.1,"
+        " .1, 'no big effect')"
+    )
+
+    assert verdicts.with_changes(con, []) == []
+
+
+def test_a_bare_changes_verdict_owns_no_change_before_it(tmp_path):
+    con = store(tmp_path)
+    con.execute("INSERT INTO changes VALUES ('x', '2026-11-20', 'earlier'), ('x', '2026-11-22', 'later')")
+    con.execute(
+        "INSERT INTO verdicts VALUES ('x', '2026-11-22', 'x', '2026-11-24', 'before and after', 9, 9, .5, .5, 0, -.1,"
+        " .1, 'no big effect')"
+    )
+
+    assert [t.started for t in verdicts.with_changes(con, [])] == ["2026-11-20", "2026-11-22"]
