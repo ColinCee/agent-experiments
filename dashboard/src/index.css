@@ -10,8 +10,6 @@
   --font-sans: "Segoe UI Variable Text", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-mono: ui-monospace, "Cascadia Mono", "SF Mono", Consolas, Menlo, monospace;
   --color-unsure: var(--unsure);
-  --color-with: var(--with);
-  --color-without: var(--without);
   --color-good: var(--good);
   --color-bad: var(--bad);
   --color-ring: var(--ring);
@@ -44,10 +42,8 @@
 :root {
   /* Scrollbars and other browser-drawn parts follow the theme too. */
   color-scheme: light dark;
-  /* The only hues on the page, each with one meaning: with the rule, without it, works, not working, can't tell.
+  /* The only hues on the page, each with one meaning: works, worse, no big effect.
      Text in them passes 4.5:1 on the page and its muted rows in both themes. */
-  --with: #2160e0;
-  --without: #696969;
   --good: #15803d;
   --bad: #c62828;
   --unsure: #8a5a00;
@@ -74,8 +70,6 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --with: #6ea8fe;
-    --without: #a8a8a8;
     --good: #4ade80;
     --bad: #f87171;
     --unsure: #facc15;

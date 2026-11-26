@@ -149,7 +149,9 @@ def build(db: Path, trials: list[verdicts.Trial], day: str, errors: list[str]) -
                         f"Trial {trial.name}: {found.verdict} on {found.day}, its day {verdicts.REAL_DAYS} of real use,"
                         f" and still `status: testing`. {ACT[found.verdict]} Then add its line to docs/findings.md."
                     )
-                elif row["rare"] and row["real_days"] and not row["replay"]:
+                elif (
+                    row["rare"] and row["real_days"] and not (row["replay"] and row["replay"]["real_rate"] is not None)
+                ):
                     errors.append(
                         f"Trial {trial.name}: {measure} has under {verdicts.RARE} chances a day of real use, too few for"
                         f" {verdicts.REAL_DAYS} days to tell. Run `agent-experiments replay --measure {measure}` with"

@@ -4,7 +4,7 @@ Tests whether a change to a coding agent's rules works: the rule is on for a ran
 
 ![Trial files and a hook stamp each task; counting reads transcripts and a private measures file into one DuckDB file; verdicts read it and write the overview page](docs/architecture.svg)
 
-It reads Claude Code session transcripts and a measures file you write in SQL, which says what counts as a chance to break a rule and what counts as a miss. Trials come from the [agents repo](https://github.com/ColinCee/agents)'s `home/trials/`, whose hook gives each task its group.
+It reads Claude Code session transcripts and a measures file you write in SQL, which says what counts as a chance to break a rule and what counts as a miss. Trials come from the [agents repo](https://github.com/ColinCee/agents)'s `home/trials/`, whose hook gives every session their rules and stamps its task.
 
 ## Start
 
