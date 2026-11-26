@@ -7,7 +7,7 @@ export type Drawn = { value: number; low: number; high: number };
 /** One row of the table: a rule change, with the answer it gives. */
 export type Row = {
   id: string;
-  /** The change in plain words, or the mistake it targets when nothing words the change. */
+  /** The mistake it targets, in plain words; the change's own wording is in its card. */
   name: string;
   status: Status;
   /** Null with no verdict yet. */
@@ -48,7 +48,7 @@ export function pageRows(report: Report): Row[] {
   return report.trials
     .map((trial): Row => {
       const status = trialStatus(trial);
-      return { id: "", name: trial.what ?? trial.name, status, change: drawn(status, trial.change), trial };
+      return { id: "", name: trial.name, status, change: drawn(status, trial.change), trial };
     })
     .toSorted(order)
     .map((row) => ({ ...row, id: unique(`trial-${slug(row.trial.name)}`) }));

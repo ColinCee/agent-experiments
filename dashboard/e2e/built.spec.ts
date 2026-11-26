@@ -59,15 +59,17 @@ test("the page opens with one row per rule change: those awaiting a verdict, the
   page,
 }) => {
   await openWide(page);
-  const ids = await page.locator("[data-row]").evaluateAll((all) => all.map((r) => r.getAttribute("data-row")));
+  const ids = await page
+    .locator("[data-row][data-status]")
+    .evaluateAll((all) => all.map((r) => r.getAttribute("data-row")));
   expect(ids).toEqual([RUNNING, SCHEDULED, REPLAYED, WORKS, NO_EFFECT, WORSE]);
   const cells = row(page, WORKS);
-  await expect(cells.locator("[data-name]")).toHaveText("Run the tests before each commit");
-  await expect(cells).toContainText("Tests skipped before a commit");
+  // One line a row: the mistake; the change's own words are in its card.
+  await expect(cells.locator("[data-name]")).toHaveText("Tests skipped before a commit");
+  await expect(cells).not.toContainText("Run the tests before each commit");
   await expect(cells.locator("[data-before]")).toHaveText("25%");
   await expect(cells.locator("[data-since]")).toHaveText("10%");
   await expect(cells.locator("[data-verdict]")).toHaveText("Works");
-  // With nothing wording the change, the row is named for its mistake.
   await expect(row(page, NO_EFFECT).locator("[data-name]")).toHaveText("Commit messages with no reason");
 });
 
@@ -263,4 +265,46 @@ test("an injected report is shown, even with </script> in a name", async ({ page
   await expect(page.getByText("data to 5 Apr")).toBeVisible();
   await expect(page.getByText("A </script> in a name")).toBeVisible();
   expect(opened.errors).toEqual([]);
+});
+
+test("below them, only the rules and skills that need him show, and the rest fold into one closed list", async ({
+  page,
+}) => {
+  await openWide(page);
+  const shown = page.locator("[data-needs] [data-row]");
+  await expect(shown).toHaveCount(3);
+  // A mistake above its usual range today, in red, and a rule and a skill unused for 30 days.
+  const high = row(page, "rule-run-the-checks-before-every-commit");
+  await expect(high.locator("[data-mistakes] .text-bad")).toHaveText("10%");
+  await expect(row(page, "rule-a-long-job-run-it-overnight").locator("[data-used]")).toHaveText("Unused");
+  await expect(row(page, "skill-drawing-diagrams").locator("[data-used]")).toHaveText("Unused");
+  const fine = page.locator("details[data-fine]");
+  await expect(fine).not.toHaveAttribute("open");
+  await expect(fine.locator("summary")).toContainText("4 more rules and skills");
+  await expect(fine.locator("summary")).toContainText("1 not measured");
+  await fine.locator("summary").click();
+  await expect(row(page, "rule-never-print-a-secret").locator("[data-mistakes]")).toHaveText("Not measured");
+  await expect(fine.locator("[data-group]")).toHaveCount(3);
+});
+
+test("an agent's link to a rule in the closed list opens the list and its card", async ({ page }) => {
+  await openWide(page, "#rule-search-the-team-notes-before-asking");
+  await expect(page.locator("details[data-fine]")).toHaveAttribute("open");
+  await expect(card(page, "rule-search-the-team-notes-before-asking")).toBeVisible();
+});
+
+test("a rule's card shows its use, then each mistake's rate, today against usual, and its weeks with model switches", async ({
+  page,
+}) => {
+  await openWide(page, "#rule-run-the-checks-before-every-commit");
+  const detail = card(page, "rule-run-the-checks-before-every-commit");
+  await expect(detail.locator('[data-section="use"]')).toContainText("40 in 30 days");
+  const mistake = detail.locator('[data-section="mistake"]');
+  await expect(mistake).toContainText("Tests skipped before a commit");
+  await expect(mistake).toContainText("10% of 60 tasks");
+  await expect(mistake).toContainText("31%, usual 4% to 17%");
+  // A rule change is a solid line, a model switch a dashed one.
+  const marks = mistake.locator(".recharts-reference-line line");
+  await expect(marks).toHaveCount(2);
+  await expect(mistake.locator('.recharts-reference-line line[stroke-dasharray="3 3"]')).toHaveCount(1);
 });

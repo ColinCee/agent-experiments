@@ -68,7 +68,7 @@ export function RuleTable({
   return (
     <div data-table className="overflow-clip rounded-lg border" onPointerLeave={onLeave}>
       <div className={cn(GRID, "items-center border-b py-2 text-muted-foreground text-xs")}>
-        <span>Change</span>
+        <span>Mistake</span>
         <span className="text-right">Before</span>
         <span className="text-right">Since</span>
         <span className="max-sm:hidden">Verdict</span>
@@ -94,7 +94,6 @@ export function RuleTable({
             <span data-name className="font-medium">
               {row.name}
             </span>
-            {row.trial.what && <span className="text-muted-foreground text-xs">{row.trial.name}</span>}
           </span>
           <span data-before className="text-right font-mono text-xs">
             {row.trial.before ? percent(row.trial.before.rate) : "–"}

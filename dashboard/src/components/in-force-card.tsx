@@ -117,7 +117,7 @@ export function InForceCard({ row, day }: { row: ForceRow; day: Day }) {
       </Section>
       {row.mistakes.length === 0 ? (
         <Section id="mistakes" title="Mistakes">
-          <p className="text-muted-foreground text-xs">No measure counts this rule's mistake yet.</p>
+          <p className="text-muted-foreground text-xs">Nothing counts this rule's mistake yet.</p>
         </Section>
       ) : (
         row.mistakes.map((mistake) => (

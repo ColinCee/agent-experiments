@@ -1,6 +1,6 @@
 // A made-up report about a fictional team's agents, for the dev server and tests. It covers every state the page shows.
 import { addDays, format, parseISO } from "date-fns";
-import type { Day, Miss, Mistake, MistakeChange, Range, Replay, Report, Side } from "./report";
+import type { Day, InForce, Miss, Mistake, MistakeChange, Range, Replay, Report, Side } from "./report";
 
 const DAY = "2026-11-12";
 const SERIES_DAYS = 42;
@@ -138,7 +138,10 @@ const mistakes: Mistake[] = [
   withRule(
     "Tests skipped before a commit",
     { day: "2026-11-07", what: "Run the checks before every commit" },
-    [{ day: "2026-11-01", what: "Tests skipped before a commit", kind: "trial" }],
+    [
+      { day: "2026-11-01", what: "Tests skipped before a commit", kind: "trial" },
+      { day: "2026-11-03", what: "model-b", kind: "model" },
+    ],
     side(0.25, 0.2, 0.3, 180, "2026-11-01"),
     side(0.1, 0.07, 0.14, 60, "2026-11-07"),
     { low: -0.74, high: -0.42 },
@@ -247,6 +250,15 @@ const sizePoints = (first: number, last: number) =>
 const ruleWords = sizePoints(3200, 4100);
 // Skills start from nothing, as a new file set does.
 const skillWords = sizePoints(0, 12600);
+
+const rule = (kind: InForce["kind"], file: string, text: string, measures: string[], used: number | null): InForce => ({
+  kind,
+  file,
+  text,
+  measures,
+  used,
+  window: used === null ? null : { from: usualStart, days: 30 },
+});
 
 export const fixture: Report = {
   day: DAY,
@@ -431,7 +443,15 @@ export const fixture: Report = {
       { month: "2026-11", label: "Skills", changes: 8, only_added: 0.75, added_share: 0.8 },
     ],
   },
-  in_force: [],
+  in_force: [
+    rule("rule", "core.md", "- Run the checks before every commit.", ["Tests skipped before a commit"], 40),
+    rule("rule", "core.md", "- Search the team notes before asking.", ["Questions asked that the notes answer"], 12),
+    rule("rule", "core.md", "- Never print a secret.", [], 20),
+    rule("rule", "local.md", "| A long job | Run it overnight |", [], 0),
+    rule("trial", "trials/ports.md", "Check a port is free before using it.", ["Ports taken without checking"], null),
+    rule("skill", "shipping-changes", "shipping-changes", ["Branch pushed without a pull request"], 50),
+    rule("skill", "drawing-diagrams", "drawing-diagrams", [], 0),
+  ],
 };
 
 const noData = series(0, 0, null, 0).map(({ day }) => ({ day, rate: null }));
