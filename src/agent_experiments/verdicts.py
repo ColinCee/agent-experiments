@@ -137,12 +137,13 @@ def with_changes(con, trials: list[Trial]) -> list[Trial]:
     already judged is that trial's, even once its file has moved on to a new wording and start, or been deleted."""
     found = con.execute('SELECT measure, "day", what FROM changes ORDER BY "day", measure').fetchall()
     now = {(t.name, t.started) for t in trials}
-    # Starts of trial files judged before, restarted or deleted since. A bare change's own verdict is not one: it
-    # started on its change's day, which a trial file, started the day after its change went in, never does.
+    # Starts of trial files judged before, restarted or deleted since. A bare change's verdict is not one: it is named
+    # for its measure and started on its change's day.
+    days = {(m, d) for m, d, _ in found}
     earlier = [
         Trial(t, "settled", (m,), s)
         for t, s, m in con.execute("SELECT trial, started, measure FROM verdicts").fetchall()
-        if (t, s) not in now
+        if (t, s) not in now and not (t == m and (m, s) in days)
     ]
     filed = [replace(t, what=next((w for m, d, w in found if own(t, m, d)), "")) for t in trials]
     bare: dict[tuple[str, str], list[str]] = {}

@@ -161,3 +161,14 @@ def test_a_deleted_trials_change_is_not_judged_again(tmp_path):
     )
 
     assert verdicts.with_changes(con, []) == []
+
+
+def test_a_bare_changes_verdict_owns_no_change_before_it(tmp_path):
+    con = store(tmp_path)
+    con.execute("INSERT INTO changes VALUES ('x', '2026-11-20', 'earlier'), ('x', '2026-11-22', 'later')")
+    con.execute(
+        "INSERT INTO verdicts VALUES ('x', '2026-11-22', 'x', '2026-11-24', 'before and after', 9, 9, .5, .5, 0, -.1,"
+        " .1, 'no big effect')"
+    )
+
+    assert [t.started for t in verdicts.with_changes(con, [])] == ["2026-11-20", "2026-11-22"]
