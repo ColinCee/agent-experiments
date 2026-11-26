@@ -24,6 +24,23 @@ export interface Report {
   mistakes: Mistake[];
   replays: Replay[];
   sizes: Sizes;
+  /** Every rule line, rule change wording and skill in force; empty when `daily` ran without the agents repo. */
+  in_force: InForce[];
+}
+
+/** A rule line, a rule change's wording or a skill, evaluated every day whether or not it changed. */
+export interface InForce {
+  kind: "rule" | "trial" | "skill";
+  /** Its rules file, trial file or skill folder. */
+  file: string;
+  /** The line as written, one line of a trial's wording, or the skill's name. */
+  text: string;
+  /** Names of the mistakes (`Mistake.name`) that count it: a rule line's named skills', a trial's own; none: not measured. */
+  measures: string[];
+  /** A rule line's chances to be broken, a skill's loads, over `window`; null where nothing counts it. */
+  used: number | null;
+  /** The days `used` covers: the last 30, or since the line was written. */
+  window: { from: Day; days: number } | null;
 }
 
 /** A rule change, judged by its mistake rate before against its first three days of real use. */
@@ -66,7 +83,8 @@ export interface Side {
 export interface MistakeChange {
   day: Day;
   what: string;
-  kind: "rule" | "trial";
+  /** A model switch's `what` is the model most typed-in sessions used from that day. */
+  kind: "rule" | "trial" | "model";
 }
 
 export interface Mistake {
@@ -83,9 +101,11 @@ export interface Mistake {
   sure: boolean;
   /** No rule: the rate over the last 28 days. */
   current: Side | null;
+  /** The rate over the last 28 days, rule or not; null with no chances. */
+  recent: Side | null;
   /** 6 weeks, 3-day rolling. */
   series: { day: Day; rate: number | null }[];
-  /** Every rule change and trial start inside the series window; a trial's `what` is the trial's name. */
+  /** Every rule change, trial start and model switch inside the series window; a trial's `what` is its name. */
   changes: MistakeChange[];
 }
 

@@ -26,13 +26,14 @@ CREATE TABLE IF NOT EXISTS sizes (
 
 
 def count(transcripts: str, measures: Path, db: Path) -> None:
-    """Rebuilds the sessions, stamps, chances, names and changes tables in `db` from a glob of transcripts and a measures file."""
+    """Rebuilds the sessions, stamps, chances, names, changes and skill measures tables in `db` from a glob of transcripts and a measures file."""
     con = duckdb.connect()
     con.execute("SET VARIABLE transcripts = ?", [transcripts.replace("\\", "/")])
     con.execute(files(__package__).joinpath("sessions.sql").read_text(encoding="utf-8"))
     con.execute(measures.read_text(encoding="utf-8"))
     con.execute("CREATE TEMP TABLE IF NOT EXISTS measure_names (measure VARCHAR, name VARCHAR)")
     con.execute('CREATE TEMP TABLE IF NOT EXISTS changes (measure VARCHAR, "day" VARCHAR, what VARCHAR)')
+    con.execute("CREATE TEMP TABLE IF NOT EXISTS skill_measures (measure VARCHAR, skill VARCHAR)")
     db.parent.mkdir(parents=True, exist_ok=True)
     # The temp tables share the stored tables' names, so the file is attached under its own name.
     con.execute(f"ATTACH '{str(db).replace("'", "''")}' AS store")
@@ -48,6 +49,7 @@ def count(transcripts: str, measures: Path, db: Path) -> None:
         SELECT measure, s AS session, "day", ts, uuid, miss FROM temp.chances ORDER BY measure, "day", session, ts;
         CREATE OR REPLACE TABLE store.measure_names AS SELECT measure, name FROM temp.measure_names;
         CREATE OR REPLACE TABLE store.changes AS SELECT measure, "day"::VARCHAR AS "day", what FROM temp.changes;
+        CREATE OR REPLACE TABLE store.skill_measures AS SELECT measure, skill FROM temp.skill_measures;
     """)
     con.execute("COMMIT")
     con.close()

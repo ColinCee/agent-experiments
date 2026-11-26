@@ -1,15 +1,16 @@
+import { differenceInCalendarDays, parseISO } from "date-fns";
 import type { FocusEvent, MouseEvent, PointerEvent } from "react";
 import type { Day } from "@/data/report";
-import { dayLabel, percent } from "@/lib/format";
+import { percent, plural } from "@/lib/format";
 import { rowHref } from "@/lib/hash";
 import type { Row } from "@/lib/rows";
-import { REAL_DAYS, STATUS_WORDS } from "@/lib/status";
+import { STATUS_WORDS } from "@/lib/status";
 import { cn } from "@/lib/utils";
 import { STATUS_TONE, StatusIcon } from "./status-icon";
 
 // One grid for the header and every row. On a phone the verdict takes a second line under the change.
 const GRID =
-  "grid grid-cols-[minmax(0,1fr)_3rem_5rem] items-baseline gap-x-3 px-3.5 sm:grid-cols-[minmax(0,1fr)_3.5rem_5rem_8.5rem] sm:gap-x-4";
+  "grid grid-cols-[minmax(0,1fr)_4rem_4rem] items-baseline gap-x-3 px-3.5 sm:grid-cols-[minmax(0,1fr)_4.5rem_4.5rem_8.5rem] sm:gap-x-4";
 
 export interface RowEvents {
   onPreview: (id: string) => void;
@@ -18,7 +19,7 @@ export interface RowEvents {
 }
 
 /** A row's pointer, focus and click handling. */
-function rowHandlers(id: string, pinned: string | null, events: RowEvents, onFocusOut: () => void) {
+export function rowHandlers(id: string, pinned: string | null, events: RowEvents, onFocusOut: () => void) {
   return {
     onPointerEnter: (event: PointerEvent<HTMLElement>) => event.pointerType === "mouse" && events.onPreview(id),
     onFocus: (event: FocusEvent<HTMLElement>) => event.currentTarget.matches(":focus-visible") && events.onFocusRow(id),
@@ -33,15 +34,18 @@ function rowHandlers(id: string, pinned: string | null, events: RowEvents, onFoc
   };
 }
 
-/** A row's verdict, or the day it is due while it waits. */
+/** A row's verdict; while it waits, the days until it starts, or until its verdict if each day from here has use. */
 function verdictWords(row: Row, day: Day): string {
-  return row.trial.verdict ? STATUS_WORDS[row.status] : `Day ${REAL_DAYS} on ${dayLabel(row.trial.due, day)}`;
+  if (row.trial.verdict) return STATUS_WORDS[row.status];
+  const until = (to: Day) => differenceInCalendarDays(parseISO(to), parseISO(day));
+  if (until(row.trial.started) > 0) return `Starts in ${plural(until(row.trial.started), "day")}`;
+  const left = until(row.trial.due);
+  return left <= 0 ? "Due today" : `${plural(left, "day")} left`;
 }
 
-/** Since the change: its rate so far, or the day it starts. */
-function sinceWords(row: Row, day: Day): string {
-  const { after, started } = row.trial;
-  return after ? percent(after.rate) : `from ${dayLabel(started, day)}`;
+/** The mistake rate since the change so far; none before it starts. */
+function sinceWords(row: Row): string {
+  return row.trial.after ? percent(row.trial.after.rate) : "–";
 }
 
 /** This week's rule changes, one row each: the mistake rate before and since, and the verdict. */
@@ -68,9 +72,9 @@ export function RuleTable({
   return (
     <div data-table className="overflow-clip rounded-lg border" onPointerLeave={onLeave}>
       <div className={cn(GRID, "items-center border-b py-2 text-muted-foreground text-xs")}>
-        <span>Change</span>
-        <span className="text-right">Before</span>
-        <span className="text-right">Since</span>
+        <span>Mistake</span>
+        <span className="text-right">Rate before</span>
+        <span className="text-right">Rate after</span>
         <span className="max-sm:hidden">Verdict</span>
       </div>
       {rows.map((row) => (
@@ -79,7 +83,7 @@ export function RuleTable({
           href={rowHref(row.id)}
           data-row={row.id}
           data-status={row.status}
-          aria-label={`${row.name}: before ${row.trial.before ? percent(row.trial.before.rate) : "none"}, since ${sinceWords(row, day)}, ${verdictWords(row, day)}`}
+          aria-label={`${row.name}: before ${row.trial.before ? percent(row.trial.before.rate) : "none"}, since ${sinceWords(row)}, ${verdictWords(row, day)}`}
           aria-current={pinned === row.id ? "true" : undefined}
           className={cn(
             GRID,
@@ -94,7 +98,6 @@ export function RuleTable({
             <span data-name className="font-medium">
               {row.name}
             </span>
-            {row.trial.what && <span className="text-muted-foreground text-xs">{row.trial.name}</span>}
           </span>
           <span data-before className="text-right font-mono text-xs">
             {row.trial.before ? percent(row.trial.before.rate) : "–"}
@@ -106,7 +109,7 @@ export function RuleTable({
               row.trial.after ? "font-mono" : "text-muted-foreground",
             )}
           >
-            {sinceWords(row, day)}
+            {sinceWords(row)}
           </span>
           <span
             data-verdict

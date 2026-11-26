@@ -1,3 +1,4 @@
+from dataclasses import replace
 from pathlib import Path
 
 import duckdb
@@ -96,6 +97,31 @@ def test_a_rule_change_with_no_trial_file_is_judged_too_and_a_trials_own_change_
     filed, bare = verdicts.with_changes(con, [trial])
     assert (filed.name, filed.what, filed.filed) == ("t", "its own", True)
     assert (bare.measures, bare.started, bare.what, bare.filed) == (("y",), "2026-11-24", "a hook", False)
+
+
+def test_a_judged_trials_change_is_not_judged_again_when_its_file_restarts(tmp_path):
+    con = store(tmp_path)
+    con.execute("INSERT INTO changes VALUES ('x', '2026-11-18', 'first wording')")
+    con.execute(
+        "INSERT INTO verdicts VALUES ('t', '2026-11-19', 'x', '2026-11-21', 'before and after', 9, 9, .5, .5, 0, -.1,"
+        " .1, 'no big effect')"
+    )
+    reworded = Trial("t", "testing", ("x",), "2026-11-30")
+
+    assert verdicts.with_changes(con, [reworded]) == [replace(reworded, what="")]
+
+
+def test_a_judged_change_with_no_trial_file_stays_a_trial_of_its_own(tmp_path):
+    con = store(tmp_path)
+    con.execute("INSERT INTO changes VALUES ('x', '2026-11-24', 'a hook')")
+    con.execute(
+        "INSERT INTO verdicts VALUES ('x', '2026-11-24', 'x', '2026-11-26', 'before and after', 9, 9, .5, .5, 0, -.1,"
+        " .1, 'no big effect')"
+    )
+    # A trial file named for the same measure, restarted, does not take the bare change's verdict as its own.
+    _, bare = verdicts.with_changes(con, [Trial("x", "testing", ("x",), "2026-11-30")])
+
+    assert (bare.name, bare.started, bare.filed) == ("x", "2026-11-24", False)
 
 
 def test_a_rare_measure_is_settled_by_a_trusted_replay(tmp_path):

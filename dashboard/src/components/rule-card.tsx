@@ -182,7 +182,7 @@ export function RuleCard({ row, day }: { row: Row; day: Day }) {
       </a>
       <section data-section="verdict">
         <h2 className="text-balance font-semibold text-[0.9375rem]">{row.name}</h2>
-        {trial.what && <p className="text-muted-foreground text-xs">{trial.name}</p>}
+        {trial.what && <p className="text-muted-foreground text-xs">{trial.what}</p>}
         <p data-verdict className={cn("mt-0.5 font-medium", STATUS_TONE[row.status])}>
           {STATUS_WORDS[row.status]}
         </p>
@@ -233,6 +233,9 @@ export function PageFacts({ report }: { report: Report }) {
           ["−63%", "63% fewer mistakes since the change"],
           ["A change that does nothing", "Called Works or Worse about 1 time in 4"],
           ["A rare mistake", "Under 2 chances a day: a replay tests it"],
+          ["A rule or skill in red", "Its mistake is above its usual range today"],
+          ["Unused", "No use in 30 days, subagents aside: worth trimming"],
+          ["A dashed line", "The model most conversations used changed"],
         ]}
       />
     </div>

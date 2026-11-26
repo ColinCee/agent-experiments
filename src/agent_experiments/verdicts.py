@@ -56,6 +56,7 @@ class Trial:
     title: str = ""  # the page's name for it; the file name is what stamps use
     what: str = ""  # the change, in plain words: its `changes` row
     filed: bool = True  # a trial file in the agents repo, which `daily` asks to update; else a bare `changes` row
+    wording: str = ""  # its `## On` lines, which the hook gives every task
 
 
 @dataclass(frozen=True)
@@ -93,7 +94,9 @@ def read_trials(folder: Path, errors: list[str]) -> list[Trial]:
             continue
         measures = tuple(m.strip() for m in field("measures").split(",") if m.strip())
         status = "settled" if field("status") == "settled" else "testing"
-        trials.append(Trial(path.stem, status, measures, started, field("name")))
+        on = re.search(r"^## On\s*\n(.*?)(?=^## |\Z)", text, re.MULTILINE | re.DOTALL)
+        wording = "\n".join(line.strip() for line in on.group(1).splitlines() if line.strip()) if on else ""
+        trials.append(Trial(path.stem, status, measures, started, field("name"), wording=wording))
     return trials
 
 
@@ -130,12 +133,23 @@ def own(trial: Trial, measure: str, day: str) -> bool:
 
 def with_changes(con, trials: list[Trial]) -> list[Trial]:
     """The trial files, each with its change in plain words, and every other rule change from JUDGED_FROM as a trial
-    of its own, so each rule change gets one verdict (docs/architecture.md#verdicts)."""
+    of its own, so each rule change gets one verdict (docs/architecture.md#verdicts). A change that dated a trial
+    already judged is that trial's, even once its file has moved on to a new wording and start."""
     found = con.execute('SELECT measure, "day", what FROM changes ORDER BY "day", measure').fetchall()
+    now = {(t.name, t.started) for t in trials}
+    # A trial file's earlier starts. A bare change's own verdict is not one: it started on its change's day, which a
+    # trial file, started the day after its change went in, never does.
+    earlier = [
+        Trial(t, "settled", (m,), s)
+        for t, s, m in con.execute("SELECT trial, started, measure FROM verdicts").fetchall()
+        if t in {name for name, _ in now} and (t, s) not in now
+    ]
     filed = [replace(t, what=next((w for m, d, w in found if own(t, m, d)), "")) for t in trials]
     bare: dict[tuple[str, str], list[str]] = {}
     for measure, day, what in found:
-        if day >= JUDGED_FROM and not any(own(t, measure, day) for t in trials):
+        if day >= JUDGED_FROM and not any(
+            own(t, measure, day) for t in trials + [e for e in earlier if e.started != day]
+        ):
             bare.setdefault((measure, day), []).append(what)  # changes on one day are one change, with one verdict
     return filed + [
         Trial(measure, "testing", (measure,), day, what="; ".join(whats), filed=False)
@@ -292,3 +306,27 @@ def stamped(con, day: str) -> tuple[int, int]:
         [day],
     ).fetchone()
     return (found[0], found[1]) if found else (0, 0)
+
+
+def model_switches(con, first: str, last: str, width: int = 7) -> list[tuple[str, str]]:
+    """The days from `first` to `last` on which the model most typed-in sessions used over the week to then changed,
+    with the new model; a week, so one day's handful of sessions on another model is not a switch."""
+    rows = con.execute(
+        """SELECT "day", model, count(*) FROM sessions WHERE typed > 0 AND model IS NOT NULL AND "day" <= ?
+           GROUP BY ALL""",
+        [last],
+    ).fetchall()
+    counts: dict[str, dict[str, int]] = {}
+    for d, model, n in rows:
+        counts.setdefault(d, {})[model] = n
+    out, held = [], None
+    for d in sorted(counts):
+        week: dict[str, int] = {}
+        for k in range(width):
+            for model, n in counts.get(shift(d, -k), {}).items():
+                week[model] = week.get(model, 0) + n
+        top = max(sorted(week), key=week.__getitem__)
+        if held is not None and top != held and d >= first:
+            out.append((d, top))
+        held = top
+    return out
