@@ -25,9 +25,8 @@ The task token keeps a task one unit across restarts. Stamps from before every t
 | `sessions` | session and day: project, entrypoint, model, effort, replies, typed messages, tokens, root session, stamps |
 | `stamps` | stamp the hook gave a session, with its time |
 | `chances` | moment a rule could be broken (`measure, session, day, ts, uuid, miss`), as the measures file defines them |
-| `skill_loads` | skill an agent loaded, with its version: a hash of the text it read, without its folder or arguments |
 
-A continued session copies its parent's entries; each counts once, for the root session. A measures file is SQL that creates a temp table `chances` from the temp tables `texts`, `calls` and `typed`; `sessions.sql` names their columns. It may also create `measure_names(measure, name)`, names the page shows in place of measure ids, `changes(measure, day, what)`, the days a rule for a measure changed, and `skill_measures(measure, skill)`, the measures that count a skill not loaded when needed, under each name the skill has had. A full rebuild takes about 8 s on 2 GB of transcripts.
+A continued session copies its parent's entries; each counts once, for the root session. A measures file is SQL that creates a temp table `chances` from the temp tables `texts`, `calls` and `typed`; `sessions.sql` names their columns. It may also create `measure_names(measure, name)`, names the page shows in place of measure ids, and `changes(measure, day, what)`, the days a rule for a measure changed, each judged (Verdicts). A full rebuild takes about 8 s on 2 GB of transcripts.
 
 `verdicts`, `looks` (the holdout era's, no longer written) and `replays` are never rebuilt: a verdict is written once, and a replay's row changes only when that replay is rerun.
 
@@ -39,6 +38,7 @@ A continued session copies its parent's entries; each counts once, for the root 
 - **When.** On the trial's third day of real use from `started` (`REAL_DAYS`), a day being one someone typed in a session; never later. A settled trial that started before `JUDGED_FROM` had the holdout's verdict and gets none.
 - **Sides.** Before: from the measure's earlier rule change in `changes`, or `BEFORE_DAYS` back if later, to the day before `started`; a `changes` row within `OWN_CHANGE` days before `started` dates the trial's own change and is skipped. After: `started` to the verdict day.
 - **Verdict.** `works` when the 90% range of the change lies wholly below 0, `worse` when wholly above, each only with `MIN_TASKS` on both sides; else `no big effect`.
+- **Every change.** A `changes` row from `JUDGED_FROM` that dates no trial's own change gets a verdict as a trial of its own, with no file to update.
 - **Rare.** A measure with under `RARE` chances per day of real use before the trial cannot tell in three days, so its wording is replayed (Replays) on day 1. When before and after say `no big effect`, a replay of it from just before `started` on that passes its check and is sure decides instead.
 - **Acted on.** `daily` exits 1 for a trial still `status: testing` once it has its verdict, and for a rare one with no replay. The agents repo's `docs/keep-going.md` says what each verdict asks.
 - **Usual range.** For each measure, the latest day's miss rate against the middle 98% of rates from the same number of tasks drawn from the 28 days before.
@@ -56,16 +56,7 @@ A continued session copies its parent's entries; each counts once, for the root 
 
 ## Rule and skill size
 
-[`size.py`](../src/agent_experiments/size.py) shows whether agents only append to rules and skills. From the agents repo's whole `git log --numstat -M` (so a file moved into a pattern from anywhere is not new) and each file's text at each commit, it fills `sizes`: one row per file a commit changed, with its words after the commit and the lines added and deleted. A file renamed away or deleted drops to 0 words. `daily --agents-repo` refreshes it for `home/*.md`, the every-turn rules, and `skills/*/SKILL.md`. The figures are on the overview page, not here, since they move with every commit.
-
-## Skills
-
-[`skills.py`](../src/agent_experiments/skills.py) shows, for each measure in `skill_measures`, how often a task that needed the skill went without it, so a skill that is never loaded, or loaded less after an edit, shows.
-
-- **Version.** Each load's text is in the transcript, so its hash names the version agents read, with no tracking in the skills repo. A chance counts for the version its session last loaded before it, or, missed with no load, the newest version loaded anywhere by then.
-- **Birth.** Tasks before the skill existed count for nothing: before its file's first commit in the agents repo (Rule and skill size) or its first load, whichever is earlier.
-- **By version.** A version gets a rate only from 10 tasks: skills change several times a week, so most versions never get one, and those that do are compared by their ranges, not tested. Before and after is not a test (Method).
-- **Not covered.** Whether an agent followed a skill once loaded; and whether a new description triggers on the right prompts before it ships, which `claude plugin eval` with a `tool_used: Skill` grader does.
+[`size.py`](../src/agent_experiments/size.py) shows whether agents only append to rules and skills. From the agents repo's whole `git log --numstat -M` (so a file moved into a pattern from anywhere is not new) and each file's text at each commit, it fills `sizes`: one row per file a commit changed, with its words after the commit and the lines added and deleted. A file renamed away or deleted drops to 0 words. `daily --agents-repo` refreshes it for `home/*.md`, the every-turn rules, and `skills/*/SKILL.md`. The figures are in the report, not here, since they move with every commit.
 
 ## Method
 
@@ -80,9 +71,9 @@ A continued session copies its parent's entries; each counts once, for the root 
 
 ## Overview page
 
-`daily` writes `report.json`, the facts (its shape: [`report.ts`](../dashboard/src/data/report.ts)), beside it `overview.html`: the dashboard built from `dashboard/` into [`dashboard.html`](../src/agent_experiments/dashboard.html), with the report put in its `<script id="report">` by [`overview.py`](../src/agent_experiments/overview.py). Both are written in full before either replaces the last one, so a failed run leaves yesterday's page. A change there is `after / before - 1`, the drop's opposite, so below 0 is fewer misses. The page shows the trials still testing, started or judged in the last 7 days, one row each ([PRODUCT.md](../PRODUCT.md)); below them, the skills (Skills). The report also carries the mistakes, replays and sizes below, which the page does not show.
+`daily` writes `report.json`, the facts (its shape: [`report.ts`](../dashboard/src/data/report.ts)), beside it `overview.html`: the dashboard built from `dashboard/` into [`dashboard.html`](../src/agent_experiments/dashboard.html), with the report put in its `<script id="report">` by [`overview.py`](../src/agent_experiments/overview.py). Both are written in full before either replaces the last one, so a failed run leaves yesterday's page. A change there is `after / before - 1`, the drop's opposite, so below 0 is fewer misses. The page shows the rule changes still awaiting a verdict, started or judged in the last 7 days, one row each ([PRODUCT.md](../PRODUCT.md)). The report also carries the mistakes, replays and sizes below, which the page does not show.
 
-- **Trials.** Per trial and measure: each side's rate with its 90% range and tasks, over the days its verdict uses, its days of real use so far, its verdict and what decided it, its latest replay, and the 5 sessions with its latest misses since `started` (their ids and days, never their text), which the page copies for an agent to read.
+- **Trials.** Per rule change and measure: the change in plain words (its `changes` row), each side's rate with its 90% range and tasks, over the days its verdict uses, its days of real use so far, its verdict and what decided it, its latest replay, and the 5 sessions with its latest misses since `started` (their ids and days, never their text), which the page copies for an agent to read.
 - **Mistakes.** Each measure's latest day against its usual range, its rate over 3 days for 6 weeks with each day a rule for it changed (`changes`) and each trial's start, and its misses before and after the latest rule change, or over the last 28 days with no rule. Trial starts are marked on it; a trial's own before and after are its verdict's (Verdicts).
 - **Replays**, with whether the replay passed its check, and **rule and skill size**: words over time, largest files, and per month and pattern the share of changes deleting no line and of changed lines added.
 

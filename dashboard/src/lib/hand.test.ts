@@ -12,7 +12,6 @@ test("the copied request names the change, its result and numbers, and each sess
   const row: Row = {
     id: "trial-a-change",
     name: "A change",
-    group: "judged",
     status: "works",
     change: { value: -0.5, low: -0.8, high: -0.1 },
     trial: trial({ misses }),
@@ -29,7 +28,6 @@ test("with no misses it asks for the counting to be checked, and with no verdict
   const row: Row = {
     id: "trial-a-change",
     name: "A change",
-    group: "due",
     status: "due",
     change: null,
     trial: trial({ verdict: null, after: null }),

@@ -14,7 +14,7 @@ One person, who runs many agent sessions at once and writes the rules they follo
 
 ## Product Purpose
 
-For every rule change this week, answer at a glance, drawn and not written: did it work, by how much, and when the verdict is due if not yet. Then let him check that answer without leaving the page.
+Did this week's rule changes work? For every rule change being tested, at a glance: how often agents made its mistake before and since, and its verdict, or when the verdict is due. Let him check each answer without leaving the page.
 
 ## Behaviour
 
@@ -22,18 +22,15 @@ Each line has an end-to-end test in `dashboard/e2e`.
 
 | When | Then |
 |---|---|
-| The page opens | Every rule change still under test, or started or judged in the last 7 days, is one row: name, band, signed change, status icon. Changes under test come first, then this week's verdicts. |
+| The page opens | Every rule change still awaiting a verdict, or started or judged in the last 7 days, is one row: the change (and its mistake), the rate before, the rate since, the verdict. Those awaiting one come first, then this week's verdicts. |
 | A row shows | Its status is one of the four below, each with its own icon. |
-| A row has no verdict yet | It draws no band and shows a dash, so a change under test never shows a lead. |
+| A row has no verdict yet | Since shows the rate so far, or the day it starts; the verdict shows the day it is due if each day from here has use. |
 | He points at a row, or moves focus to it | Its card shows beside the table. A click keeps it open; leaving the table returns to the kept one. |
 | He opens an agent's link to a rule | That rule's card is open. Below 1100px the card is the whole screen, with a way back. |
-| He points at a status pill | Rows of other statuses dim. A click keeps only its rows, and hides the skills. |
-| The page opens | Below the rules, each tracked skill is one row, most missed first: name, its rate over 28 days with its range, no status, since a rate alone is no verdict. |
-| A skill's card shows | How often it is missed, its rate over time with a dashed line where each version was first loaded, each version's rate (none under 10 tasks), and its latest misses to hand to an agent. |
 | A rule change's card shows | In one order: verdict; mistake rate before and since, a dot each on one axis of the share of chances broken, with its range; change in mistakes (once judged); what it rests on (days of real use, tasks each side, the replay for a rare mistake); hand to an agent. |
 | No rule is picked | The card says how the numbers are made and what each mark means. |
 | He clicks "Copy for an agent" | The result and the sessions behind its latest misses are copied, worded as a request. |
-| A change is larger than the scale | Its band stops at the edge with a mark. |
+| A change is larger than the card's scale | Its band stops at the edge with a mark. |
 
 | Status | Verdict |
 |---|---|
@@ -47,15 +44,13 @@ Each line has an end-to-end test in `dashboard/e2e`.
 The general rules are the [`designing-interfaces`](https://github.com/ColinCee/agents/blob/main/skills/designing-interfaces/SKILL.md) skill, which holds for every page; this one adds:
 
 - The shadcn components the dashboard has, 13px type.
-- A result is a thin band across its 90% range with a small dot at the estimate and a tick at no change, fewer mistakes to the left. The column header is the scale, each number over its place.
-- The one number format is the signed change in mistakes, in percent.
-- Beside the table the card leaves out the row's number; the band returns only at full width, with its range's own numbers.
+- A rate is a whole percent of chances broken; a change, in the card only, is signed. The card draws a result as a thin band across its 90% range with a dot at the estimate and a tick at no change, fewer mistakes to the left, with its range's own numbers.
 
 ## Constraints
 
 - One self-contained file, opened from disk or published as a claude.ai page, with no server. No transcript text on the page.
 - Words he uses: "rule change" for a trial, "real use" for a day he typed to an agent.
-- Not on the rebuilt page, though the report keeps carrying them: mistake trends, mistakes with no rule yet, replays, rule and skill size. Whether they return behind a link is undecided.
+- Not on the page, though the report keeps carrying them: mistake trends, mistakes with no rule yet, replays, rule and skill size. Skill misses are not an experiment: the daily review logs them as lessons.
 
 ## Checks
 

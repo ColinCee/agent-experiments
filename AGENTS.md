@@ -9,7 +9,6 @@ Checks: `uv run ruff format --check && uv run ruff check && uv run ty check && u
 | `src/agent_experiments/counting.py`, `sessions.sql` | Transcripts and the measures file into the DuckDB file |
 | `src/agent_experiments/stats.py` | Shuffle p and resampled range, with SciPy |
 | `src/agent_experiments/verdicts.py` | Each trial's before against after on its third day of real use, usual ranges |
-| `src/agent_experiments/skills.py` | How often each skill is missed when needed, over time and by version |
 | `src/agent_experiments/replay.py` | Past moments answered again under old and new rules |
 | `src/agent_experiments/size.py` | Words of rule and skill files at each commit, from git |
 | `src/agent_experiments/overview.py` | The overview page: the report put into the built dashboard |

@@ -10,7 +10,7 @@ from pathlib import Path
 
 import numpy as np
 
-from agent_experiments import overview, replay, size, skills, verdicts
+from agent_experiments import overview, replay, size, verdicts
 from agent_experiments.counting import count
 from agent_experiments.stats import Effect, compare
 from agent_experiments.verdicts import shift
@@ -116,6 +116,7 @@ def build(db: Path, trials: list[verdicts.Trial], day: str, errors: list[str]) -
     # Numbers only the page uses draw from their own generator, so adding one never moves a verdict's range.
     shown = np.random.default_rng(2)
     con = verdicts.open_store(db)
+    trials = verdicts.with_changes(con, trials)
     names = dict(con.execute("SELECT measure, name FROM measure_names").fetchall())
 
     def name(trial: verdicts.Trial, measure: str) -> str:
@@ -124,7 +125,8 @@ def build(db: Path, trials: list[verdicts.Trial], day: str, errors: list[str]) -
         if not found:
             errors.append(
                 f"Trial {trial.name} shows its file name: give its measure {measure} a name in `measure_names` in the"
-                " measures file, or the trial file a line `name: <the mistake, in plain words>`."
+                " measures file"
+                + (", or the trial file a line `name: <the mistake, in plain words>`." if trial.filed else ".")
             )
         return found or trial.name
 
@@ -140,22 +142,26 @@ def build(db: Path, trials: list[verdicts.Trial], day: str, errors: list[str]) -
                 found = verdicts.judge(con, trial, measure, day, rng)
                 new += [found] if found and not (stored and stored[0]) else []
                 row = _trial_row(con, trial, measure, found, day, shown)
-                if trial.status == "testing" or trial.started >= week or (found and found.day >= week):
+                if row["status"] == "testing" or trial.started >= week or (found and found.day >= week):
                     rows.append({"name": name(trial, measure), **row})
-                if trial.status != "testing":
+                if row["status"] != "testing":
                     continue
-                if found:
+                if found and trial.filed:
                     errors.append(
                         f"Trial {trial.name}: {found.verdict} on {found.day}, its day {verdicts.REAL_DAYS} of real use,"
                         f" and still `status: testing`. {ACT[found.verdict]} Then add its line to docs/findings.md."
                     )
                 elif (
-                    row["rare"] and row["real_days"] and not (row["replay"] and row["replay"]["real_rate"] is not None)
+                    not found
+                    and row["rare"]
+                    and row["real_days"]
+                    and not (row["replay"] and row["replay"]["real_rate"] is not None)
                 ):
+                    old_new = "the trial's Off and On" if trial.filed else "the rules before and after the change"
                     errors.append(
                         f"Trial {trial.name}: {measure} has under {verdicts.RARE} chances a day of real use, too few for"
                         f" {verdicts.REAL_DAYS} days to tell. Run `agent-experiments replay --measure {measure}` with"
-                        " the trial's Off and On as --old and --new before its verdict is due."
+                        f" {old_new} as --old and --new before its verdict is due."
                     )
         except Exception:
             errors.append(f"Trial {trial.name} left off the page:\n{traceback.format_exc()}")
@@ -164,7 +170,9 @@ def build(db: Path, trials: list[verdicts.Trial], day: str, errors: list[str]) -
         """SELECT measure, "day", what, 'rule' FROM changes WHERE "day" <= ? ORDER BY "day\"""", [day]
     ).fetchall()
     # Trial starts are marked; a before and after boundary is a rule change (docs/architecture.md#overview-page).
-    changes += [(m, t.started, t.title or t.name, "trial") for t in trials if t.started <= day for m in t.measures]
+    changes += [
+        (m, t.started, t.title or t.name, "trial") for t in trials if t.filed and t.started <= day for m in t.measures
+    ]
     mistakes = [_mistake(con, m, names.get(m, m), changes, day, rng) for m in verdicts.measures(con)]
     mistakes.sort(key=lambda r: r["name"])
     in_group, total = verdicts.stamped(con, day)
@@ -172,7 +180,6 @@ def build(db: Path, trials: list[verdicts.Trial], day: str, errors: list[str]) -
     columns = [d[0] for d in found.description]
     replays = [_replay(dict(zip(columns, r, strict=True)), names) for r in found.fetchall()]
     sizes = size.report(con)
-    skill_rows = skills.report(con, names, day, shown)
     con.close()
     report = {
         "day": day,
@@ -182,7 +189,6 @@ def build(db: Path, trials: list[verdicts.Trial], day: str, errors: list[str]) -
         "mistakes": mistakes,
         "replays": replays,
         "sizes": sizes,
-        "skills": skill_rows,
     }
     return report, new
 
@@ -211,14 +217,17 @@ def _trial_row(
     it has one), the verdict, the replay that can settle a rare measure, and the sessions behind the latest misses."""
     last, used = verdicts.due(con, trial, day)
     end = found.day if found else last or day
+    # Until it is reached, the verdict's day if every day from here has real use.
+    expected = shift(max(trial.started, shift(day, 1)), verdicts.REAL_DAYS - used - 1)
     first = verdicts.before_from(con, trial, measure)
     before = verdicts.side(con, measure, first, shift(trial.started, -1), rng)[0]
     after = verdicts.side(con, measure, trial.started, end, rng)[0] if day >= trial.started else None
     replayed = verdicts.latest_replay(con, trial, measure)
     return {
+        "what": trial.what or None,
         "started": trial.started,
-        "status": trial.status,
-        "due": found.day if found else last,
+        "status": trial.status if trial.filed else "settled" if found else "testing",
+        "due": found.day if found else last or expected,
         "real_days": verdicts.REAL_DAYS if found else used,
         "rare": verdicts.is_rare(con, trial, measure),
         "before": before,

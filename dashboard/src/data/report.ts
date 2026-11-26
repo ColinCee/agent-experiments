@@ -19,24 +19,24 @@ export interface Report {
   written: string;
   /** Typed in on `day`, and how many of them the trial hook stamped. */
   sessions: { total: number; stamped: number };
-  /** Rule changes still awaiting a verdict, or started or given one in the last 7 days. */
+  /** Rule changes, with a trial file or without, still awaiting a verdict, or started or given one in the last 7 days. */
   trials: Trial[];
   mistakes: Mistake[];
   replays: Replay[];
   sizes: Sizes;
-  /** One per mistake the measures file ties to a skill: the skill not loaded when its moment came. */
-  skills: Skill[];
 }
 
 /** A rule change, judged by its mistake rate before against its first three days of real use. */
 export interface Trial {
   /** The mistake it targets, in plain words. */
   name: string;
+  /** The change, in plain words; null when the measures file dates none. */
+  what: string | null;
   /** The day the change reached every task. */
   started: Day;
   status: "testing" | "settled";
-  /** Its third day of real use, the verdict's day; null until reached. */
-  due: Day | null;
+  /** Its third day of real use, the verdict's day; until reached, the day it falls on if every day from here has use. */
+  due: Day;
   /** Days of real use since the start, at most 3. */
   real_days: number;
   /** Under 2 chances a day: three days hold too few, so a replay tests it. */
@@ -112,34 +112,4 @@ export interface Sizes {
   largest: { file: string; words: number }[];
   /** Per month (YYYY-MM): edits, the share of them that only added lines, and the share of changed lines added. */
   months: { month: string; label: "Rules" | "Skills"; changes: number; only_added: number; added_share: number }[];
-}
-
-/** A version of a skill's text, from the first day an agent loaded it. */
-export interface SkillVersion {
-  /** 7 hex characters of a hash of the text. */
-  version: string;
-  /** The skill's name when this version was first loaded; a renamed skill keeps its earlier versions. */
-  skill: string;
-  since: Day;
-  /** Tasks whose moment came while this was the latest version loaded, over the timeline. */
-  tasks: number;
-  /** Null under 10 tasks, too few to rank versions by. */
-  rate: number | null;
-  low: number | null;
-  high: number | null;
-}
-
-export interface Skill {
-  /** The mistake, in plain words. */
-  name: string;
-  /** Every name the skill has had. */
-  skills: string[];
-  /** Over the last 28 days; null with no tasks. */
-  now: Side | null;
-  /** 6 weeks, 7-day rolling. */
-  series: { day: Day; rate: number | null }[];
-  /** The version in force when the series starts and every one after, newest first. */
-  versions: SkillVersion[];
-  /** Up to 5, latest first, over the last 28 days. */
-  misses: { day: Day; session: string }[];
 }

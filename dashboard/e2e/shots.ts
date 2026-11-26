@@ -13,7 +13,10 @@ const source = report === undefined ? "fixture" : "report";
 const outDir = new URL("../shots/", import.meta.url);
 await mkdir(outDir, { recursive: true });
 
-const KINDS = ["due", "judged"];
+const KINDS = [
+  ["due", '[data-status="due"]'],
+  ["judged", '[data-row]:not([data-status="due"])'],
+] as const;
 
 /** Every state of a row in the fixture, by name and row. */
 const FIXTURE_STATES = [
@@ -51,10 +54,7 @@ try {
     await save(page, `page-${width}-${colorScheme}`, true);
     if (width === "desktop" && colorScheme === "light") {
       // The fixture shoots every state of every kind; a real report, the first row of each kind.
-      const picks =
-        report === undefined
-          ? FIXTURE_STATES
-          : KINDS.map((group) => [group, `[data-group="${group}"] [data-row]`] as const);
+      const picks = report === undefined ? FIXTURE_STATES : KINDS;
       for (const [name, selector] of picks) {
         const row = page.locator(selector).first();
         if ((await row.count()) === 0) continue;

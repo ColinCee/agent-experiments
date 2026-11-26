@@ -1,7 +1,10 @@
 import type { Trial } from "@/data/report";
 
-/** The four answers a row can give, worst first: the order the pills use (PRODUCT.md, Behaviour). */
+/** The four answers a row can give, worst first. */
 export const STATUSES = ["worse", "works", "no-effect", "due"] as const;
+
+/** Days of real use a change gets before its verdict (docs/architecture.md#verdicts). */
+export const REAL_DAYS = 3;
 
 export type Status = (typeof STATUSES)[number];
 

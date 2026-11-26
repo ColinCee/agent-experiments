@@ -32,12 +32,12 @@ for (const [name, report] of Object.entries({ fixture, empty: emptyReport })) {
     test(`the page renders cleanly with the ${name} report at ${width} width`, async ({ page }) => {
       await page.setViewportSize(viewport);
       const opened = await openBuilt(page, report);
-      await expect(page.locator("h1")).toHaveText("Rule experiments");
+      await expect(page.locator("h1")).toHaveText("Rule changes being tested");
       // biome-ignore lint/performance/useDomNodeTextContent: only words shown on screen count, not hidden ones.
       const text = await page.locator("body").innerText();
       expect(text).not.toMatch(BANNED);
       expect(text).not.toMatch(/\bCI\b/);
-      if (name === "empty") expect(text).toContain("No rule changes under test this week.");
+      if (name === "empty") expect(text).toContain("No rule changes this week.");
       const found = await page.evaluate(() => {
         const small: string[] = [];
         for (const el of document.querySelectorAll("body *")) {
@@ -55,44 +55,30 @@ for (const [name, report] of Object.entries({ fixture, empty: emptyReport })) {
   }
 }
 
-test("the page opens with one row per rule change: those under test, then this week's verdicts", async ({ page }) => {
-  await openWide(page);
-  const ids = (group: string) =>
-    page.locator(`[data-group="${group}"] [data-row]`).evaluateAll((all) => all.map((r) => r.getAttribute("data-row")));
-  await expect(page.locator("[data-group] [data-row]")).toHaveCount(fixture.trials.length);
-  expect(await page.locator("[data-group]").evaluateAll((all) => all.map((g) => g.getAttribute("data-group")))).toEqual(
-    ["due", "judged"],
-  );
-  expect(await ids("due")).toEqual([RUNNING, SCHEDULED]);
-  expect(await ids("judged")).toEqual([REPLAYED, WORKS, NO_EFFECT, WORSE]);
-  const cells = row(page, WORKS);
-  await expect(cells.locator("[data-name]")).toHaveText("Tests skipped before a commit");
-  await expect(cells.locator('[data-track="change"]')).toBeVisible();
-  await expect(cells.locator("[data-change]")).toHaveText("−60%");
-  await expect(cells.getByRole("img", { name: "Works" })).toBeVisible();
-});
-
-test("each skill is a row below, most missed first, and its card shows its rate over time and by version", async ({
+test("the page opens with one row per rule change: those awaiting a verdict, then this week's verdicts", async ({
   page,
 }) => {
   await openWide(page);
-  const skills = page.getByRole("region", { name: "Skills" }).locator("[data-row]");
-  await expect(skills).toHaveCount(fixture.skills.length);
-  expect(await skills.locator("[data-name]").allTextContents()).toEqual([
-    "Reviews done without the review skill",
-    "Releases cut without the release skill",
-    "Exports run without the export skill",
-  ]);
-  await expect(skills.nth(0).locator("[data-rate]")).toHaveText("60%");
-  await expect(skills.nth(2).locator("[data-rate]")).toHaveText("–");
-  await expect(skills.nth(2).locator('[data-track="rate"]')).toHaveCount(0);
-  const id = "skill-releases-cut-without-the-release-skill";
-  await row(page, id).hover();
-  await expect(card(page, id).locator("[data-version]")).toHaveCount(3);
-  await expect(card(page, id).locator('[data-version="c41d9e2"]')).toContainText("too few");
-  expect(await sections(page)).toEqual(["verdict", "rate-now", "rate", "versions", "hand"]);
-  await row(page, id).click();
-  await expect(page).toHaveURL(new RegExp(`#${id}$`));
+  const ids = await page.locator("[data-row]").evaluateAll((all) => all.map((r) => r.getAttribute("data-row")));
+  expect(ids).toEqual([RUNNING, SCHEDULED, REPLAYED, WORKS, NO_EFFECT, WORSE]);
+  const cells = row(page, WORKS);
+  await expect(cells.locator("[data-name]")).toHaveText("Run the tests before each commit");
+  await expect(cells).toContainText("Tests skipped before a commit");
+  await expect(cells.locator("[data-before]")).toHaveText("25%");
+  await expect(cells.locator("[data-since]")).toHaveText("10%");
+  await expect(cells.locator("[data-verdict]")).toHaveText("Works");
+  // With nothing wording the change, the row is named for its mistake.
+  await expect(row(page, NO_EFFECT).locator("[data-name]")).toHaveText("Commit messages with no reason");
+});
+
+test("a change awaiting its verdict shows its rate so far, or the day it starts, and the day its verdict is due", async ({
+  page,
+}) => {
+  await openWide(page);
+  await expect(row(page, RUNNING).locator("[data-since]")).toHaveText("9%");
+  await expect(row(page, RUNNING).locator("[data-verdict]")).toHaveText("Day 3 on 13 Nov");
+  await expect(row(page, SCHEDULED).locator("[data-since]")).toHaveText("from 13 Nov");
+  await expect(row(page, SCHEDULED).locator("[data-verdict]")).toHaveText("Day 3 on 15 Nov");
 });
 
 test("each row's status is its verdict, one of four, each with its own icon", async ({ page }) => {
@@ -102,20 +88,13 @@ test("each row's status is its verdict, one of four, each with its own icon", as
     [REPLAYED]: ["works", "Works"],
     [WORSE]: ["worse", "Worse"],
     [NO_EFFECT]: ["no-effect", "No big effect"],
-    [RUNNING]: ["due", "Verdict due"],
-    [SCHEDULED]: ["due", "Verdict due"],
+    [RUNNING]: ["due", ""],
+    [SCHEDULED]: ["due", ""],
   };
   for (const [id, [status, words]] of Object.entries(expected)) {
     await expect(row(page, id), id).toHaveAttribute("data-status", status);
-    await expect(row(page, id).locator(`[data-status-icon="${status}"]`), id).toHaveAccessibleName(words);
-  }
-});
-
-test("a row with no verdict yet draws no band and shows a dash", async ({ page }) => {
-  await openWide(page);
-  for (const id of [RUNNING, SCHEDULED]) {
-    await expect(row(page, id).locator('[data-track="change"]'), id).toHaveCount(0);
-    await expect(row(page, id).locator("[data-change]"), id).toHaveText("–");
+    await expect(row(page, id).locator(`[data-status-icon="${status}"]`), id).toBeVisible();
+    if (status !== "due") await expect(row(page, id).locator("[data-verdict]"), id).toHaveText(words);
   }
 });
 
@@ -190,23 +169,6 @@ test("on a phone a linked rule's card is the whole screen, with a way back to th
   await expect(card(page, REPLAYED)).toBeVisible();
 });
 
-test("pointing at a status pill dims the other rows, and a click keeps only its rows", async ({ page }) => {
-  await openWide(page);
-  const opacity = (id: string) => row(page, id).evaluate((el) => getComputedStyle(el).opacity);
-  await page.locator('[data-pill="works"]').hover();
-  await expect.poll(() => opacity(RUNNING)).toBe("0.3");
-  expect(await opacity(WORKS)).toBe("1");
-  await page.mouse.move(5, 5);
-  await expect.poll(() => opacity(RUNNING)).toBe("1");
-  await page.locator('[data-pill="works"]').click();
-  await expect(page.locator("[data-row]")).toHaveCount(2);
-  await expect(page.locator('[data-row]:not([data-status="works"])')).toHaveCount(0);
-  await expect(page.locator('[data-group="due"]')).toHaveCount(0);
-  await expect(page.locator('[data-pill="works"]')).toHaveAttribute("aria-pressed", "true");
-  await page.locator('[data-pill="works"]').click();
-  await expect(page.locator("[data-group] [data-row]")).toHaveCount(fixture.trials.length);
-});
-
 test("every card has its sections in one order, and one with no verdict has no change", async ({ page }) => {
   const opened = await openWide(page);
   const expected = {
@@ -273,45 +235,17 @@ test("with no rule picked the card says how the numbers are made and what each m
 });
 
 test("a change larger than the scale stops at the edge with a mark", async ({ page }) => {
-  await openWide(page);
-  const band = row(page, WORSE).locator('[data-track="change"]');
+  await openWide(page, `#${WORSE}`);
+  const band = card(page, WORSE).locator('[data-track="change"]');
   await expect(band.locator("[data-clipped]")).toBeVisible();
-  await expect(row(page, WORSE).locator("[data-change]")).toHaveText("+133%");
+  await expect(card(page, WORSE).locator('[data-end="high"]')).toHaveText("+310% ›");
   const { edge, dot } = await band.evaluate((track) => {
     const mark = track.querySelector("[data-value]")?.getBoundingClientRect();
     return { edge: track.getBoundingClientRect().right, dot: mark ? mark.left + mark.width / 2 : Number.NaN };
   });
   expect(Math.abs(dot - edge)).toBeLessThanOrEqual(1);
-  await expect(row(page, WORKS).locator("[data-clipped]")).toHaveCount(0);
-});
-
-test("every band's dot sits at its value, under the same number in the header's scale", async ({ page }) => {
-  await openWide(page);
-  const tracks = await page.evaluate(() => {
-    const box = (el: Element) => el.getBoundingClientRect();
-    return [...document.querySelectorAll('[data-table] [data-track="change"], [data-table] [data-axis]')].map(
-      (track) => ({
-        axis: track.hasAttribute("data-axis"),
-        left: box(track).left,
-        width: box(track).width,
-        marks: [...track.querySelectorAll("[data-value]")].map((mark) => ({
-          value: Number(mark.getAttribute("data-value")),
-          x: box(mark).left + box(mark).width / 2,
-        })),
-      }),
-    );
-  });
-  expect(tracks.filter((t) => !t.axis).length).toBe(4);
-  for (const track of tracks) {
-    expect(Math.abs(track.left - tracks[0].left), "left edge").toBeLessThanOrEqual(0.5);
-    expect(Math.abs(track.width - tracks[0].width), "width").toBeLessThanOrEqual(0.5);
-    for (const mark of track.marks) {
-      // The scale's two end numbers sit inside its edges, so only its middle numbers are centred on their place.
-      if (track.axis && Math.abs(mark.value) === 1) continue;
-      const at = (Math.min(1, Math.max(-1, mark.value)) + 1) / 2;
-      expect(Math.abs(mark.x - (track.left + at * track.width)), `${mark.value}`).toBeLessThanOrEqual(1);
-    }
-  }
+  await page.goto(page.url().replace(WORSE, WORKS));
+  await expect(card(page, WORKS).locator("[data-clipped]")).toHaveCount(0);
 });
 
 test("the placeholder appears once, so injection replaces only the report", async () => {

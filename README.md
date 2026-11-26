@@ -1,6 +1,6 @@
 # agent-experiments
 
-Tests whether a change to a coding agent's rules works: the rule is on for a random half of tasks, and each day this tool counts how often each half breaks it, gives a verdict when it can, and draws one page.
+Tests whether a change to a coding agent's rules works: each day this tool counts how often agents break each rule, judges each change by its rate before against its first three days of real use, and draws one page.
 
 ![Trial files and a hook stamp each task; counting reads transcripts and a private measures file into one DuckDB file; verdicts read it and write the overview page](docs/architecture.svg)
 

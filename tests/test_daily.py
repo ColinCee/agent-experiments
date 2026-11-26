@@ -29,9 +29,9 @@ TEMPLATE = (
 PACKAGED = overview.template
 SIDE = {"rate", "low", "high", "tasks", "from"}
 KEYS = {
-    "report": {"day", "written", "sessions", "trials", "mistakes", "replays", "sizes", "skills"},
+    "report": {"day", "written", "sessions", "trials", "mistakes", "replays", "sizes"},
     "sessions": {"total", "stamped"},
-    "trial": {"name", "started", "status", "due", "real_days", "rare", "before", "after", "change", "verdict"}
+    "trial": {"name", "what", "started", "status", "due", "real_days", "rare", "before", "after", "change", "verdict"}
     | {"source", "replay", "misses"},
     "mistake": {"name", "today", "rule", "before", "after", "change", "sure", "current", "series", "changes"},
 }
@@ -92,7 +92,7 @@ def test_daily_writes_the_report_and_puts_it_in_the_page(tmp_path: Path, capsys)
     assert (running["name"], running["status"], running["due"], running["real_days"]) == (
         "Bad words",
         "testing",
-        None,
+        "2026-01-04",  # its third day of real use, if the next two have use
         1,
     )
     assert (running["verdict"], running["change"], running["before"], running["rare"]) == (None, None, None, True)
@@ -215,3 +215,19 @@ def test_a_failed_build_leaves_yesterdays_files(tmp_path: Path, monkeypatch):
 
 def test_the_packaged_dashboard_has_one_slot_for_the_report():
     assert PACKAGED().count(overview.SLOT) == 1
+
+
+def test_a_rule_change_with_no_trial_file_gets_a_row_and_a_rare_one_asks_for_a_replay(
+    tmp_path: Path, capsys, monkeypatch
+):
+    # Moved back so the made-up days count: the measures file's change on 2 Jan dates no trial's own change.
+    monkeypatch.setattr(cli.verdicts, "JUDGED_FROM", "2026-01-01")
+    daily(tmp_path)
+    err = capsys.readouterr().err
+    report = json.loads((tmp_path / "report.json").read_text(encoding="utf-8"))
+    bare = [t for t in report["trials"] if t["what"] == "rule added"]
+    assert [(t["name"], t["started"], t["status"], t["verdict"]) for t in bare] == [
+        ("Bad words", "2026-01-02", "testing", None)
+    ]
+    assert "Trial bad-word: bad-word has under 2 chances" in err and "the rules before and after the change" in err
+    assert "Trial bad-word: " not in err.replace("Trial bad-word: bad-word has under", "")
