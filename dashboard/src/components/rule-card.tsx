@@ -233,7 +233,6 @@ export function PageFacts({ report }: { report: Report }) {
           ["−63%", "63% fewer mistakes since the change"],
           ["A change that does nothing", "Called Works or Worse about 1 time in 4"],
           ["A rare mistake", "Under 2 chances a day: a replay tests it"],
-          ["A needless stop", "An agent stopped and had to be nudged on, as a labeller model judged"],
         ]}
       />
     </div>

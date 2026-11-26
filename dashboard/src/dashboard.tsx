@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { StopsChart } from "@/components/charts/stops-chart";
 import { PageFacts, RuleCard } from "@/components/rule-card";
 import { RuleTable } from "@/components/rule-table";
 import type { Report } from "@/data/report";
@@ -17,8 +16,8 @@ const PREVIEW_AFTER = 70;
 const LET_GO_AFTER = 220;
 
 /**
- * The one page (PRODUCT.md, Behaviour): this week's rule changes and how the stop rules have done overall, and beside
- * them a card for the row under the pointer or focus. A click keeps a row's card and puts it in the address.
+ * The one page (PRODUCT.md, Behaviour): the rule changes being tested, and beside them a card for the row under the
+ * pointer or focus. A click keeps a row's card and puts it in the address.
  */
 export function Dashboard({ report }: { report: Report }) {
   const rows = useMemo(() => pageRows(report), [report]);
@@ -65,28 +64,15 @@ export function Dashboard({ report }: { report: Report }) {
     <div className="grid items-start gap-6 min-[1100px]:grid-cols-[minmax(0,1fr)_22.5rem]">
       {!alone && (
         <div className="grid gap-6">
-          <section aria-labelledby="changes" className="grid gap-2">
-            <h2 id="changes" className="font-medium text-sm">
-              This week's changes
-            </h2>
-            <RuleTable
-              rows={rows}
-              day={report.day}
-              pinned={pinned}
-              shown={shownId}
-              events={events}
-              onLeave={() => preview(null, LET_GO_AFTER)}
-              onFocusOut={() => preview(null, 0)}
-            />
-          </section>
-          {report.stops.some((v) => v.rate !== null) && (
-            <section aria-labelledby="overall" className="grid gap-2">
-              <h2 id="overall" className="font-medium text-sm">
-                Is it improving overall?
-              </h2>
-              <StopsChart versions={report.stops} day={report.day} />
-            </section>
-          )}
+          <RuleTable
+            rows={rows}
+            day={report.day}
+            pinned={pinned}
+            shown={shownId}
+            events={events}
+            onLeave={() => preview(null, LET_GO_AFTER)}
+            onFocusOut={() => preview(null, 0)}
+          />
         </div>
       )}
       {(wide || alone) && (

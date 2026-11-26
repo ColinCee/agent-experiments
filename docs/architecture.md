@@ -58,10 +58,6 @@ A continued session copies its parent's entries; each counts once, for the root 
 
 [`size.py`](../src/agent_experiments/size.py) shows whether agents only append to rules and skills. From the agents repo's whole `git log --numstat -M` (so a file moved into a pattern from anywhere is not new) and each file's text at each commit, it fills `sizes`: one row per file a commit changed, with its words after the commit and the lines added and deleted. A file renamed away or deleted drops to 0 words. `daily --agents-repo` refreshes it for `home/*.md`, the every-turn rules, and `skills/*/SKILL.md`. The figures are in the report, not here, since they move with every commit.
 
-## Stops
-
-[`stops.py`](../src/agent_experiments/stops.py) answers whether agents stop needlessly less over time. From the labeller's labelled stops (`--labels`, each a stop judged right or wrong, wrong being one the user had to nudge on) and the versions of the stop rules with their days (`--versions`), it gives each version its stops and the share wrong. A day between two versions, the day a change went in, belongs to neither; a version with under `MIN_STOPS` gets no rate.
-
 ## Method
 
 [`stats.py`](../src/agent_experiments/stats.py) uses SciPy for both tests.
@@ -75,7 +71,7 @@ A continued session copies its parent's entries; each counts once, for the root 
 
 ## Overview page
 
-`daily` writes `report.json`, the facts (its shape: [`report.ts`](../dashboard/src/data/report.ts)), beside it `overview.html`: the dashboard built from `dashboard/` into [`dashboard.html`](../src/agent_experiments/dashboard.html), with the report put in its `<script id="report">` by [`overview.py`](../src/agent_experiments/overview.py). Both are written in full before either replaces the last one, so a failed run leaves yesterday's page. A change there is `after / before - 1`, the drop's opposite, so below 0 is fewer misses. The page shows the rule changes still awaiting a verdict, started or judged in the last 7 days, one row each ([PRODUCT.md](../PRODUCT.md)); below them, needless stops by rule version (Stops). The report also carries the mistakes, replays and sizes below, which the page does not show.
+`daily` writes `report.json`, the facts (its shape: [`report.ts`](../dashboard/src/data/report.ts)), beside it `overview.html`: the dashboard built from `dashboard/` into [`dashboard.html`](../src/agent_experiments/dashboard.html), with the report put in its `<script id="report">` by [`overview.py`](../src/agent_experiments/overview.py). Both are written in full before either replaces the last one, so a failed run leaves yesterday's page. A change there is `after / before - 1`, the drop's opposite, so below 0 is fewer misses. The page shows the rule changes still awaiting a verdict, started or judged in the last 7 days, one row each ([PRODUCT.md](../PRODUCT.md)). The report also carries the mistakes, replays and sizes below, which the page does not show.
 
 - **Trials.** Per rule change and measure: the change in plain words (its `changes` row), each side's rate with its 90% range and tasks, over the days its verdict uses, its days of real use so far, its verdict and what decided it, its latest replay, and the 5 sessions with its latest misses since `started` (their ids and days, never their text), which the page copies for an agent to read.
 - **Mistakes.** Each measure's latest day against its usual range, its rate over 3 days for 6 weeks with each day a rule for it changed (`changes`) and each trial's start, and its misses before and after the latest rule change, or over the last 28 days with no rule. Trial starts are marked on it; a trial's own before and after are its verdict's (Verdicts).

@@ -24,20 +24,6 @@ export interface Report {
   mistakes: Mistake[];
   replays: Replay[];
   sizes: Sizes;
-  /** Each version of the stop rules, oldest first. */
-  stops: StopVersion[];
-}
-
-/** A version of the rules on when an agent stops, and how often he had to nudge an agent that stopped under it. */
-export interface StopVersion {
-  version: string;
-  from: Day;
-  /** What it changed, in plain words. */
-  what: string;
-  /** Stops a labeller model judged, over the version's days. */
-  stops: number;
-  /** The share he had to nudge on; null under 50 stops. */
-  rate: number | null;
 }
 
 /** A rule change, judged by its mistake rate before against its first three days of real use. */

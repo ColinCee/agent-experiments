@@ -8,10 +8,9 @@ import traceback
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
-import duckdb
 import numpy as np
 
-from agent_experiments import overview, replay, size, stops, verdicts
+from agent_experiments import overview, replay, size, verdicts
 from agent_experiments.counting import count
 from agent_experiments.stats import Effect, compare
 from agent_experiments.verdicts import shift
@@ -34,8 +33,6 @@ def main(argv: list[str] | None = None) -> int:
     daily.add_argument("--measures", type=Path, default=DATA / "measures" / "measures.sql")
     daily.add_argument("--transcripts", default=str(PROJECTS / "*" / "*.jsonl"))
     daily.add_argument("--db", type=Path, default=DATA / "experiments.duckdb")
-    daily.add_argument("--labels", type=Path, default=DATA / "labels", help="the labeller's labelled stops, *.jsonl")
-    daily.add_argument("--versions", type=Path, default=DATA / "versions.csv", help="the stop rules' versions")
     daily.add_argument("--page", type=Path, default=DATA / "overview.html", help="report.json is written beside it")
     rp = sub.add_parser("replay", help="answer past moments again under old and new rules, and compare their misses")
     rp.add_argument(
@@ -84,11 +81,6 @@ def main(argv: list[str] | None = None) -> int:
     if args.agents_repo:
         size.measure(args.agents_repo, size.PATHS, args.db)
     report, new = build(args.db, trials, day, errors)
-    try:
-        report["stops"] = stops.by_version(args.labels, args.versions)
-    except duckdb.Error as e:  # a labels or versions file in a shape the query cannot read
-        report["stops"] = []
-        errors.append(f"Needless stops left off the page: {e}")
     for v in new:
         change = "no rate to compare" if np.isnan(v.change) else f"change {v.change:+.0%}"
         print(f"{v.trial} ({v.measure}): {v.verdict} on {v.day}, from {v.source}; {change}")

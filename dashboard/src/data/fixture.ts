@@ -429,19 +429,6 @@ export const fixture: Report = {
       { month: "2026-11", label: "Skills", changes: 8, only_added: 0.75, added_share: 0.8 },
     ],
   },
-  stops: [
-    { version: "v0", from: "2026-09-01", what: "No rule on when to stop", stops: 640, rate: 0.3 },
-    { version: "v1", from: "2026-09-20", what: "Act without asking unless it is destructive", stops: 380, rate: 0.19 },
-    { version: "v2", from: "2026-10-05", what: "Stop only for a decision only he can make", stops: 300, rate: 0.16 },
-    { version: "v3", from: "2026-10-20", what: "A reminder before each stop", stops: 41, rate: null },
-    {
-      version: "v4",
-      from: "2026-10-24",
-      what: "An offer for a step the agent could take is a stop",
-      stops: 410,
-      rate: 0.21,
-    },
-  ],
 };
 
 const noData = series(0, 0, null, 0).map(({ day }) => ({ day, rate: null }));
@@ -480,5 +467,4 @@ export const emptyReport: Report = {
   ],
   replays: [],
   sizes: { series: [], largest: [], months: [] },
-  stops: [],
 };

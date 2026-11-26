@@ -29,7 +29,7 @@ TEMPLATE = (
 PACKAGED = overview.template
 SIDE = {"rate", "low", "high", "tasks", "from"}
 KEYS = {
-    "report": {"day", "written", "sessions", "trials", "mistakes", "replays", "sizes", "stops"},
+    "report": {"day", "written", "sessions", "trials", "mistakes", "replays", "sizes"},
     "sessions": {"total", "stamped"},
     "trial": {"name", "what", "started", "status", "due", "real_days", "rare", "before", "after", "change", "verdict"}
     | {"source", "replay", "misses"},
@@ -61,7 +61,6 @@ def daily(tmp_path: Path, day: str = "2026-01-02", used: tuple[str, ...] = ("202
     (trials / "unnamed.md").write_text("---\nmeasures: no-name\nstarted: 2026-01-05\n---\n")
     (trials / "undated.md").write_text("---\nmeasures: bad-word\n---\n")
     paths = {"trials": trials, "measures": tmp_path / "measures.sql", "db": tmp_path / "x.duckdb"}
-    paths |= {"labels": tmp_path / "labels", "versions": tmp_path / "versions.csv"}
     paths |= {"page": tmp_path / "overview.html", "transcripts": tmp_path / "projects" / "*" / "*.jsonl"}
     return main(["daily", "--day", day, *(a for k, v in paths.items() for a in (f"--{k}", str(v)))])
 
@@ -84,7 +83,7 @@ def test_daily_writes_the_report_and_puts_it_in_the_page(tmp_path: Path, capsys)
     report = json.loads(text)
     assert "NaN" not in text and "Infinity" not in text
     assert set(report) == KEYS["report"] and set(report["sessions"]) == KEYS["sessions"]
-    assert report["sessions"] == {"total": 2, "stamped": 2} and report["stops"] == []
+    assert report["sessions"] == {"total": 2, "stamped": 2}
     trials = {t["started"]: t for t in report["trials"]}
     assert all(set(t) == KEYS["trial"] for t in trials.values())
     assert set(trials) == {"2026-01-01", "2026-01-05", "2026-01-10"}  # the old settled trial is not this week's

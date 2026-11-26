@@ -32,7 +32,7 @@ for (const [name, report] of Object.entries({ fixture, empty: emptyReport })) {
     test(`the page renders cleanly with the ${name} report at ${width} width`, async ({ page }) => {
       await page.setViewportSize(viewport);
       const opened = await openBuilt(page, report);
-      await expect(page.locator("h1")).toHaveText("Did this week's changes make agents better?");
+      await expect(page.locator("h1")).toHaveText("Rule changes being tested");
       // biome-ignore lint/performance/useDomNodeTextContent: only words shown on screen count, not hidden ones.
       const text = await page.locator("body").innerText();
       expect(text).not.toMatch(BANNED);
@@ -79,20 +79,6 @@ test("a change awaiting its verdict shows its rate so far, or the day it starts,
   await expect(row(page, RUNNING).locator("[data-verdict]")).toHaveText("Day 3 on 13 Nov");
   await expect(row(page, SCHEDULED).locator("[data-since]")).toHaveText("from 13 Nov");
   await expect(row(page, SCHEDULED).locator("[data-verdict]")).toHaveText("Day 3 on 15 Nov");
-});
-
-test("below the table, one line of needless stops per 100 for each rule version with enough stops", async ({
-  page,
-}) => {
-  await openWide(page);
-  const overall = page.getByRole("region", { name: "Is it improving overall?" });
-  await expect(overall.getByRole("img")).toHaveAccessibleName(
-    "Needless stops per 100 stops, by rule version: v0: 30, v1: 19, v2: 16, v4: 21",
-  );
-  await expect(overall.getByText("Rule version")).toBeVisible();
-  await expect(overall.getByText("Needless stops per 100 stops")).toBeVisible();
-  await openBuilt(page, emptyReport);
-  await expect(page.getByRole("region", { name: "Is it improving overall?" })).toHaveCount(0);
 });
 
 test("each row's status is its verdict, one of four, each with its own icon", async ({ page }) => {

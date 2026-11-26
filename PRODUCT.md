@@ -14,7 +14,7 @@ One person, who runs many agent sessions at once and writes the rules they follo
 
 ## Product Purpose
 
-Did this week's changes make his agents better? For every rule change this week, at a glance: how often agents made its mistake before and since, and its verdict, or when the verdict is due. Then whether agents stop needlessly less, version by version. Let him check each answer without leaving the page.
+Did this week's rule changes work? For every rule change being tested, at a glance: how often agents made its mistake before and since, and its verdict, or when the verdict is due. Let him check each answer without leaving the page.
 
 ## Behaviour
 
@@ -27,7 +27,6 @@ Each line has an end-to-end test in `dashboard/e2e`.
 | A row has no verdict yet | Since shows the rate so far, or the day it starts; the verdict shows the day it is due if each day from here has use. |
 | He points at a row, or moves focus to it | Its card shows beside the table. A click keeps it open; leaving the table returns to the kept one. |
 | He opens an agent's link to a rule | That rule's card is open. Below 1100px the card is the whole screen, with a way back. |
-| The page opens | Below the table, "Is it improving overall?": one neutral line of needless stops per 100 by rule version, hover showing what each version changed. |
 | A rule change's card shows | In one order: verdict; mistake rate before and since, a dot each on one axis of the share of chances broken, with its range; change in mistakes (once judged); what it rests on (days of real use, tasks each side, the replay for a rare mistake); hand to an agent. |
 | No rule is picked | The card says how the numbers are made and what each mark means. |
 | He clicks "Copy for an agent" | The result and the sessions behind its latest misses are copied, worded as a request. |
