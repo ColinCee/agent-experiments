@@ -30,10 +30,12 @@ function drawn(status: Status, change: Range | null): Drawn | null {
 
 const order = (a: Row, b: Row) =>
   Number(a.status !== "due") - Number(b.status !== "due") ||
-  (a.status === "due" ? a.trial.started.localeCompare(b.trial.started) : b.trial.due.localeCompare(a.trial.due));
+  (a.status === "due"
+    ? a.trial.due.localeCompare(b.trial.due) || a.trial.started.localeCompare(b.trial.started)
+    : b.trial.due.localeCompare(a.trial.due));
 
 /**
- * Every row in page order: changes awaiting a verdict (earliest started first), then this week's verdicts (latest
+ * Every row in page order: changes awaiting a verdict (soonest due first), then this week's verdicts (latest
  * first). Ids are unique and stable across reports, so a link can name a row.
  */
 export function pageRows(report: Report): Row[] {

@@ -13,14 +13,14 @@ test("a row with no verdict carries no change, and is named for its mistake alon
   expect([row.status, row.change, row.name]).toEqual(["due", null, "Replies too long"]);
 });
 
-test("changes under test come first, earliest started first, then verdicts, latest first", () => {
+test("changes under test come first, soonest due first, then verdicts, latest first", () => {
   const rows = pageRows(
     report({
       trials: [
         trial({ name: "Older verdict", due: "2026-11-03" }),
-        trial({ name: "Later", verdict: null, started: "2026-11-05" }),
+        trial({ name: "Later", verdict: null, started: "2026-11-03", due: "2026-11-08" }),
         trial({ name: "Newer verdict", due: "2026-11-04" }),
-        trial({ name: "Sooner", verdict: null, started: "2026-11-04" }),
+        trial({ name: "Sooner", verdict: null, started: "2026-11-05", due: "2026-11-06" }),
       ],
     }),
   );
