@@ -25,7 +25,6 @@ The task token keeps a task one unit across restarts. Stamps from before every t
 | `sessions` | session and day: project, entrypoint, model, effort, replies, typed messages, tokens, root session, stamps |
 | `stamps` | stamp the hook gave a session, with its time |
 | `chances` | moment a rule could be broken (`measure, session, day, ts, uuid, miss`), as the measures file defines them |
-| `skill_loads` | skill an agent loaded, with its version: a hash of the text it read, without its folder or arguments |
 
 A continued session copies its parent's entries; each counts once, for the root session. A measures file is SQL that creates a temp table `chances` from the temp tables `texts`, `calls` and `typed`; `sessions.sql` names their columns. It may also create `measure_names(measure, name)`, names the page shows in place of measure ids, and `changes(measure, day, what)`, the days a rule for a measure changed, each judged (Verdicts). A full rebuild takes about 8 s on 2 GB of transcripts.
 

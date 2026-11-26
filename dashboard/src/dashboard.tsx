@@ -79,7 +79,7 @@ export function Dashboard({ report }: { report: Report }) {
               onFocusOut={() => preview(null, 0)}
             />
           </section>
-          {report.stops.length > 0 && (
+          {report.stops.some((v) => v.rate !== null) && (
             <section aria-labelledby="overall" className="grid gap-2">
               <h2 id="overall" className="font-medium text-sm">
                 Is it improving overall?

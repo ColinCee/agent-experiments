@@ -8,6 +8,7 @@ import traceback
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+import duckdb
 import numpy as np
 
 from agent_experiments import overview, replay, size, stops, verdicts
@@ -83,7 +84,11 @@ def main(argv: list[str] | None = None) -> int:
     if args.agents_repo:
         size.measure(args.agents_repo, size.PATHS, args.db)
     report, new = build(args.db, trials, day, errors)
-    report["stops"] = stops.by_version(args.labels, args.versions)
+    try:
+        report["stops"] = stops.by_version(args.labels, args.versions)
+    except duckdb.Error as e:  # a labels or versions file in a shape the query cannot read
+        report["stops"] = []
+        errors.append(f"Needless stops left off the page: {e}")
     for v in new:
         change = "no rate to compare" if np.isnan(v.change) else f"change {v.change:+.0%}"
         print(f"{v.trial} ({v.measure}): {v.verdict} on {v.day}, from {v.source}; {change}")
@@ -128,7 +133,8 @@ def build(db: Path, trials: list[verdicts.Trial], day: str, errors: list[str]) -
         if not found:
             errors.append(
                 f"Trial {trial.name} shows its file name: give its measure {measure} a name in `measure_names` in the"
-                " measures file, or the trial file a line `name: <the mistake, in plain words>`."
+                " measures file"
+                + (", or the trial file a line `name: <the mistake, in plain words>`." if trial.filed else ".")
             )
         return found or trial.name
 
@@ -146,20 +152,24 @@ def build(db: Path, trials: list[verdicts.Trial], day: str, errors: list[str]) -
                 row = _trial_row(con, trial, measure, found, day, shown)
                 if row["status"] == "testing" or trial.started >= week or (found and found.day >= week):
                     rows.append({"name": name(trial, measure), **row})
-                if not trial.filed or trial.status != "testing":
+                if row["status"] != "testing":
                     continue
-                if found:
+                if found and trial.filed:
                     errors.append(
                         f"Trial {trial.name}: {found.verdict} on {found.day}, its day {verdicts.REAL_DAYS} of real use,"
                         f" and still `status: testing`. {ACT[found.verdict]} Then add its line to docs/findings.md."
                     )
                 elif (
-                    row["rare"] and row["real_days"] and not (row["replay"] and row["replay"]["real_rate"] is not None)
+                    not found
+                    and row["rare"]
+                    and row["real_days"]
+                    and not (row["replay"] and row["replay"]["real_rate"] is not None)
                 ):
+                    old_new = "the trial's Off and On" if trial.filed else "the rules before and after the change"
                     errors.append(
                         f"Trial {trial.name}: {measure} has under {verdicts.RARE} chances a day of real use, too few for"
                         f" {verdicts.REAL_DAYS} days to tell. Run `agent-experiments replay --measure {measure}` with"
-                        " the trial's Off and On as --old and --new before its verdict is due."
+                        f" {old_new} as --old and --new before its verdict is due."
                     )
         except Exception:
             errors.append(f"Trial {trial.name} left off the page:\n{traceback.format_exc()}")

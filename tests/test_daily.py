@@ -216,3 +216,19 @@ def test_a_failed_build_leaves_yesterdays_files(tmp_path: Path, monkeypatch):
 
 def test_the_packaged_dashboard_has_one_slot_for_the_report():
     assert PACKAGED().count(overview.SLOT) == 1
+
+
+def test_a_rule_change_with_no_trial_file_gets_a_row_and_a_rare_one_asks_for_a_replay(
+    tmp_path: Path, capsys, monkeypatch
+):
+    # Moved back so the made-up days count: the measures file's change on 2 Jan dates no trial's own change.
+    monkeypatch.setattr(cli.verdicts, "JUDGED_FROM", "2026-01-01")
+    daily(tmp_path)
+    err = capsys.readouterr().err
+    report = json.loads((tmp_path / "report.json").read_text(encoding="utf-8"))
+    bare = [t for t in report["trials"] if t["what"] == "rule added"]
+    assert [(t["name"], t["started"], t["status"], t["verdict"]) for t in bare] == [
+        ("Bad words", "2026-01-02", "testing", None)
+    ]
+    assert "Trial bad-word: bad-word has under 2 chances" in err and "the rules before and after the change" in err
+    assert "Trial bad-word: " not in err.replace("Trial bad-word: bad-word has under", "")

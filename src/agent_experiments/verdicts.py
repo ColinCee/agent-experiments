@@ -133,12 +133,14 @@ def with_changes(con, trials: list[Trial]) -> list[Trial]:
     of its own, so each rule change gets one verdict (docs/architecture.md#verdicts)."""
     found = con.execute('SELECT measure, "day", what FROM changes ORDER BY "day", measure').fetchall()
     filed = [replace(t, what=next((w for m, d, w in found if own(t, m, d)), "")) for t in trials]
-    bare = [
-        Trial(measure, "testing", (measure,), day, what=what, filed=False)
-        for measure, day, what in found
-        if day >= JUDGED_FROM and not any(own(t, measure, day) for t in trials)
+    bare: dict[tuple[str, str], list[str]] = {}
+    for measure, day, what in found:
+        if day >= JUDGED_FROM and not any(own(t, measure, day) for t in trials):
+            bare.setdefault((measure, day), []).append(what)  # changes on one day are one change, with one verdict
+    return filed + [
+        Trial(measure, "testing", (measure,), day, what="; ".join(whats), filed=False)
+        for (measure, day), whats in bare.items()
     ]
-    return filed + bare
 
 
 def before_from(con, trial: Trial, measure: str) -> str:

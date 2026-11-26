@@ -21,3 +21,13 @@ def test_each_version_counts_the_stops_of_its_own_days_and_shows_no_rate_under_t
     assert (new["what"], new["stops"], new["rate"]) == ("A rule, kept", 10, None)
     assert new["stops"] < MIN_STOPS
     assert by_version(tmp_path / "none", versions) == []
+
+
+def test_a_labels_file_with_no_usable_rows_counts_nothing(tmp_path: Path):
+    labels = tmp_path / "labels"
+    labels.mkdir()
+    (labels / "empty.jsonl").write_text("")
+    (labels / "other.jsonl").write_text('{"key": "a"}\n{"day": "2026-01-01T10:00:00Z", "verdict": "wrong"}\n')
+    versions = tmp_path / "versions.csv"
+    versions.write_text("version,from,to,what,link\nv0,2026-01-01,2026-01-01,No rule,\n")
+    assert [(v["stops"], v["rate"]) for v in by_version(labels, versions)] == [(1, None)]

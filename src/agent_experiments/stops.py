@@ -10,8 +10,8 @@ MIN_STOPS = 50
 # A day between two versions (the day a change went in) belongs to neither.
 BY_VERSION = """
 WITH l AS (
-  SELECT "day"::VARCHAR AS "day", verdict FROM read_json_auto($labels, format = 'newline_delimited',
-    ignore_errors = true, union_by_name = true)
+  SELECT left("day", 10) AS "day", verdict FROM read_json($labels, format = 'newline_delimited',
+    columns = {"day": 'VARCHAR', verdict: 'VARCHAR'}, ignore_errors = true)
   WHERE verdict IN ('right', 'wrong')),
 v AS (SELECT version, "from", "to", what FROM read_csv($versions, all_varchar = true))
 SELECT version, "from", what, count(l."day") AS stops, avg((l.verdict = 'wrong')::INTEGER) AS rate
