@@ -44,7 +44,14 @@ def test_each_rule_line_trial_line_and_skill_is_a_row_with_its_measures_and_use(
     trial = Trial("t", "testing", ("bad-word",), "2026-01-02", wording="Say less.\nSay it once.")
 
     rows = rules.report(
-        con, repo, [trial], {"ship-skill": "Shipped without the skill"}, "2026-01-03", use, lambda _: {"shipping": 4}
+        con,
+        repo,
+        [trial],
+        {"ship-skill": "Shipped without the skill"},
+        "2026-01-03",
+        use,
+        [],
+        lambda _: {"shipping": 4},
     )
 
     found = {(r["kind"], r["text"]): (r["measures"], r["used"], r["window"]) for r in rows}
@@ -66,7 +73,7 @@ def test_a_line_written_after_the_count_began_counts_only_from_then(tmp_path: Pa
     con = duckdb.connect()
     con.execute("CREATE TABLE skill_measures (measure VARCHAR, skill VARCHAR)")
 
-    rows = rules.report(con, repo, [], {}, "2026-01-04", use, lambda _: {})
+    rows = rules.report(con, repo, [], {}, "2026-01-04", use, [], lambda _: {})
 
     first = next(r for r in rows if r["text"] == LINES[0])
     assert (first["used"], first["window"]) == (1, {"from": "2026-01-03", "days": 2})
@@ -85,3 +92,18 @@ def test_a_model_switch_is_the_day_most_sessions_over_a_week_move_to_another_mod
             con.execute("INSERT INTO sessions VALUES ('c', ?, 'other', 1)", [day])
 
     assert verdicts.model_switches(con, "2026-01-01", "2026-01-20") == [("2026-01-12", "new")]
+
+
+def test_a_failing_count_is_reported_and_leaves_its_uses_out(tmp_path: Path):
+    repo = repo_with_rules(tmp_path, "2026-01-01")
+    con = duckdb.connect()
+    con.execute("CREATE TABLE skill_measures (measure VARCHAR, skill VARCHAR)")
+    errors: list[str] = []
+
+    def broken(_: Path) -> dict[str, int]:
+        raise FileNotFoundError("duckdb")
+
+    rows = rules.report(con, repo, [], {}, "2026-01-04", tmp_path / "none", errors, broken)
+
+    assert [r["used"] for r in rows if r["kind"] == "skill"] == [None, None]
+    assert len(errors) == 1 and "Skills' use left out" in errors[0]

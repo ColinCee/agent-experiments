@@ -6,7 +6,7 @@ import { RuleTable } from "@/components/rule-table";
 import type { Report } from "@/data/report";
 import { useHash, useMedia } from "@/hooks/use-place";
 import { pickedRow } from "@/lib/hash";
-import { forceRows } from "@/lib/in-force";
+import { forceRows, needsHim } from "@/lib/in-force";
 import { pageRows } from "@/lib/rows";
 import { cn } from "@/lib/utils";
 
@@ -28,6 +28,12 @@ export function Dashboard({ report }: { report: Report }) {
   const pinned = pickedRow(useHash(), [...rows.map((row) => row.id), ...force.map((row) => row.id)]);
   const wide = useMedia(WIDE);
   const [previewed, setPreviewed] = useState<string | null>(null);
+  // The closed list opens when a link picks a row in it.
+  const pickedFolded = force.some((row) => row.id === pinned && !needsHim(row));
+  const [folded, setFolded] = useState(pickedFolded);
+  useEffect(() => {
+    if (pickedFolded) setFolded(true);
+  }, [pickedFolded]);
   const timer = useRef<number | undefined>(undefined);
 
   const preview = (id: string | null, after: number) => {
@@ -77,6 +83,8 @@ export function Dashboard({ report }: { report: Report }) {
           />
           <InForceTable
             rows={force}
+            open={folded}
+            onOpen={setFolded}
             pinned={pinned}
             shown={shownId}
             events={events}

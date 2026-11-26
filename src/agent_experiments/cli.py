@@ -199,7 +199,7 @@ def build(
     columns = [d[0] for d in found.description]
     replays = [_replay(dict(zip(columns, r, strict=True)), names) for r in found.fetchall()]
     sizes = size.report(con)
-    in_force = rules.report(con, repo, trials, names, day, rule_use) if repo and rule_use else []
+    in_force = rules.report(con, repo, trials, names, day, rule_use, errors) if repo and rule_use else []
     con.close()
     report = {
         "day": day,

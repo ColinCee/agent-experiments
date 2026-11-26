@@ -308,3 +308,15 @@ test("a rule's card shows its use, then each mistake's rate, today against usual
   await expect(marks).toHaveCount(2);
   await expect(mistake.locator('.recharts-reference-line line[stroke-dasharray="3 3"]')).toHaveCount(1);
 });
+
+test("on a phone, coming back from a card in the closed list keeps the list open and focus on its row", async ({
+  page,
+}) => {
+  await page.setViewportSize(widths.phone);
+  const opened = await openBuilt(page);
+  await page.goto(`${opened.url}#rule-search-the-team-notes-before-asking`);
+  await expect(card(page, "rule-search-the-team-notes-before-asking")).toBeVisible();
+  await page.getByRole("link", { name: "All rules and skills" }).click();
+  await expect(page.locator("details[data-fine]")).toHaveAttribute("open");
+  await expect(row(page, "rule-search-the-team-notes-before-asking")).toBeFocused();
+});

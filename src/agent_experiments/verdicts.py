@@ -136,14 +136,20 @@ def with_changes(con, trials: list[Trial]) -> list[Trial]:
     of its own, so each rule change gets one verdict (docs/architecture.md#verdicts). A change that dated a trial
     already judged is that trial's, even once its file has moved on to a new wording and start."""
     found = con.execute('SELECT measure, "day", what FROM changes ORDER BY "day", measure').fetchall()
-    judged = [
+    now = {(t.name, t.started) for t in trials}
+    # A trial file's earlier starts. A bare change's own verdict is not one: it started on its change's day, which a
+    # trial file, started the day after its change went in, never does.
+    earlier = [
         Trial(t, "settled", (m,), s)
         for t, s, m in con.execute("SELECT trial, started, measure FROM verdicts").fetchall()
+        if t in {name for name, _ in now} and (t, s) not in now
     ]
     filed = [replace(t, what=next((w for m, d, w in found if own(t, m, d)), "")) for t in trials]
     bare: dict[tuple[str, str], list[str]] = {}
     for measure, day, what in found:
-        if day >= JUDGED_FROM and not any(own(t, measure, day) for t in trials + judged):
+        if day >= JUDGED_FROM and not any(
+            own(t, measure, day) for t in trials + [e for e in earlier if e.started != day]
+        ):
             bare.setdefault((measure, day), []).append(what)  # changes on one day are one change, with one verdict
     return filed + [
         Trial(measure, "testing", (measure,), day, what="; ".join(whats), filed=False)

@@ -234,7 +234,7 @@ export function PageFacts({ report }: { report: Report }) {
           ["A change that does nothing", "Called Works or Worse about 1 time in 4"],
           ["A rare mistake", "Under 2 chances a day: a replay tests it"],
           ["A rule or skill in red", "Its mistake is above its usual range today"],
-          ["Unused", "No use in 30 days: worth trimming"],
+          ["Unused", "No use in 30 days, subagents aside: worth trimming"],
           ["A dashed line", "The model most conversations used changed"],
         ]}
       />

@@ -74,7 +74,10 @@ def written(repo: Path) -> dict[str, str]:
 
 def skill_loads(repo: Path) -> dict[str, int]:
     """Each installed skill's loads over the last TRIM_DAYS days, from the agents repo's own count, which runs in the
-    DuckDB command line: it reads the home folder with `getenv`, which only the command line has."""
+    DuckDB command line: it reads the home folder with `getenv`, which only the command line has. None for a repo
+    without that count."""
+    if not (repo / SKILL_USE).is_file():
+        return {}
     out = subprocess.run(
         ["duckdb", "-json", "-cmd", f"SET VARIABLE days = {TRIM_DAYS}", "-f", str(repo / SKILL_USE)],
         capture_output=True,
@@ -94,16 +97,22 @@ def report(
     names: dict[str, str],
     day: str,
     rule_use: Path,
+    errors: list[str],
     loads: Callable[[Path], dict[str, int]] = skill_loads,
 ) -> list[dict]:
     """One row per rule line, trial `## On` line and skill: the names of the measures that count its mistake (none is
     not measured), and how often it was used over the last TRIM_DAYS days, or since it was written, with the days
     counted; null where nothing counts it. A rule line's use is its chances to be broken, a skill's its loads. A rule
-    line is measured by the skills it names, a trial by its own measures."""
+    line is measured by the skills it names, a trial by its own measures. A count that fails is added to `errors` and
+    its uses left null, so the page is still written."""
     by_skill = con.execute("SELECT skill, measure FROM skill_measures ORDER BY skill, measure").fetchall()
     first = shift(day, 1 - TRIM_DAYS)
     counted, days = chances(rule_use, first, day)
-    ages = written(repo) if days else {}
+    try:
+        ages = written(repo) if days else {}
+    except (OSError, subprocess.SubprocessError) as e:
+        errors.append(f"Rule lines' use left out: git blame in {repo} failed: {e}")
+        days, ages = [], {}
 
     def measured(ids: list[str]) -> list[str]:
         return [names.get(m, m) for m in dict.fromkeys(ids)]
@@ -137,7 +146,11 @@ def report(
         for line in t.wording.splitlines()
         if line.strip()
     ]
-    loaded = loads(repo)
+    try:
+        loaded = loads(repo)
+    except (OSError, subprocess.SubprocessError, ValueError) as e:
+        errors.append(f"Skills' use left out: {SKILL_USE} in the DuckDB command line failed: {e}")
+        loaded = {}
     for path in sorted(repo.glob(SKILLS)):
         skill = path.parent.name
         rows.append(

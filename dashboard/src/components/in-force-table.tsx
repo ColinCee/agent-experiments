@@ -1,5 +1,4 @@
 import { ArrowUp, ChevronRight } from "lucide-react";
-import { useEffect, useState } from "react";
 import { number, percent, plural } from "@/lib/format";
 import { rowHref } from "@/lib/hash";
 import { type ForceRow, GROUPS, needsHim } from "@/lib/in-force";
@@ -91,16 +90,19 @@ function ForceRows({ rows, pinned, shown, events, onFocusOut }: Rows) {
  */
 export function InForceTable({
   rows,
+  open,
+  onOpen,
   onLeave,
   ...rest
-}: Omit<Rows, "rows"> & { rows: ForceRow[]; onLeave: () => void }) {
+}: Omit<Rows, "rows"> & {
+  rows: ForceRow[];
+  /** Kept by the page, so the list is still open when he comes back from a card on a phone. */
+  open: boolean;
+  onOpen: (open: boolean) => void;
+  onLeave: () => void;
+}) {
   const needs = rows.filter(needsHim);
   const fine = rows.filter((row) => !needsHim(row));
-  const pickedFine = fine.some((row) => row.id === rest.pinned);
-  const [open, setOpen] = useState(pickedFine);
-  useEffect(() => {
-    if (pickedFine) setOpen(true);
-  }, [pickedFine]);
   if (rows.length === 0) return null;
   const unmeasured = fine.filter((row) => row.mistakes.length === 0).length;
   return (
@@ -121,7 +123,7 @@ export function InForceTable({
       <details
         data-fine
         open={open}
-        onToggle={(event) => setOpen(event.currentTarget.open)}
+        onToggle={(event) => onOpen(event.currentTarget.open)}
         className="group overflow-clip rounded-lg border"
       >
         <summary className="flex cursor-pointer list-none items-center gap-1.5 px-3.5 py-2.5 text-xs outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset [&::-webkit-details-marker]:hidden">
