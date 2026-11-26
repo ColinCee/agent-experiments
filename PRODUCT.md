@@ -22,11 +22,11 @@ Each line has an end-to-end test in `dashboard/e2e`.
 
 | When | Then |
 |---|---|
-| The page opens | Every rule change still awaiting a verdict, or started or judged in the last 7 days, is one row: its mistake, its mistake rate before the change and since, the verdict. Those awaiting one come first, then this week's verdicts. |
+| The page opens | Every rule change still awaiting a verdict, or started or judged in the last 7 days, is one row: its mistake, its mistake rate before the change and after, the verdict. Those awaiting one come first, then this week's verdicts. |
 | The page opens | Below them, the rules and skills in force that need him: a mistake above its usual range today, in red, or unused for 30 days. The rest fold into one closed list, grouped into every-turn rules, rule changes' wording and skills. |
 | He opens an agent's link to a rule or skill in the closed list | The list opens, with its card. |
 | A row shows | Its status is one of the four below, each with its own icon. |
-| A row has no verdict yet | Mistakes since shows the rate so far, or Not yet before it starts; the verdict shows the days left until it is due if each day from here has use. Those awaiting one are sorted soonest first. |
+| A row has no verdict yet | Rate after shows the rate so far; the verdict shows the days left until it is due if each day from here has use, or before it starts, the days until it does. Those awaiting one are sorted soonest first. |
 | He points at a row, or moves focus to it | Its card shows beside the table. A click keeps it open; leaving the table returns to the kept one. |
 | He opens an agent's link to a rule | That rule's card is open. Below 1100px the card is the whole screen, with a way back. |
 | A rule or skill's card shows | Its use over the last 30 days, then each mistake that counts it: its rate over 28 days, today against its usual range, and its last 6 weeks with each rule change and model switch marked. |

@@ -34,16 +34,18 @@ export function rowHandlers(id: string, pinned: string | null, events: RowEvents
   };
 }
 
-/** A row's verdict, or while it waits, the days left until it is due if each day from here has use. */
+/** A row's verdict; while it waits, the days until it starts, or until its verdict if each day from here has use. */
 function verdictWords(row: Row, day: Day): string {
   if (row.trial.verdict) return STATUS_WORDS[row.status];
-  const left = differenceInCalendarDays(parseISO(row.trial.due), parseISO(day));
+  const until = (to: Day) => differenceInCalendarDays(parseISO(to), parseISO(day));
+  if (until(row.trial.started) > 0) return `Starts in ${plural(until(row.trial.started), "day")}`;
+  const left = until(row.trial.due);
   return left <= 0 ? "Due today" : `${plural(left, "day")} left`;
 }
 
-/** Mistakes since the change: its rate so far, or nothing before it starts. */
+/** The mistake rate since the change so far; none before it starts. */
 function sinceWords(row: Row): string {
-  return row.trial.after ? percent(row.trial.after.rate) : "Not yet";
+  return row.trial.after ? percent(row.trial.after.rate) : "–";
 }
 
 /** This week's rule changes, one row each: the mistake rate before and since, and the verdict. */
@@ -71,8 +73,8 @@ export function RuleTable({
     <div data-table className="overflow-clip rounded-lg border" onPointerLeave={onLeave}>
       <div className={cn(GRID, "items-center border-b py-2 text-muted-foreground text-xs")}>
         <span>Mistake</span>
-        <span className="text-right">Mistakes before</span>
-        <span className="text-right">Mistakes since</span>
+        <span className="text-right">Rate before</span>
+        <span className="text-right">Rate after</span>
         <span className="max-sm:hidden">Verdict</span>
       </div>
       {rows.map((row) => (

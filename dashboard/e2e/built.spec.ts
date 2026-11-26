@@ -73,14 +73,14 @@ test("the page opens with one row per rule change: those awaiting a verdict, the
   await expect(row(page, NO_EFFECT).locator("[data-name]")).toHaveText("Commit messages with no reason");
 });
 
-test("a change awaiting its verdict shows its rate so far, or not yet before it starts, and the days left to its verdict", async ({
+test("a change awaiting its verdict shows its rate so far and the days left to its verdict, or the days until it starts", async ({
   page,
 }) => {
   await openWide(page);
   await expect(row(page, RUNNING).locator("[data-since]")).toHaveText("9%");
   await expect(row(page, RUNNING).locator("[data-verdict]")).toHaveText("1 day left");
-  await expect(row(page, SCHEDULED).locator("[data-since]")).toHaveText("Not yet");
-  await expect(row(page, SCHEDULED).locator("[data-verdict]")).toHaveText("3 days left");
+  await expect(row(page, SCHEDULED).locator("[data-since]")).toHaveText("–");
+  await expect(row(page, SCHEDULED).locator("[data-verdict]")).toHaveText("Starts in 1 day");
 });
 
 test("each row's status is its verdict, one of four, each with its own icon", async ({ page }) => {
