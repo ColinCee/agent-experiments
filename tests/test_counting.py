@@ -80,3 +80,28 @@ def test_counting_dedupes_a_continuation_and_reads_stamps_and_typed_messages(tmp
         ("s2", "2026-01-01T09:00:00.000Z", "t=on holdout=no task=aaaa1111 rules=abc1234"),
         ("s2", "2026-01-02T08:00:00.000Z", "t=on holdout=no task=aaaa1111 rules=def5678"),
     ]
+
+
+def test_blocks_of_one_model_call_share_its_step(tmp_path: Path):
+    # Claude Code writes each block of a reply as its own entry, so a batch of calls is many uuids but one step.
+    def call(uuid: str, ts: str, command: str, message: str) -> dict:
+        entry = reply(uuid, "s1", ts, "", message)
+        entry["message"]["content"] = [{"type": "tool_use", "name": "Bash", "input": {"command": command}}]
+        return entry
+
+    entries = [
+        typed("u1", "s1", "2026-01-01T09:00:00.000Z", "look around"),
+        call("u2", "2026-01-01T09:00:01.000Z", "ls", "m1"),
+        call("u3", "2026-01-01T09:00:02.000Z", "pwd", "m1"),
+        call("u4", "2026-01-01T09:00:09.000Z", "git status", "m2"),
+    ]
+    write(tmp_path / "projects" / "one", "s1", entries)
+    measures = """CREATE TEMP TABLE chances AS
+SELECT 'steps' AS measure, s, "day", min(ts) AS ts, any_value(uuid) AS uuid, count(DISTINCT step) = 2 AS miss
+FROM calls GROUP BY s, "day";"""
+    (tmp_path / "measures.sql").write_text(measures)
+    db = tmp_path / "x.duckdb"
+
+    count(str(tmp_path / "projects" / "*" / "*.jsonl"), tmp_path / "measures.sql", db)
+
+    assert duckdb.connect(str(db)).execute("SELECT miss FROM chances").fetchall() == [(True,)]
