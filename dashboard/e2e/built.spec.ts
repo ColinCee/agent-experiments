@@ -64,9 +64,9 @@ test("the page opens with one row per rule change: those awaiting a verdict, the
     .evaluateAll((all) => all.map((r) => r.getAttribute("data-row")));
   expect(ids).toEqual([RUNNING, SCHEDULED, REPLAYED, WORKS, NO_EFFECT, WORSE]);
   const cells = row(page, WORKS);
-  // One line a row: the mistake; the change's own words are in its card.
-  await expect(cells.locator("[data-name]")).toHaveText("Tests skipped before a commit");
-  await expect(cells).not.toContainText("Run the tests before each commit");
+  // One line a row: the change, in a few words; its mistake is in its card.
+  await expect(cells.locator("[data-name]")).toHaveText("Run the tests before each commit");
+  await expect(cells).not.toContainText("Tests skipped before a commit");
   await expect(cells.locator("[data-before]")).toHaveText("25%");
   await expect(cells.locator("[data-since]")).toHaveText("10%");
   await expect(cells.locator("[data-verdict]")).toHaveText("Works");
@@ -78,7 +78,7 @@ test("a change awaiting its verdict shows its rate so far and the days left to i
 }) => {
   await openWide(page);
   await expect(row(page, RUNNING).locator("[data-since]")).toHaveText("9%");
-  await expect(row(page, RUNNING).locator("[data-verdict]")).toHaveText("1 day left");
+  await expect(row(page, RUNNING).locator("[data-verdict]")).toHaveText("1 day");
   await expect(row(page, SCHEDULED).locator("[data-since]")).toHaveText("–");
   await expect(row(page, SCHEDULED).locator("[data-verdict]")).toHaveText("Starts in 1 day");
 });
@@ -260,7 +260,7 @@ test("an injected report is shown, even with </script> in a name", async ({ page
   const opened = await openBuilt(page, {
     ...fixture,
     day: "2031-04-05",
-    trials: [{ ...fixture.trials[0], name: "A </script> in a name" }],
+    trials: [{ ...fixture.trials[0], what: "A </script> in a name" }],
   });
   await expect(page.getByText("data to 5 Apr")).toBeVisible();
   await expect(page.getByText("A </script> in a name")).toBeVisible();

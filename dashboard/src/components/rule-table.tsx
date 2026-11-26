@@ -71,7 +71,7 @@ export function RuleTable({
   }
   const lists = [
     { id: "testing", title: "Testing", last: "Days left", rows: rows.filter((row) => !row.trial.verdict) },
-    { id: "settled", title: "Settled this week", last: "Verdict", rows: rows.filter((row) => row.trial.verdict) },
+    { id: "settled", title: "Decided this week", last: "Verdict", rows: rows.filter((row) => row.trial.verdict) },
   ].filter((list) => list.rows.length);
   return (
     <div className="grid gap-5" onPointerLeave={onLeave}>

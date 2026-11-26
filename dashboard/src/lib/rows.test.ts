@@ -6,11 +6,14 @@ import { pageRows } from "./rows";
 
 const report = (over: Partial<Report>): Report => ({ ...emptyReport, ...over });
 
-test("a row with no verdict carries no change, and is named for its mistake alone", () => {
+test("a row with no verdict carries no change, and is named for the change, else its mistake", () => {
   const [row] = pageRows(
     report({ trials: [trial({ name: "Replies too long", verdict: null, what: "A hook asks first" })] }),
   );
-  expect([row.status, row.change, row.name]).toEqual(["due", null, "Replies too long"]);
+  expect([row.status, row.change, row.name]).toEqual(["due", null, "A hook asks first"]);
+  expect(pageRows(report({ trials: [trial({ name: "Replies too long", what: null })] }))[0].name).toBe(
+    "Replies too long",
+  );
 });
 
 test("changes under test come first, soonest due first, then verdicts, latest first", () => {
