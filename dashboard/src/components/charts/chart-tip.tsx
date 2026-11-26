@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 export interface TipRow {
   name: string;
   value: string;
-  /** A swatch class such as bg-with; none for a neutral line. */
+  /** A swatch class such as bg-foreground; none for a neutral line. */
   swatch?: string;
 }
 

@@ -3,19 +3,17 @@ import { expect, type Page, test } from "@playwright/test";
 import { emptyReport, fixture } from "../src/data/fixture.ts";
 import { builtPage, openBuilt, widths } from "./built.ts";
 
-// Words the page never uses, since they are the method's and not his; "CI" is matched in capitals only.
+// Words the page never uses, since they are the method's and not his ("No big effect" is his); "CI" is matched in capitals only.
 const BANNED =
-  /\b(measures?|settled|holdout|off course|stamped|grouped|sessions?|looks?|effects?|drops?|p-value|confidence interval|bootstrap|kind)\b/i;
+  /\b(measures?|settled|holdout|off course|stamped|grouped|sessions?|looks?|drops?|p-value|confidence interval|bootstrap|kind)\b/i;
 
 // Rows of the fixture, one for each state the page must show.
 const WORKS = "trial-tests-skipped-before-a-commit";
 const RUNNING = "trial-config-read-from-memory";
 const SCHEDULED = "trial-screenshots-sent-without-a-link";
-const CANT_TELL = "trial-commit-messages-with-no-reason";
-const PAST_SCALE = "trial-ports-taken-without-checking";
-const RULE = "permanent-long-logs-pasted-into-a-reply";
-const SLIPPING = "permanent-drafts-saved-in-the-wrong-folder";
-const WAITING = "permanent-branch-pushed-without-a-pull-request";
+const NO_EFFECT = "trial-commit-messages-with-no-reason";
+const WORSE = "trial-ports-taken-without-checking";
+const REPLAYED = "trial-replies-with-no-summary-line";
 
 const row = (page: Page, id: string) => page.locator(`[data-row="${id}"]`);
 const card = (page: Page, id: string) => page.locator(`[data-detail="${id}"]`);
@@ -39,7 +37,7 @@ for (const [name, report] of Object.entries({ fixture, empty: emptyReport })) {
       const text = await page.locator("body").innerText();
       expect(text).not.toMatch(BANNED);
       expect(text).not.toMatch(/\bCI\b/);
-      if (name === "empty") expect(text).toContain("No experiments or active rules yet.");
+      if (name === "empty") expect(text).toContain("No rule changes under test this week.");
       const found = await page.evaluate(() => {
         const small: string[] = [];
         for (const el of document.querySelectorAll("body *")) {
@@ -57,17 +55,16 @@ for (const [name, report] of Object.entries({ fixture, empty: emptyReport })) {
   }
 }
 
-test("the page opens with one row per experiment and active rule, finished experiments in a third group", async ({
-  page,
-}) => {
+test("the page opens with one row per rule change: those under test, then this week's verdicts", async ({ page }) => {
   await openWide(page);
-  await expect(page.locator("[data-group] [data-row]")).toHaveCount(fixture.trials.length + fixture.permanent.length);
+  const ids = (group: string) =>
+    page.locator(`[data-group="${group}"] [data-row]`).evaluateAll((all) => all.map((r) => r.getAttribute("data-row")));
+  await expect(page.locator("[data-group] [data-row]")).toHaveCount(fixture.trials.length);
   expect(await page.locator("[data-group]").evaluateAll((all) => all.map((g) => g.getAttribute("data-group")))).toEqual(
-    ["running", "active", "finished"],
+    ["due", "judged"],
   );
-  await expect(page.locator('[data-group="running"] [data-row]')).toHaveCount(2);
-  await expect(row(page, SCHEDULED)).toBeVisible();
-  await expect(page.locator('[data-group="finished"] [data-row]')).toHaveCount(3);
+  expect(await ids("due")).toEqual([RUNNING, SCHEDULED]);
+  expect(await ids("judged")).toEqual([REPLAYED, WORKS, NO_EFFECT, WORSE]);
   const cells = row(page, WORKS);
   await expect(cells.locator("[data-name]")).toHaveText("Tests skipped before a commit");
   await expect(cells.locator('[data-track="change"]')).toBeVisible();
@@ -98,19 +95,15 @@ test("each skill is a row below, most missed first, and its card shows its rate 
   await expect(page).toHaveURL(new RegExp(`#${id}$`));
 });
 
-test("each row's status is one of four, from the verdict or the rule's check, each with its own icon", async ({
-  page,
-}) => {
+test("each row's status is its verdict, one of four, each with its own icon", async ({ page }) => {
   await openWide(page);
   const expected = {
     [WORKS]: ["works", "Works"],
-    [PAST_SCALE]: ["not-working", "Not working"],
-    [CANT_TELL]: ["cant-tell", "Can't tell"],
-    [RUNNING]: ["not-enough", "Not enough tasks"],
-    [SLIPPING]: ["not-working", "Not working"],
-    [WAITING]: ["not-enough", "Not enough tasks"],
-    // Its range crosses no change, yet it still reaches a 30% cut, so the rule works.
-    [RULE]: ["works", "Works"],
+    [REPLAYED]: ["works", "Works"],
+    [WORSE]: ["worse", "Worse"],
+    [NO_EFFECT]: ["no-effect", "No big effect"],
+    [RUNNING]: ["due", "Verdict due"],
+    [SCHEDULED]: ["due", "Verdict due"],
   };
   for (const [id, [status, words]] of Object.entries(expected)) {
     await expect(row(page, id), id).toHaveAttribute("data-status", status);
@@ -118,12 +111,9 @@ test("each row's status is one of four, from the verdict or the rule's check, ea
   }
 });
 
-test("a row with not enough tasks draws no band and shows a dash, even when the report has its numbers", async ({
-  page,
-}) => {
+test("a row with no verdict yet draws no band and shows a dash", async ({ page }) => {
   await openWide(page);
-  expect(fixture.trials.find((t) => t.name === "Config read from memory")?.change).not.toBeNull();
-  for (const id of [RUNNING, SCHEDULED, WAITING]) {
+  for (const id of [RUNNING, SCHEDULED]) {
     await expect(row(page, id).locator('[data-track="change"]'), id).toHaveCount(0);
     await expect(row(page, id).locator("[data-change]"), id).toHaveText("–");
   }
@@ -133,20 +123,20 @@ test("pointing at a row shows its card, a click keeps it, and leaving the table 
   page,
 }) => {
   await openWide(page);
-  await row(page, RULE).hover();
-  await expect(card(page, RULE)).toBeVisible();
+  await row(page, REPLAYED).hover();
+  await expect(card(page, REPLAYED)).toBeVisible();
   await row(page, WORKS).click();
   await expect(page).toHaveURL(new RegExp(`#${WORKS}$`));
   await expect(row(page, WORKS)).toHaveAttribute("aria-current", "true");
-  await row(page, RULE).hover();
-  await expect(card(page, RULE)).toBeVisible();
+  await row(page, REPLAYED).hover();
+  await expect(card(page, REPLAYED)).toBeVisible();
   await page.mouse.move(5, 5);
   await expect(card(page, WORKS)).toBeVisible();
-  await row(page, RULE).hover();
+  await row(page, REPLAYED).hover();
   // The pointer can cross to the card without losing it.
-  await card(page, RULE).hover();
+  await card(page, REPLAYED).hover();
   await page.waitForTimeout(400);
-  await expect(card(page, RULE)).toBeVisible();
+  await expect(card(page, REPLAYED)).toBeVisible();
   await page.mouse.move(5, 5);
   await expect(card(page, WORKS)).toBeVisible();
   await row(page, WORKS).click();
@@ -170,10 +160,10 @@ test("moving focus to a row with the keyboard shows its card", async ({ page }) 
 test("an agent's link to a rule opens its card, in today's form and in every earlier one", async ({ page }) => {
   const opened = await openWide(page);
   const links = {
-    [`#${RULE}`]: RULE,
+    [`#${REPLAYED}`]: REPLAYED,
     [`#/?m=${WORKS}`]: WORKS,
-    "#/mistakes/long-logs-pasted-into-a-reply": RULE,
-    "#/?m=mistake-long-logs-pasted-into-a-reply": RULE,
+    "#/mistakes/replies-with-no-summary-line": REPLAYED,
+    "#/?m=mistake-replies-with-no-summary-line": REPLAYED,
   };
   for (const [hash, id] of Object.entries(links)) {
     await page.goto(`${opened.url}${hash}`);
@@ -193,11 +183,11 @@ test("on a phone a linked rule's card is the whole screen, with a way back to th
   await expect(card(page, WORKS).locator("[data-estimate]")).toHaveText("−60%");
   // The swap removes what had focus, so it moves to the card, and back to the row on return.
   expect(await page.evaluate(() => document.activeElement?.tagName)).toBe("ASIDE");
-  await page.getByRole("link", { name: "All rules" }).click();
+  await page.getByRole("link", { name: "All rule changes" }).click();
   await expect(page.locator("[data-table]").first()).toBeVisible();
   expect(await page.evaluate(() => document.activeElement?.getAttribute("data-row"))).toBe(WORKS);
-  await row(page, RULE).click();
-  await expect(card(page, RULE)).toBeVisible();
+  await row(page, REPLAYED).click();
+  await expect(card(page, REPLAYED)).toBeVisible();
 });
 
 test("pointing at a status pill dims the other rows, and a click keeps only its rows", async ({ page }) => {
@@ -209,48 +199,45 @@ test("pointing at a status pill dims the other rows, and a click keeps only its 
   await page.mouse.move(5, 5);
   await expect.poll(() => opacity(RUNNING)).toBe("1");
   await page.locator('[data-pill="works"]').click();
-  await expect(page.locator("[data-row]")).toHaveCount(3);
+  await expect(page.locator("[data-row]")).toHaveCount(2);
   await expect(page.locator('[data-row]:not([data-status="works"])')).toHaveCount(0);
-  await expect(page.locator('[data-group="running"]')).toHaveCount(0);
+  await expect(page.locator('[data-group="due"]')).toHaveCount(0);
   await expect(page.locator('[data-pill="works"]')).toHaveAttribute("aria-pressed", "true");
   await page.locator('[data-pill="works"]').click();
-  await expect(page.locator("[data-group] [data-row]")).toHaveCount(fixture.trials.length + fixture.permanent.length);
+  await expect(page.locator("[data-group] [data-row]")).toHaveCount(fixture.trials.length);
 });
 
-test("every card has its sections in one order, and a rule with not enough tasks stops after the second", async ({
-  page,
-}) => {
+test("every card has its sections in one order, and one with no verdict has no change", async ({ page }) => {
   const opened = await openWide(page);
   const expected = {
-    [WORKS]: ["verdict", "trust", "change", "rate", "hand"],
-    [CANT_TELL]: ["verdict", "trust", "change", "rate", "hand"],
-    [RULE]: ["verdict", "trust", "change", "rate", "hand"],
-    [RUNNING]: ["verdict", "trust"],
-    [WAITING]: ["verdict", "trust"],
+    [WORKS]: ["verdict", "before-after", "change", "basis", "hand"],
+    [NO_EFFECT]: ["verdict", "before-after", "change", "basis", "hand"],
+    [RUNNING]: ["verdict", "before-after", "basis", "hand"],
   };
   for (const [id, order] of Object.entries(expected)) {
     await page.goto(`${opened.url}#${id}`);
     await expect(card(page, id)).toBeVisible();
     expect(await sections(page), id).toEqual(order);
   }
-  await expect(card(page, WAITING).locator("[data-verdict]")).toHaveText("Not enough tasks");
+  await expect(card(page, RUNNING).locator("[data-verdict]")).toHaveText("Verdict due");
+  await expect(card(page, RUNNING).getByText("2 of 3")).toBeVisible();
   // Beside the table the row already gives the number, so the card does not repeat it.
   await page.goto(`${opened.url}#${WORKS}`);
-  await expect(card(page, WORKS).locator("[data-estimate]")).toBeHidden();
-  await expect(card(page, WORKS).locator('[data-end="low"]')).toHaveText("−78%");
-  await expect(card(page, WORKS).locator('[data-end="high"]')).toHaveText("−33%");
-  await expect(card(page, WORKS).locator("[data-needed]")).toHaveText("90 needed");
-  await page.goto(`${opened.url}#${RULE}`);
-  await expect(card(page, RULE).locator("[data-needed]")).toHaveText("40 needed");
-  // An active rule's chart runs over dates, a week apart back from the report's day.
-  const ticks = card(page, RULE).locator('[data-section="rate"] .recharts-cartesian-axis-tick-value');
-  await expect(ticks.first()).toBeVisible();
-  expect((await ticks.allTextContents()).filter((t) => !t.endsWith("%"))).toEqual([
-    "22 Oct",
-    "29 Oct",
-    "5 Nov",
-    "12 Nov",
-  ]);
+  const works = card(page, WORKS);
+  await expect(works.locator("[data-estimate]")).toBeHidden();
+  await expect(works.locator('[data-end="low"]')).toHaveText("−78%");
+  await expect(works.locator('[data-end="high"]')).toHaveText("−33%");
+  // Before and since are dots on one axis of the share of chances broken; fewer mistakes since sits further left.
+  const at = (side: string) =>
+    works.locator(`[data-side="${side}"] [data-rate]`).evaluate((dot) => dot.getBoundingClientRect().left);
+  expect(await at("after")).toBeLessThan(await at("before"));
+  await expect(works.locator('[data-section="before-after"] [role="img"]')).toHaveAccessibleName(
+    "Before: 25% of chances broken, Since: 10% of chances broken",
+  );
+  await expect(works.locator("[data-axis]")).toHaveText("0%10%20%30%40%50%");
+  // A rare mistake's verdict came from its replay.
+  await page.goto(`${opened.url}#${REPLAYED}`);
+  await expect(card(page, REPLAYED).locator("dd", { hasText: /^Replay$/ })).toBeVisible();
 });
 
 test("copy for an agent copies the result and the sessions behind its latest misses, worded as a request", async ({
@@ -262,34 +249,34 @@ test("copy for an agent copies the result and the sessions behind its latest mis
     });
   });
   const opened = await openWide(page);
-  await page.goto(`${opened.url}#${RULE}`);
-  const hand = card(page, RULE).locator('[data-section="hand"]');
-  await expect(hand.locator("[data-misses] dd")).toHaveCount(5);
+  await page.goto(`${opened.url}#${REPLAYED}`);
+  const hand = card(page, REPLAYED).locator('[data-section="hand"]');
+  await expect(hand.locator("[data-misses] dd")).toHaveCount(1);
   await hand.getByRole("button", { name: "Copy for an agent" }).click();
   await expect(hand.getByRole("status")).toHaveText("Copied");
   const copied = String(await page.evaluate(() => (window as unknown as { copied: string }).copied));
-  const check = fixture.permanent.find((c) => c.name === "Long logs pasted into a reply");
+  const change = fixture.trials.find((t) => t.name === "Replies with no summary line");
   expect(copied).toMatch(/^Find out why agents still make this mistake/);
-  expect(copied).toContain("Long logs pasted into a reply");
+  expect(copied).toContain("Replies with no summary line");
   expect(copied).toContain("Works");
-  for (const miss of check?.misses ?? []) expect(copied).toContain(miss.session);
-  expect(check?.misses.length).toBeGreaterThan(0);
+  for (const miss of change?.misses ?? []) expect(copied).toContain(miss.session);
+  expect(change?.misses.length).toBeGreaterThan(0);
 });
 
 test("with no rule picked the card says how the numbers are made and what each mark means", async ({ page }) => {
   await openWide(page);
   const about = card(page, "page");
   await expect(about.getByRole("heading")).toHaveText("How these numbers are made");
-  for (const mark of ["A band", "Dashed line on a band", "Dashed lines on a chart", "Tasks needed"]) {
+  for (const mark of ["A band", "A verdict", "A day of real use", "A change that does nothing"]) {
     await expect(about.getByText(mark, { exact: true })).toBeVisible();
   }
 });
 
 test("a change larger than the scale stops at the edge with a mark", async ({ page }) => {
   await openWide(page);
-  const band = row(page, PAST_SCALE).locator('[data-track="change"]');
+  const band = row(page, WORSE).locator('[data-track="change"]');
   await expect(band.locator("[data-clipped]")).toBeVisible();
-  await expect(row(page, PAST_SCALE).locator("[data-change]")).toHaveText("+133%");
+  await expect(row(page, WORSE).locator("[data-change]")).toHaveText("+133%");
   const { edge, dot } = await band.evaluate((track) => {
     const mark = track.querySelector("[data-value]")?.getBoundingClientRect();
     return { edge: track.getBoundingClientRect().right, dot: mark ? mark.left + mark.width / 2 : Number.NaN };
@@ -314,7 +301,7 @@ test("every band's dot sits at its value, under the same number in the header's 
       }),
     );
   });
-  expect(tracks.filter((t) => !t.axis).length).toBeGreaterThan(5);
+  expect(tracks.filter((t) => !t.axis).length).toBe(4);
   for (const track of tracks) {
     expect(Math.abs(track.left - tracks[0].left), "left edge").toBeLessThanOrEqual(0.5);
     expect(Math.abs(track.width - tracks[0].width), "width").toBeLessThanOrEqual(0.5);

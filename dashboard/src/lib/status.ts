@@ -1,34 +1,27 @@
-import type { PermanentCheck, Trial } from "@/data/report";
-import { permanentStatus } from "./permanent";
+import type { Trial } from "@/data/report";
 
-/** The four answers a row can give, worst first: the order the pills and the active rules use (PRODUCT.md, Behaviour). */
-export const STATUSES = ["not-working", "works", "cant-tell", "not-enough"] as const;
+/** The four answers a row can give, worst first: the order the pills use (PRODUCT.md, Behaviour). */
+export const STATUSES = ["worse", "works", "no-effect", "due"] as const;
 
 export type Status = (typeof STATUSES)[number];
 
 export const STATUS_WORDS: Record<Status, string> = {
-  "not-working": "Not working",
+  worse: "Worse",
   works: "Works",
-  "cant-tell": "Can't tell",
-  "not-enough": "Not enough tasks",
+  "no-effect": "No big effect",
+  due: "Verdict due",
 };
 
-/** An experiment's status is its latest verdict, never read off its numbers: before a verdict it has no answer. */
+/** A change's status is its verdict, never read off its numbers: before day 3 of real use it has no answer. */
 export function trialStatus(trial: Trial): Status {
   switch (trial.verdict) {
     case "works":
       return "works";
-    case "no useful effect":
-      return "not-working";
-    case "can't tell":
-      return "cant-tell";
+    case "worse":
+      return "worse";
+    case "no big effect":
+      return "no-effect";
     default:
-      return "not-enough";
+      return "due";
   }
-}
-
-/** An active rule works until its range rules out a 30% cut, so a rule that works can have a band across no change. */
-export function ruleStatus(check: PermanentCheck): Status {
-  const status = permanentStatus(check);
-  return status === "working" ? "works" : status === "slipping" ? "not-working" : "not-enough";
 }

@@ -11,13 +11,11 @@ import numpy as np
 from scipy import stats
 
 USEFUL_DROP = 0.3  # a drop smaller than this is not worth a rule's place in the every-turn file
-RESAMPLES = 99_999  # the first look's limit is p < 0.0003, which needs steps of p well below it
+RESAMPLES = 99_999  # steps of p fine enough for a replay's one-sided test
 BOOTSTRAPS = 9_999
 # Resamples held in memory at once: all 99,999 for 60 against 500 tasks took 2 GB, a thousand take about 20 MB and
 # run no slower.
 BATCH = 1_000
-POWER_SIZES = (10, 20, 40, 80, 160, 320)
-POWER_RUNS = 200
 
 
 @dataclass(frozen=True)
@@ -69,25 +67,7 @@ def rate_range(tasks, rng: np.random.Generator) -> tuple[float, float, float]:
     return whole, float(low), float(high)
 
 
-def tasks_needed(recent, limit: float, rng: np.random.Generator) -> int | None:
-    """Tasks per group at which one look at `limit` finds a true halving 80% of the time, simulated from a measure's
-    recent tasks (rows of chances, misses); None when even the largest size tried falls short."""
-    recent = np.asarray(recent, dtype=float).reshape(-1, 2)
-    if len(recent) < 10 or recent[:, 1].sum() == 0:
-        return None
-    for n in POWER_SIZES:
-        found = 0
-        for _ in range(POWER_RUNS):
-            off = recent[rng.integers(len(recent), size=n)]
-            on = recent[rng.integers(len(recent), size=n)]
-            on[:, 1] = rng.binomial(on[:, 1].astype(int), 0.5)
-            found += _effect(off, on, rng, 999, paired=False, ranges=False).p < limit
-        if found >= 0.8 * POWER_RUNS:
-            return n
-    return None
-
-
-def _effect(off, on, rng: np.random.Generator, resamples: int, paired: bool, ranges: bool = True) -> Effect:
+def _effect(off, on, rng: np.random.Generator, resamples: int, paired: bool) -> Effect:
     off, on = np.asarray(off, dtype=float).reshape(-1, 2), np.asarray(on, dtype=float).reshape(-1, 2)
     chances = np.concatenate([off[:, 0], on[:, 0]])
     misses = np.concatenate([off[:, 1], on[:, 1]])
@@ -115,7 +95,7 @@ def _effect(off, on, rng: np.random.Generator, resamples: int, paired: bool, ran
         rng=rng,
     ).pvalue
     low = high = np.nan
-    if ranges and min(len(off), len(on)) > 1:
+    if min(len(off), len(on)) > 1:
         # A resample with no misses without the rule has no drop. SciPy's own interval turns NaN and warns, so the
         # range is taken here from its resamples, leaving those out.
         with warnings.catch_warnings():

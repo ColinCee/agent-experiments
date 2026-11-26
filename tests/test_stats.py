@@ -1,9 +1,7 @@
 import numpy as np
 
-from agent_experiments.looks import LOOK_SIZES, verdict
 from agent_experiments.stats import compare, compare_paired, rate_range
-
-RESAMPLES = 10_000  # fewer than a real look's, but fine enough to place p against the first limit of 0.0003
+from agent_experiments.verdicts import MIN_TASKS, call
 
 
 def tasks(rng: np.random.Generator, n: int, miss_rate: float) -> np.ndarray:
@@ -13,24 +11,25 @@ def tasks(rng: np.random.Generator, n: int, miss_rate: float) -> np.ndarray:
     return np.column_stack([chances, rng.binomial(chances.astype(int), prone)])
 
 
-def passes(rng: np.random.Generator, rate_off: float, rate_on: float) -> bool:
-    """A trial run through its three looks: whether any said `works`."""
-    off, on = tasks(rng, 40, rate_off), tasks(rng, 40, rate_on)
-    return any(
-        verdict(compare(off[:n], on[:n], rng, RESAMPLES), look, n) == "works"
-        for look, n in enumerate(LOOK_SIZES, start=1)
-    )
+def verdict(rng: np.random.Generator, rate_before: float, rate_after: float) -> str:
+    """A trial judged as daily judges one, at the sizes real ones have: weeks of tasks before, three days after."""
+    before = tasks(rng, int(rng.integers(30, 151)), rate_before)
+    after = tasks(rng, int(rng.integers(5, 16)), rate_after)
+    effect = compare(before, after, rng, resamples=99)
+    return call(-effect.high, -effect.low, min(len(before), len(after)) >= MIN_TASKS)
 
 
-def test_three_looks_rarely_pass_a_rule_that_does_nothing():
+def test_before_and_after_rarely_call_a_change_that_does_nothing():
     rng = np.random.default_rng(7)
     runs = 300
-    assert sum(passes(rng, 0.4, 0.4) for _ in range(runs)) / runs < 0.07
+    called = [verdict(rng, 0.4, 0.4) for _ in range(runs)]
+    assert called.count("works") / runs < 0.07
+    assert called.count("worse") / runs < 0.07
 
 
-def test_a_rule_that_removes_most_misses_passes():
+def test_a_change_that_removes_most_misses_works():
     rng = np.random.default_rng(8)
-    assert sum(passes(rng, 0.5, 0.1) for _ in range(40)) > 32
+    assert sum(verdict(rng, 0.5, 0.1) == "works" for _ in range(40)) > 20
 
 
 def test_a_replay_sees_a_drop_in_the_same_moments():

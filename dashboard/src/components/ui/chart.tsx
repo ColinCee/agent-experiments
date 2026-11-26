@@ -2,7 +2,7 @@ import { cn } from "cn";
 import type * as React from "react";
 import { ResponsiveContainer, Tooltip } from "recharts";
 
-// Trimmed from shadcn's chart: series take their colour straight from the page's tokens (var(--with) and so on),
+// Trimmed from shadcn's chart: series take their colour straight from the page's tokens (var(--foreground) and so on),
 // so the config, its per-theme style tag and the legend are gone.
 
 const INITIAL_DIMENSION = { width: 320, height: 200 } as const;

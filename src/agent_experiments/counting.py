@@ -11,6 +11,10 @@ CREATE TABLE IF NOT EXISTS looks (
   trial VARCHAR, started VARCHAR, measure VARCHAR, look INTEGER, "day" VARCHAR, tasks_off INTEGER, tasks_on INTEGER,
   rate_off DOUBLE, rate_on DOUBLE, "drop" DOUBLE, low DOUBLE, high DOUBLE, p DOUBLE, verdict VARCHAR,
   PRIMARY KEY (trial, started, measure, look));
+CREATE TABLE IF NOT EXISTS verdicts (
+  trial VARCHAR, started VARCHAR, measure VARCHAR, "day" VARCHAR, source VARCHAR, tasks_before INTEGER,
+  tasks_after INTEGER, rate_before DOUBLE, rate_after DOUBLE, change DOUBLE, low DOUBLE, high DOUBLE, verdict VARCHAR,
+  PRIMARY KEY (trial, started, measure));
 CREATE TABLE IF NOT EXISTS replays (
   folder VARCHAR PRIMARY KEY, measure VARCHAR, "day" VARCHAR, in_force VARCHAR, moments INTEGER, paired INTEGER,
   sessions INTEGER, rate_old DOUBLE, rate_new DOUBLE, "drop" DOUBLE, low DOUBLE, high DOUBLE, p DOUBLE,

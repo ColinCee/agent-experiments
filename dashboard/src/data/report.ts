@@ -1,30 +1,26 @@
 // The report `agent-experiments daily` writes (its source of truth: `build()` in src/agent_experiments/cli.py). Facts
 // only: rates and changes are fractions, dates are YYYY-MM-DD, and every rate is a mistake rate, so lower is always
-// better. A change is after / before - 1 (or with / without - 1).
+// better. A change is after / before - 1.
 
 export type Day = string;
 
 /** 90% range; low and high are null when there are too few tasks. */
 export type Range = { value: number; low: number | null; high: number | null };
 
-export type Verdict = "works" | "no useful effect" | "can't tell" | "no verdict yet";
+export type Verdict = "works" | "worse" | "no big effect";
 
-/** Each side's mistake rate on a day, over that day and the days before it; null with no chances. */
-export type RatePoint = { day: Day; with: number | null; without: number | null };
-
-/** A session with one of the latest mistakes, among the tasks the numbers count; its last day with one. */
-export type Miss = { day: Day; side: "with" | "without"; session: string };
+/** A session with one of the latest mistakes since the change; its last day with one. */
+export type Miss = { day: Day; session: string };
 
 export interface Report {
   /** The data runs up to this day. */
   day: Day;
   /** ISO timestamp when the file was written. */
   written: string;
-  /** On `day`. */
-  sessions: { total: number; in_group: number; split_since: Day | null };
+  /** Typed in on `day`, and how many of them the trial hook stamped. */
+  sessions: { total: number; stamped: number };
+  /** Rule changes still awaiting a verdict, or started or given one in the last 7 days. */
   trials: Trial[];
-  /** Rules proven earlier, each kept off for 1 task in 10. */
-  permanent: PermanentCheck[];
   mistakes: Mistake[];
   replays: Replay[];
   sizes: Sizes;
@@ -32,48 +28,30 @@ export interface Report {
   skills: Skill[];
 }
 
+/** A rule change, judged by its mistake rate before against its first three days of real use. */
 export interface Trial {
   /** The mistake it targets, in plain words. */
   name: string;
+  /** The day the change reached every task. */
   started: Day;
-  /** started + 7 days, the day of the last look. */
-  ends: Day;
-  state: "scheduled" | "running" | "finished";
-  /** Latest look's verdict; null before any look. */
+  status: "testing" | "settled";
+  /** Its third day of real use, the verdict's day; null until reached. */
+  due: Day | null;
+  /** Days of real use since the start, at most 3. */
+  real_days: number;
+  /** Under 2 chances a day: three days hold too few, so a replay tests it. */
+  rare: boolean;
+  /** From the earlier rule change, or 6 weeks back, to the day before the start. */
+  before: Side | null;
+  /** From the start to `due`, or to the report's day until then; null before the start. */
+  after: Side | null;
+  /** after / before - 1, once judged. */
+  change: Range | null;
   verdict: Verdict | null;
-  tasks_with: number;
-  tasks_without: number;
-  rate_with: number | null;
-  rate_without: number | null;
-  /** Null until each half has 2 tasks, or when there were no mistakes without the rule. */
-  change: Range | null;
-  /** Tasks per half to detect a true halving; null if over 320. */
-  needed: number | null;
-  /** Tasks per half a week usually brings. */
-  per_week: number;
-  looks: { look: number; day: Day; verdict: Verdict; tasks_with: number; tasks_without: number }[];
-  /** 3-day rolling rates since start; empty if scheduled. */
-  trend: RatePoint[];
-  /** Up to 5 sessions, latest first. */
-  misses: Miss[];
-}
-
-export interface PermanentCheck {
-  name: string;
-  since: Day;
-  model: string | null;
-  tasks_with: number;
-  tasks_without: number;
-  rate_with: number | null;
-  rate_without: number | null;
-  change: Range | null;
-  /** The range rules out a 30% drop: the rule no longer earns its place. */
-  slipping: boolean;
-  /** Tasks a side needs for a true halving to put the range clear of no change; null if over 320. */
-  needed: number | null;
-  /** 7-day rolling rates over the last 28 days, the tasks its numbers count. */
-  trend: RatePoint[];
-  /** Up to 5 sessions, latest first. */
+  source: "before and after" | "replay" | null;
+  /** The latest replay of its wording. */
+  replay: Replay | null;
+  /** Up to 5 sessions since the start, latest first. */
   misses: Miss[];
 }
 

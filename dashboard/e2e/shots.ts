@@ -13,18 +13,15 @@ const source = report === undefined ? "fixture" : "report";
 const outDir = new URL("../shots/", import.meta.url);
 await mkdir(outDir, { recursive: true });
 
-const KINDS = ["trial", "permanent"];
+const KINDS = ["due", "judged"];
 
 /** Every state of a row in the fixture, by name and row. */
 const FIXTURE_STATES = [
-  ["trial-scheduled", '[data-row="trial-screenshots-sent-without-a-link"]'],
-  ["trial-running", '[data-row="trial-config-read-from-memory"]'],
-  ["trial-works", '[data-row="trial-tests-skipped-before-a-commit"]'],
-  ["trial-cant-tell", '[data-row="trial-commit-messages-with-no-reason"]'],
-  ["trial-past-scale", '[data-row="trial-ports-taken-without-checking"]'],
-  ["permanent-working", '[data-row="permanent-replies-with-no-summary-line"]'],
-  ["permanent-slipping", '[data-row="permanent-drafts-saved-in-the-wrong-folder"]'],
-  ["permanent-waiting", '[data-row="permanent-branch-pushed-without-a-pull-request"]'],
+  ["due", '[data-row="trial-config-read-from-memory"]'],
+  ["works", '[data-row="trial-tests-skipped-before-a-commit"]'],
+  ["worse", '[data-row="trial-ports-taken-without-checking"]'],
+  ["no-effect", '[data-row="trial-commit-messages-with-no-reason"]'],
+  ["replayed", '[data-row="trial-replies-with-no-summary-line"]'],
 ] as const;
 
 async function save(page: Page, name: string, whole: boolean) {
@@ -55,7 +52,9 @@ try {
     if (width === "desktop" && colorScheme === "light") {
       // The fixture shoots every state of every kind; a real report, the first row of each kind.
       const picks =
-        report === undefined ? FIXTURE_STATES : KINDS.map((kind) => [kind, `[data-row^="${kind}-"]`] as const);
+        report === undefined
+          ? FIXTURE_STATES
+          : KINDS.map((group) => [group, `[data-group="${group}"] [data-row]`] as const);
       for (const [name, selector] of picks) {
         const row = page.locator(selector).first();
         if ((await row.count()) === 0) continue;

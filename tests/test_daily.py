@@ -29,30 +29,29 @@ TEMPLATE = (
 PACKAGED = overview.template
 SIDE = {"rate", "low", "high", "tasks", "from"}
 KEYS = {
-    "report": {"day", "written", "sessions", "trials", "permanent", "mistakes", "replays", "sizes", "skills"},
-    "sessions": {"total", "in_group", "split_since"},
-    "trial": {"name", "started", "ends", "state", "verdict", "tasks_with", "tasks_without", "rate_with"}
-    | {"rate_without", "change", "needed", "per_week", "looks", "trend", "misses"},
-    "permanent": {"name", "since", "model", "tasks_with", "tasks_without", "change", "slipping", "rate_with"}
-    | {"rate_without", "needed", "trend", "misses"},
+    "report": {"day", "written", "sessions", "trials", "mistakes", "replays", "sizes", "skills"},
+    "sessions": {"total", "stamped"},
+    "trial": {"name", "started", "status", "due", "real_days", "rare", "before", "after", "change", "verdict"}
+    | {"source", "replay", "misses"},
     "mistake": {"name", "today", "rule", "before", "after", "change", "sure", "current", "series", "changes"},
 }
 
 
-def daily(tmp_path: Path, day: str = "2026-01-02") -> int:
-    """`daily` on made-up sessions: a task in each half of a running trial, a scheduled trial, a settled one and a
-    broken trial file."""
-    for i, group in enumerate(("off", "on")):
-        session = f"s{i}"
-        write(
-            tmp_path / "projects" / "one",
-            session,
-            [
-                stamp(f"{session}-0", session, "2026-01-02T09:00:00.000Z", f"t={group} s={group} task=aaaa000{i}"),
-                typed(f"{session}-1", session, "2026-01-02T09:00:01.000Z", "please fix it"),
-                reply(f"{session}-2", session, "2026-01-02T09:00:02.000Z", "a bad reply", f"m{i}"),
-            ],
-        )
+def daily(tmp_path: Path, day: str = "2026-01-02", used: tuple[str, ...] = ("2026-01-02",)) -> int:
+    """`daily` on made-up sessions, two tasks on each day of real use: a trial under test, one not yet started, an old
+    settled one and a broken trial file."""
+    for d in used:
+        for i in range(2):
+            session = f"s{i}-{d}"
+            write(
+                tmp_path / "projects" / "one",
+                session,
+                [
+                    stamp(f"{session}-0", session, f"{d}T09:00:00.000Z", f"t=on s=on task={d.replace('-', '')}{i}"),
+                    typed(f"{session}-1", session, f"{d}T09:00:01.000Z", "please fix it"),
+                    reply(f"{session}-2", session, f"{d}T09:00:02.000Z", "a bad reply", f"m{i}{d}"),
+                ],
+            )
     (tmp_path / "measures.sql").write_text(MEASURES)
     trials = tmp_path / "trials"
     trials.mkdir(exist_ok=True)
@@ -76,33 +75,30 @@ def test_daily_writes_the_report_and_puts_it_in_the_page(tmp_path: Path, capsys)
     err = capsys.readouterr().err
     assert "undated.md" in err
     # A trial nothing names still shows, under its file name, and is reported so it gets a plain name.
-    assert "Trial unnamed shows its file name" in err and "Trial t " not in err
+    assert "Trial unnamed shows its file name" in err and "Trial t shows" not in err
+    # With no chances before it, a trial's measure is rare: three days could not tell, so it needs a replay.
+    assert "Trial t: bad-word has under 2 chances" in err
 
     text = (tmp_path / "report.json").read_text(encoding="utf-8")
     report = json.loads(text)
     assert "NaN" not in text and "Infinity" not in text
     assert set(report) == KEYS["report"] and set(report["sessions"]) == KEYS["sessions"]
-    assert report["sessions"] == {"total": 2, "in_group": 2, "split_since": "2026-01-02"}
+    assert report["sessions"] == {"total": 2, "stamped": 2}
     trials = {t["started"]: t for t in report["trials"]}
     assert all(set(t) == KEYS["trial"] for t in trials.values())
-    running, scheduled = trials["2026-01-01"], trials["2026-01-10"]
+    assert set(trials) == {"2026-01-01", "2026-01-05", "2026-01-10"}  # the old settled trial is not this week's
+    running, later = trials["2026-01-01"], trials["2026-01-10"]
     assert trials["2026-01-05"]["name"] == "unnamed"
-    assert (running["name"], running["state"], running["ends"]) == ("Bad words", "running", "2026-01-08")
-    assert (running["tasks_with"], running["tasks_without"], running["rate_with"]) == (1, 1, 1.0)
-    assert running["change"] is None  # one task a half is too few to compare
-    assert [p["day"] for p in running["trend"]] == ["2026-01-01", "2026-01-02"]
-    assert running["trend"][1] == {"day": "2026-01-02", "with": 1.0, "without": 1.0}
-    assert {(m["side"], m["session"]) for m in running["misses"]} == {("with", "s1"), ("without", "s0")}
-    assert (scheduled["state"], scheduled["trend"], scheduled["verdict"]) == ("scheduled", [], None)
-    (permanent,) = report["permanent"]
-    assert set(permanent) == KEYS["permanent"] and permanent["since"] == "2025-12-01"
-    assert (permanent["rate_with"], permanent["rate_without"], permanent["needed"]) == (1.0, 1.0, None)
-    assert {(m["side"], m["session"]) for m in permanent["misses"]} == {("with", "s1"), ("without", "s0")}
-    assert len(permanent["trend"]) == 28 and permanent["trend"][-1] == {
-        "day": "2026-01-02",
-        "with": 1.0,
-        "without": 1.0,
-    }
+    assert (running["name"], running["status"], running["due"], running["real_days"]) == (
+        "Bad words",
+        "testing",
+        None,
+        1,
+    )
+    assert (running["verdict"], running["change"], running["before"], running["rare"]) == (None, None, None, True)
+    assert (running["after"]["tasks"], running["after"]["rate"]) == (2, 1.0)
+    assert {m["session"] for m in running["misses"]} == {"s0-2026-01-02", "s1-2026-01-02"}
+    assert (later["after"], later["misses"], later["real_days"]) == (None, [], 0)
     mistakes = {m["name"]: m for m in report["mistakes"]}
     assert all(set(m) == KEYS["mistake"] for m in mistakes.values())
     ruled, unruled = mistakes["Bad words"], mistakes["Long </script><!-- replies"]
@@ -117,24 +113,31 @@ def test_daily_writes_the_report_and_puts_it_in_the_page(tmp_path: Path, capsys)
     assert data and json.loads(data.group(1))["mistakes"] == report["mistakes"]
 
 
-def test_the_last_look_finishes_a_trial_and_replays_and_sizes_are_reported(tmp_path: Path):
+def test_the_third_day_of_real_use_gives_the_verdict_and_a_trial_left_testing_fails(tmp_path: Path, capsys):
     with duckdb.connect(str(tmp_path / "x.duckdb")) as con:
         con.execute(SCHEMA)
         # A replay that missed far less often than the real agents did: its drop stands for nothing.
         con.execute(
-            "INSERT INTO replays VALUES ('r', 'bad-word', '2026-01-07', 'old', 9, 8, 5, .4, .2, .5, .2, .8, .01, .3, .1, 'replay can''t test this')"
+            "INSERT INTO replays VALUES ('r', 'bad-word', '2026-01-01', 'old', 9, 8, 5, .4, .2, .5, .2, .8, .01, .3, .1, 'replay can''t test this')"
         )
         con.execute("""INSERT INTO sizes VALUES (1, 'a', '2025-12-01', 'home/*.md', 'home/a.md', 100, 10, 0),
                        (2, 'b', '2026-01-05', 'home/*.md', 'home/a.md', 120, 20, 0)""")
 
-    assert daily(tmp_path, "2026-01-08") == 1
+    # Nobody worked on the 3rd, so the third day of real use is the 5th.
+    assert daily(tmp_path, "2026-01-08", ("2026-01-02", "2026-01-04", "2026-01-05", "2026-01-06")) == 1
 
+    err = capsys.readouterr().err
+    assert "Trial t: no big effect on 2026-01-05, its day 3 of real use, and still `status: testing`." in err
     report = json.loads((tmp_path / "report.json").read_text(encoding="utf-8"))
     (trial,) = [t for t in report["trials"] if t["started"] == "2026-01-01"]
-    assert (trial["state"], trial["verdict"]) == ("finished", "can't tell")
-    assert trial["looks"] == [
-        {"look": 3, "day": "2026-01-08", "verdict": "can't tell", "tasks_with": 1, "tasks_without": 1}
-    ]
+    assert (trial["due"], trial["real_days"], trial["verdict"], trial["source"]) == (
+        "2026-01-05",
+        3,
+        "no big effect",
+        "before and after",
+    )
+    assert trial["after"]["tasks"] == 6  # the 6th is past the verdict, so never counted
+    assert trial["replay"]["trusted"] is False
     (r,) = report["replays"]
     assert (r["name"], r["trusted"], r["real_rate"], r["replay_rate"]) == ("Bad words", False, 0.3, 0.1)
     assert r["change"] == pytest.approx({"value": -0.5, "low": -0.8, "high": -0.2})
@@ -156,9 +159,11 @@ def test_trial_starts_are_marked_but_never_move_the_before_and_after_boundary(tm
     assert bad["rule"] == {"day": "2026-01-02", "what": "rule added"}
     assert bad["after"]["from"] == "2026-01-02" and bad["after"]["tasks"] == 2
     assert bad["changes"] == [
+        {"day": "2025-12-01", "what": "s", "kind": "trial"},
         {"day": "2026-01-01", "what": "A plain name", "kind": "trial"},
         {"day": "2026-01-02", "what": "rule added", "kind": "rule"},
         {"day": "2026-01-03", "what": "New wording", "kind": "trial"},
+        {"day": "2026-01-04", "what": "kept", "kind": "trial"},
     ]
 
 

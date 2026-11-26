@@ -21,7 +21,7 @@ SELECT j ->> 'uuid' AS uuid, j ->> 'sessionId' AS s, j ->> 'timestamp' AS ts, j 
             WHEN (j ->> 'type') = 'user' AND json_type(j -> 'message' -> 'content') = 'VARCHAR' THEN j -> 'message' ->> 'content'
             WHEN (j ->> 'type') = 'user' THEN array_to_string(json_extract_string(j, '$.message.content[*].text'), chr(10)) END AS body,
        coalesce((j -> 'attachment' ->> 'type') = 'queued_command', false) AS queued,
-       -- The hook's first line: the session's trial groups, holdout, task and rules version (docs/architecture.md#hook).
+       -- The hook's first line: the session's trials, task and rules version (docs/architecture.md#hook).
        -- The content is a JSON array of strings, read here as its JSON text, so the line ends at an escaped newline.
        CASE WHEN (j -> 'attachment' ->> 'type') = 'hook_additional_context'
             THEN nullif(regexp_extract(j -> 'attachment' ->> 'content', 'Rule trials: ([^\n"\\]*)', 1), '') END AS stamp,

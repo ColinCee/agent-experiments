@@ -7,18 +7,13 @@ import { PointMark } from "./marks";
 
 type Series = { key: "with" | "without"; name: string; stroke: string; fill: string; swatch: string };
 
-const SIDES: Series[] = [
-  { key: "without", name: "Without", stroke: "var(--without)", fill: "fill-without", swatch: "bg-without" },
-  { key: "with", name: "With rule", stroke: "var(--with)", fill: "fill-with", swatch: "bg-with" },
-];
-
 /** A skill's one line: a rate with nothing to compare it with, so no result colour. */
 export const MISSED: Series[] = [
   { key: "with", name: "Missed", stroke: "var(--foreground)", fill: "fill-foreground", swatch: "bg-foreground" },
 ];
 
 /**
- * A mistake rate by day, with and without the rule (or the lines in `series`), each line named at its end and each
+ * A mistake rate by day, one line for each of `series`, each named at its end, and each
  * day in `marks` drawn as a dashed line. `ticks` are the labels the day axis names; every label when left out.
  */
 export function TrendChart({
@@ -26,10 +21,10 @@ export function TrendChart({
   marks = [],
   ticks,
   tickFormatter,
-  series = SIDES,
+  series,
 }: {
   rows: TrendRow[];
-  series?: Series[];
+  series: Series[];
   marks?: string[];
   ticks?: string[];
   tickFormatter?: (label: string, index: number) => string;

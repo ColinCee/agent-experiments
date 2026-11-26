@@ -1,44 +1,42 @@
 import { expect, test } from "vitest";
 import { handText } from "./hand";
-import { check, trial } from "./made-up";
+import { trial } from "./made-up";
 import type { Row } from "./rows";
 
 const misses = [
-  { day: "2026-11-27", side: "without" as const, session: "id-without" },
-  { day: "2026-11-26", side: "with" as const, session: "id-with" },
+  { day: "2026-11-03", session: "id-later" },
+  { day: "2026-11-02", session: "id-earlier" },
 ];
 
-test("the copied request names the rule, its result and numbers, and each session behind its latest misses", () => {
+test("the copied request names the change, its result and numbers, and each session behind its latest misses", () => {
   const row: Row = {
-    kind: "permanent",
-    id: "permanent-a-rule",
-    name: "A rule",
-    group: "active",
+    id: "trial-a-change",
+    name: "A change",
+    group: "judged",
     status: "works",
-    change: { value: -0.4, low: -0.7, high: 0.15 },
-    check: check({ misses }),
+    change: { value: -0.5, low: -0.8, high: -0.1 },
+    trial: trial({ misses }),
   };
-  const text = handText(row, "2026-11-28");
-  expect(text).toContain('"A rule"');
-  expect(text).toContain("active rule's result as of 2026-11-28: Works");
-  expect(text).toContain("with the rule 12% over 100 tasks, without it 20% over 12 tasks");
-  expect(text).toContain("−40% (90% range −70% to +15%)");
-  expect(text).toContain("- id-without (2026-11-27, without it)\n- id-with (2026-11-26, with the rule)");
+  const text = handText(row, "2026-11-05");
+  expect(text).toContain('"A change"');
+  expect(text).toContain("rule change of 2026-11-01, as of 2026-11-05: Works");
+  expect(text).toContain("before the change 20% over 80 tasks, since it 10% over 12 tasks");
+  expect(text).toContain("−50% (90% range −80% to −10%)");
+  expect(text).toContain("- id-later (2026-11-03)\n- id-earlier (2026-11-02)");
 });
 
-test("with no misses it asks for the counting to be checked, and an experiment says so", () => {
+test("with no misses it asks for the counting to be checked, and with no verdict it gives no range", () => {
   const row: Row = {
-    kind: "trial",
-    id: "trial-a-trial",
-    name: "A trial",
-    group: "running",
-    status: "cant-tell",
+    id: "trial-a-change",
+    name: "A change",
+    group: "due",
+    status: "due",
     change: null,
-    trial: trial({ rate_without: null }),
+    trial: trial({ verdict: null, after: null }),
   };
-  const text = handText(row, "2026-11-28");
-  expect(text).toContain("experiment's result");
-  expect(text).toContain("without it none counted");
+  const text = handText(row, "2026-11-01");
+  expect(text).toContain("Verdict due");
+  expect(text).toContain("since it none counted");
   expect(text).not.toContain("90% range");
-  expect(text).toContain("No session in its tasks has missed yet");
+  expect(text).toContain("No session has missed since the change");
 });

@@ -1,8 +1,5 @@
 import type { Range } from "@/data/report";
 
-/** Fewer tasks than this in the smaller group and the range means little. */
-export const FEWEST_TASKS = 5;
-
 /** True when the change or its range goes past +100%, the band's right edge, so the band shows a mark there. */
 export function isClipped(change: Range | null): boolean {
   return Math.max(change?.value ?? 0, change?.high ?? 0) > 1;
