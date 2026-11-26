@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { InForceCard } from "@/components/in-force-card";
+import { InForceTable } from "@/components/in-force-table";
 import { PageFacts, RuleCard } from "@/components/rule-card";
 import { RuleTable } from "@/components/rule-table";
 import type { Report } from "@/data/report";
 import { useHash, useMedia } from "@/hooks/use-place";
 import { pickedRow } from "@/lib/hash";
+import { forceRows } from "@/lib/in-force";
 import { pageRows } from "@/lib/rows";
 import { cn } from "@/lib/utils";
 
@@ -21,10 +24,8 @@ const LET_GO_AFTER = 220;
  */
 export function Dashboard({ report }: { report: Report }) {
   const rows = useMemo(() => pageRows(report), [report]);
-  const pinned = pickedRow(
-    useHash(),
-    rows.map((row) => row.id),
-  );
+  const force = useMemo(() => forceRows(report), [report]);
+  const pinned = pickedRow(useHash(), [...rows.map((row) => row.id), ...force.map((row) => row.id)]);
   const wide = useMedia(WIDE);
   const [previewed, setPreviewed] = useState<string | null>(null);
   const timer = useRef<number | undefined>(undefined);
@@ -37,6 +38,7 @@ export function Dashboard({ report }: { report: Report }) {
 
   const shownId = (wide ? previewed : null) ?? pinned;
   const shown = rows.find((row) => row.id === shownId);
+  const shownForce = force.find((row) => row.id === shownId);
 
   const events = {
     onPreview: (id: string) => preview(id, PREVIEW_AFTER),
@@ -73,11 +75,19 @@ export function Dashboard({ report }: { report: Report }) {
             onLeave={() => preview(null, LET_GO_AFTER)}
             onFocusOut={() => preview(null, 0)}
           />
+          <InForceTable
+            rows={force}
+            pinned={pinned}
+            shown={shownId}
+            events={events}
+            onLeave={() => preview(null, LET_GO_AFTER)}
+            onFocusOut={() => preview(null, 0)}
+          />
         </div>
       )}
       {(wide || alone) && (
         <aside
-          aria-label={shown ? "Rule change in full" : "About this page"}
+          aria-label={shown ? "Rule change in full" : shownForce ? "Rule or skill in full" : "About this page"}
           ref={card}
           tabIndex={-1}
           className={cn(
@@ -87,7 +97,13 @@ export function Dashboard({ report }: { report: Report }) {
           onPointerEnter={() => window.clearTimeout(timer.current)}
           onPointerLeave={() => preview(null, LET_GO_AFTER)}
         >
-          {shown ? <RuleCard key={shown.id} row={shown} day={report.day} /> : <PageFacts report={report} />}
+          {shown ? (
+            <RuleCard key={shown.id} row={shown} day={report.day} />
+          ) : shownForce ? (
+            <InForceCard key={shownForce.id} row={shownForce} day={report.day} />
+          ) : (
+            <PageFacts report={report} />
+          )}
         </aside>
       )}
     </div>

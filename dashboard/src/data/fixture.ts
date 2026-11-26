@@ -74,6 +74,7 @@ function withRule(
     change,
     sure,
     current: null,
+    recent: after,
     series: series(
       before.rate,
       after.rate,
@@ -102,6 +103,7 @@ function noRule(
     change: null,
     sure: false,
     current,
+    recent: current,
     series: series(
       current.rate,
       current.rate,
@@ -429,6 +431,7 @@ export const fixture: Report = {
       { month: "2026-11", label: "Skills", changes: 8, only_added: 0.75, added_share: 0.8 },
     ],
   },
+  in_force: [],
 };
 
 const noData = series(0, 0, null, 0).map(({ day }) => ({ day, rate: null }));
@@ -449,6 +452,7 @@ export const emptyReport: Report = {
       change: null,
       sure: false,
       current: null,
+      recent: null,
       series: noData,
       changes: [{ day: "2026-11-01", what: "Replies end with one line saying what is left", kind: "rule" }],
     },
@@ -461,10 +465,12 @@ export const emptyReport: Report = {
       change: null,
       sure: false,
       current: null,
+      recent: null,
       series: noData,
       changes: [],
     },
   ],
   replays: [],
   sizes: { series: [], largest: [], months: [] },
+  in_force: [],
 };

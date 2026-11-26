@@ -10,7 +10,7 @@ from pathlib import Path
 
 import numpy as np
 
-from agent_experiments import overview, replay, size, verdicts
+from agent_experiments import overview, replay, rules, size, verdicts
 from agent_experiments.counting import count
 from agent_experiments.stats import Effect, compare
 from agent_experiments.verdicts import shift
@@ -33,6 +33,9 @@ def main(argv: list[str] | None = None) -> int:
     daily.add_argument("--measures", type=Path, default=DATA / "measures" / "measures.sql")
     daily.add_argument("--transcripts", default=str(PROJECTS / "*" / "*.jsonl"))
     daily.add_argument("--db", type=Path, default=DATA / "experiments.duckdb")
+    daily.add_argument(
+        "--rule-use", type=Path, default=DATA / "rule-use" / "daily", help="the rule-use count's daily files"
+    )
     daily.add_argument("--page", type=Path, default=DATA / "overview.html", help="report.json is written beside it")
     rp = sub.add_parser("replay", help="answer past moments again under old and new rules, and compare their misses")
     rp.add_argument(
@@ -80,7 +83,7 @@ def main(argv: list[str] | None = None) -> int:
     count(args.transcripts, args.measures, args.db)
     if args.agents_repo:
         size.measure(args.agents_repo, size.PATHS, args.db)
-    report, new = build(args.db, trials, day, errors)
+    report, new = build(args.db, trials, day, errors, args.agents_repo, args.rule_use)
     for v in new:
         change = "no rate to compare" if np.isnan(v.change) else f"change {v.change:+.0%}"
         print(f"{v.trial} ({v.measure}): {v.verdict} on {v.day}, from {v.source}; {change}")
@@ -108,10 +111,18 @@ def _positive(text: str) -> int:
     return int(text)
 
 
-def build(db: Path, trials: list[verdicts.Trial], day: str, errors: list[str]) -> tuple[dict, list[verdicts.Verdict]]:
+def build(
+    db: Path,
+    trials: list[verdicts.Trial],
+    day: str,
+    errors: list[str],
+    repo: Path | None = None,
+    rule_use: Path | None = None,
+) -> tuple[dict, list[verdicts.Verdict]]:
     """Takes the verdicts due as of `day`, and returns the report the overview page shows (its shape:
     dashboard/src/data/report.ts) with the verdicts just taken. A trial that fails is left out and added to `errors`,
-    so the others still show; so is one past its verdict that is still testing, or a rare one with no replay."""
+    so the others still show; so is one past its verdict that is still testing, or a rare one with no replay. With the
+    agents repo, it also holds every rule line and skill in force."""
     rng = np.random.default_rng(1)
     # Numbers only the page uses draw from their own generator, so adding one never moves a verdict's range.
     shown = np.random.default_rng(2)
@@ -173,13 +184,22 @@ def build(db: Path, trials: list[verdicts.Trial], day: str, errors: list[str]) -
     changes += [
         (m, t.started, t.title or t.name, "trial") for t in trials if t.filed and t.started <= day for m in t.measures
     ]
-    mistakes = [_mistake(con, m, names.get(m, m), changes, day, rng) for m in verdicts.measures(con)]
+    changes += [
+        (m, d, model, "model")
+        for d, model in verdicts.model_switches(con, shift(day, 1 - TIMELINE_DAYS), day)
+        for m in verdicts.measures(con)
+    ]
+    mistakes = []
+    for m in verdicts.measures(con):
+        mistakes.append(_mistake(con, m, names.get(m, m), changes, day, rng))
+        mistakes[-1]["recent"] = verdicts.side(con, m, shift(day, 1 - verdicts.USUAL_DAYS), day, shown)[0]
     mistakes.sort(key=lambda r: r["name"])
     in_group, total = verdicts.stamped(con, day)
     found = con.execute('SELECT * FROM replays ORDER BY "day" DESC, measure')
     columns = [d[0] for d in found.description]
     replays = [_replay(dict(zip(columns, r, strict=True)), names) for r in found.fetchall()]
     sizes = size.report(con)
+    in_force = rules.report(con, repo, trials, names, day, rule_use, errors) if repo and rule_use else []
     con.close()
     report = {
         "day": day,
@@ -189,6 +209,7 @@ def build(db: Path, trials: list[verdicts.Trial], day: str, errors: list[str]) -
         "mistakes": mistakes,
         "replays": replays,
         "sizes": sizes,
+        "in_force": in_force,
     }
     return report, new
 
@@ -249,7 +270,8 @@ def _trial_row(
 def _mistake(con, measure: str, name: str, changes: list, day: str, rng: np.random.Generator) -> dict:
     """A tracked measure's day against its usual range, its timeline with the rule changes and trial starts on it, and
     its misses before and after the latest rule change, the before side starting at the rule change before it; with no
-    rule yet, its misses over the last USUAL_DAYS (docs/architecture.md#overview-page)."""
+    rule yet, its misses over the last USUAL_DAYS (docs/architecture.md#overview-page). Model switches are marked too, but
+    only rule changes split before from after."""
     marks = sorted({(d, w, k) for m, d, w, k in changes if m == measure})
     days = [(d, w) for d, w, k in marks if k == "rule"]
     flag = verdicts.flag(con, measure, day, rng)

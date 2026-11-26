@@ -18,7 +18,7 @@ export interface RowEvents {
 }
 
 /** A row's pointer, focus and click handling. */
-function rowHandlers(id: string, pinned: string | null, events: RowEvents, onFocusOut: () => void) {
+export function rowHandlers(id: string, pinned: string | null, events: RowEvents, onFocusOut: () => void) {
   return {
     onPointerEnter: (event: PointerEvent<HTMLElement>) => event.pointerType === "mouse" && events.onPreview(id),
     onFocus: (event: FocusEvent<HTMLElement>) => event.currentTarget.matches(":focus-visible") && events.onFocusRow(id),

@@ -56,6 +56,7 @@ class Trial:
     title: str = ""  # the page's name for it; the file name is what stamps use
     what: str = ""  # the change, in plain words: its `changes` row
     filed: bool = True  # a trial file in the agents repo, which `daily` asks to update; else a bare `changes` row
+    wording: str = ""  # its `## On` rule, which the hook gives every task
 
 
 @dataclass(frozen=True)
@@ -93,7 +94,9 @@ def read_trials(folder: Path, errors: list[str]) -> list[Trial]:
             continue
         measures = tuple(m.strip() for m in field("measures").split(",") if m.strip())
         status = "settled" if field("status") == "settled" else "testing"
-        trials.append(Trial(path.stem, status, measures, started, field("name")))
+        on = re.search(r"^## On\s*\n(.*?)(?=^## |\Z)", text, re.MULTILINE | re.DOTALL)
+        wording = " ".join(on.group(1).split()) if on else ""
+        trials.append(Trial(path.stem, status, measures, started, field("name"), wording=wording))
     return trials
 
 
@@ -292,3 +295,27 @@ def stamped(con, day: str) -> tuple[int, int]:
         [day],
     ).fetchone()
     return (found[0], found[1]) if found else (0, 0)
+
+
+def model_switches(con, first: str, last: str, width: int = 7) -> list[tuple[str, str]]:
+    """The days from `first` to `last` on which the model most typed-in sessions used over the week to then changed,
+    with the new model; a week, so one day's handful of sessions on another model is not a switch."""
+    rows = con.execute(
+        """SELECT "day", model, count(*) FROM sessions WHERE typed > 0 AND model IS NOT NULL AND "day" <= ?
+           GROUP BY ALL""",
+        [last],
+    ).fetchall()
+    counts: dict[str, dict[str, int]] = {}
+    for d, model, n in rows:
+        counts.setdefault(d, {})[model] = n
+    out, held = [], None
+    for d in sorted(counts):
+        week: dict[str, int] = {}
+        for k in range(width):
+            for model, n in counts.get(shift(d, -k), {}).items():
+                week[model] = week.get(model, 0) + n
+        top = max(sorted(week), key=week.__getitem__)
+        if held is not None and top != held and d >= first:
+            out.append((d, top))
+        held = top
+    return out
