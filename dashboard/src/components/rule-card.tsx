@@ -182,7 +182,7 @@ export function RuleCard({ row, day }: { row: Row; day: Day }) {
       </a>
       <section data-section="verdict">
         <h2 className="text-balance font-semibold text-[0.9375rem]">{row.name}</h2>
-        {trial.what && <p className="text-muted-foreground text-xs">{trial.what}</p>}
+        {trial.what && <p className="text-muted-foreground text-xs">{trial.name}</p>}
         <p data-verdict className={cn("mt-0.5 font-medium", STATUS_TONE[row.status])}>
           {STATUS_WORDS[row.status]}
         </p>

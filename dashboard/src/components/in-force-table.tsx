@@ -1,12 +1,20 @@
 import { ArrowUp, ChevronRight } from "lucide-react";
 import { number, percent, plural } from "@/lib/format";
 import { rowHref } from "@/lib/hash";
-import { type ForceRow, GROUPS, needsHim } from "@/lib/in-force";
+import { EVIDENCE_WORDS, type Evidence, type ForceRow, GROUPS, needsHim } from "@/lib/in-force";
 import { cn } from "@/lib/utils";
 import { type RowEvents, rowHandlers } from "./rule-table";
 
 const GRID =
-  "grid grid-cols-[minmax(0,1fr)_5.5rem_4rem] items-baseline gap-x-3 px-3.5 sm:grid-cols-[minmax(0,1fr)_7rem_5rem] sm:gap-x-4";
+  "grid grid-cols-[minmax(0,1fr)_5.5rem_4rem] items-baseline gap-x-3 gap-y-1 px-3.5 sm:grid-cols-[minmax(0,1fr)_6rem_8rem_4.5rem] sm:gap-x-4";
+
+const EVIDENCE_TONE: Record<Evidence, string> = {
+  fewer: "text-good",
+  more: "text-bad",
+  unclear: "text-unsure",
+  "too few": "text-muted-foreground",
+  none: "text-muted-foreground",
+};
 
 /** Its mistake rate over 28 days, the highest when several mistakes count it. */
 export function mistakeWords(row: ForceRow): string {
@@ -43,6 +51,7 @@ function Header() {
     <div className={cn(GRID, "items-center border-b py-2 text-muted-foreground text-xs")}>
       <span>Rule or skill</span>
       <span className="text-right">Mistakes, 28 days</span>
+      <span className="max-sm:hidden">Since its change</span>
       <span className="text-right">Used</span>
     </div>
   );
@@ -54,7 +63,7 @@ function ForceRows({ rows, pinned, shown, events, onFocusOut }: Rows) {
       key={row.id}
       href={rowHref(row.id)}
       data-row={row.id}
-      aria-label={`${row.name}: mistakes ${mistakeWords(row)}, used ${usedWords(row)}`}
+      aria-label={`${row.name}: mistakes ${mistakeWords(row)}${row.mistakes.length ? `, ${EVIDENCE_WORDS[row.evidence]}` : ""}, used ${usedWords(row)}`}
       aria-current={pinned === row.id ? "true" : undefined}
       className={cn(
         GRID,
@@ -70,6 +79,9 @@ function ForceRows({ rows, pinned, shown, events, onFocusOut }: Rows) {
       </span>
       <span data-mistakes className="text-right">
         <Mistakes row={row} />
+      </span>
+      <span data-evidence className={cn("max-sm:col-span-3 max-sm:row-start-2", EVIDENCE_TONE[row.evidence])}>
+        {row.mistakes.length ? EVIDENCE_WORDS[row.evidence] : ""}
       </span>
       <span
         data-used
@@ -107,8 +119,8 @@ export function InForceTable({
   const unmeasured = fine.filter((row) => row.mistakes.length === 0).length;
   return (
     <section aria-labelledby="in-force" className="grid gap-3" onPointerLeave={onLeave}>
-      <h2 id="in-force" className="pt-3 font-semibold text-lg tracking-tight">
-        Rules and skills in force
+      <h2 id="in-force" className="font-medium text-sm">
+        Slipping or unused <span className="font-mono text-muted-foreground text-xs">{needs.length}</span>
       </h2>
       {needs.length > 0 ? (
         <div data-table data-needs className="overflow-clip rounded-lg border">
@@ -117,7 +129,7 @@ export function InForceTable({
         </div>
       ) : (
         <p data-needs className="rounded-lg border px-3.5 py-3 text-muted-foreground text-xs">
-          Nothing needs you today.
+          None today.
         </p>
       )}
       <details

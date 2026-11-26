@@ -40,7 +40,7 @@ function verdictWords(row: Row, day: Day): string {
   const until = (to: Day) => differenceInCalendarDays(parseISO(to), parseISO(day));
   if (until(row.trial.started) > 0) return `Starts in ${plural(until(row.trial.started), "day")}`;
   const left = until(row.trial.due);
-  return left <= 0 ? "Due today" : `${plural(left, "day")} left`;
+  return left <= 0 ? "Due today" : plural(left, "day");
 }
 
 /** The mistake rate since the change so far; none before it starts. */
@@ -69,13 +69,56 @@ export function RuleTable({
   if (rows.length === 0) {
     return <p className="rounded-lg border px-3.5 py-6 text-muted-foreground">No rule changes this week.</p>;
   }
+  const lists = [
+    { id: "testing", title: "Testing", last: "Days left", rows: rows.filter((row) => !row.trial.verdict) },
+    { id: "settled", title: "Decided this week", last: "Verdict", rows: rows.filter((row) => row.trial.verdict) },
+  ].filter((list) => list.rows.length);
   return (
-    <div data-table className="overflow-clip rounded-lg border" onPointerLeave={onLeave}>
+    <div className="grid gap-5" onPointerLeave={onLeave}>
+      {lists.map((list) => (
+        <section key={list.id} data-list={list.id} aria-labelledby={`list-${list.id}`} className="grid gap-2">
+          <h2 id={`list-${list.id}`} className="font-medium text-sm">
+            {list.title} <span className="font-mono text-muted-foreground text-xs">{list.rows.length}</span>
+          </h2>
+          <ChangeRows
+            rows={list.rows}
+            last={list.last}
+            day={day}
+            pinned={pinned}
+            shown={shown}
+            events={events}
+            onFocusOut={onFocusOut}
+          />
+        </section>
+      ))}
+    </div>
+  );
+}
+
+function ChangeRows({
+  rows,
+  last,
+  day,
+  pinned,
+  shown,
+  events,
+  onFocusOut,
+}: {
+  rows: Row[];
+  last: string;
+  day: Day;
+  pinned: string | null;
+  shown: string | null;
+  events: RowEvents;
+  onFocusOut: () => void;
+}) {
+  return (
+    <div data-table className="overflow-clip rounded-lg border">
       <div className={cn(GRID, "items-center border-b py-2 text-muted-foreground text-xs")}>
-        <span>Mistake</span>
+        <span>Change</span>
         <span className="text-right">Rate before</span>
         <span className="text-right">Rate after</span>
-        <span className="max-sm:hidden">Verdict</span>
+        <span className="max-sm:hidden">{last}</span>
       </div>
       {rows.map((row) => (
         <a
