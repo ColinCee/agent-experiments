@@ -32,7 +32,7 @@ for (const [name, report] of Object.entries({ fixture, empty: emptyReport })) {
     test(`the page renders cleanly with the ${name} report at ${width} width`, async ({ page }) => {
       await page.setViewportSize(viewport);
       const opened = await openBuilt(page, report);
-      await expect(page.locator("h1")).toHaveText("Rule changes being tested");
+      await expect(page.locator("h1")).toHaveText("Agent rules");
       // biome-ignore lint/performance/useDomNodeTextContent: only words shown on screen count, not hidden ones.
       const text = await page.locator("body").innerText();
       expect(text).not.toMatch(BANNED);
