@@ -115,7 +115,7 @@ function ChangeRows({
   return (
     <div data-table className="overflow-clip rounded-lg border">
       <div className={cn(GRID, "items-center border-b py-2 text-muted-foreground text-xs")}>
-        <span>Mistake</span>
+        <span>Change</span>
         <span className="text-right">Rate before</span>
         <span className="text-right">Rate after</span>
         <span className="max-sm:hidden">{last}</span>
